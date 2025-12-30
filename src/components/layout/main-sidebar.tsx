@@ -22,10 +22,10 @@ import Link from "next/link";
 import { Logo } from "@/components/logo";
 
 const menuItems = [
-  { href: "/", label: "Resumen", icon: <LayoutDashboard /> },
-  { href: "/ingresos", label: "Ingresos", icon: <TrendingUp /> },
-  { href: "/gastos", label: "Gastos", icon: <TrendingDown /> },
-  { href: "/categorias", label: "Categorías", icon: <Shapes /> },
+  { href: "/", label: "Resumen", icon: LayoutDashboard },
+  { href: "/ingresos", label: "Ingresos", icon: TrendingUp },
+  { href: "/gastos", label: "Gastos", icon: TrendingDown },
+  { href: "/categorias", label: "Categorías", icon: Shapes },
 ];
 
 export function MainSidebar() {
@@ -43,7 +43,7 @@ export function MainSidebar() {
               <SidebarMenuButton
                 asChild
                 isActive={pathname === item.href}
-                icon={item.icon}
+                icon={<item.icon />}
                 tooltip={item.label}
               >
                 <Link href={item.href}>
