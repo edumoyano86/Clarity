@@ -5,52 +5,52 @@ import { generateSavingsSuggestions } from '@/ai/flows/savings-suggestions';
 import { Categoria, Gasto, Ingreso } from './definitions';
 import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import { getCategorias, getIngresos, getGastos, addGasto as addGastoToDb, addIngreso as addIngresoToDb, saveCategoria as saveCategoriaToDb } from './firebase-actions';
-import { generateBudgetAlert } from '@/ai/flows/budget-alerts';
 import { z } from 'zod';
 
-export type Periodo = 'mes_actual' | 'mes_pasado' | 'ultimos_3_meses' | 'ano_actual';
-
-const CategoriaSchema = z.object({
-  id: z.string().optional().or(z.literal('')),
-  nombre: z.string().min(1, 'El nombre es requerido'),
-  icono: z.string().min(1, 'El icono es requerido'),
-  presupuesto: z.coerce.number().min(0, 'El presupuesto debe ser un número positivo').optional(),
-});
-
-const IngresoSchema = z.object({
-  fuente: z.string().min(1, 'La fuente es requerida'),
-  cantidad: z.coerce.number().positive('La cantidad debe ser un número positivo'),
-  fecha: z.string().min(1, 'La fecha es requerida'),
-});
-
-const GastoSchema = z.object({
-  descripcion: z.string().optional(),
-  cantidad: z.coerce.number().positive('La cantidad debe ser un número positivo'),
-  categoriaId: z.string().min(1, 'La categoría es requerida'),
-  fecha: z.string().min(1, 'La fecha es requerida'),
-});
-
-type FormState = {
+export type ActionState = {
     success: boolean;
     message: string;
     errors?: Record<string, string[] | undefined>;
     alertMessage?: string;
 };
 
-export async function saveCategoria(formData: FormData): Promise<FormState | undefined> {
+const CategoriaSchema = z.object({
+  id: z.string().optional().or(z.literal('')),
+  nombre: z.string({ required_error: 'El nombre es requerido.'}).min(1, 'El nombre es requerido'),
+  icono: z.string({ required_error: 'El icono es requerido.'}).min(1, 'El icono es requerido'),
+  presupuesto: z.coerce.number().min(0, 'El presupuesto debe ser un número positivo').optional(),
+});
+
+const IngresoSchema = z.object({
+  fuente: z.string({ required_error: 'La fuente es requerida.'}).min(1, 'La fuente es requerida'),
+  cantidad: z.coerce.number({ invalid_type_error: 'La cantidad debe ser un número.'}).positive('La cantidad debe ser un número positivo'),
+  fecha: z.string({ required_error: 'La fecha es requerida.'}).min(1, 'La fecha es requerida'),
+});
+
+const GastoSchema = z.object({
+  descripcion: z.string().optional(),
+  cantidad: z.coerce.number({ invalid_type_error: 'La cantidad debe ser un número.'}).positive('La cantidad debe ser un número positivo'),
+  categoriaId: z.string({ required_error: 'La categoría es requerida.'}).min(1, 'La categoría es requerida'),
+  fecha: z.string({ required_error: 'La fecha es requerida.'}).min(1, 'La fecha es requerida'),
+});
+
+
+export async function saveCategoria(prevState: ActionState, formData: FormData): Promise<ActionState> {
     const data = Object.fromEntries(formData.entries());
     const validatedFields = CategoriaSchema.safeParse(data);
     
     if (!validatedFields.success) {
         return {
             success: false,
-            message: 'Error de validación: ' + validatedFields.error.flatten().fieldErrors.nombre,
+            message: 'Error de validación.',
+            errors: validatedFields.error.flatten().fieldErrors,
         };
     }
 
     try {
         await saveCategoriaToDb(validatedFields.data);
         revalidatePath('/categorias');
+        revalidatePath('/');
         return { success: true, message: 'Categoría guardada exitosamente.' };
     } catch (e) {
         const errorMessage = e instanceof Error ? e.message : 'Error desconocido';
@@ -58,14 +58,15 @@ export async function saveCategoria(formData: FormData): Promise<FormState | und
     }
 }
 
-export async function addIngreso(formData: FormData): Promise<FormState | undefined> {
+export async function addIngreso(prevState: ActionState, formData: FormData): Promise<ActionState> {
     const data = Object.fromEntries(formData.entries());
     const validatedFields = IngresoSchema.safeParse(data);
 
     if (!validatedFields.success) {
         return {
             success: false,
-            message: 'Error de validación: ' + JSON.stringify(validatedFields.error.flatten().fieldErrors),
+            message: 'Error de validación.',
+            errors: validatedFields.error.flatten().fieldErrors,
         };
     }
     
@@ -80,14 +81,15 @@ export async function addIngreso(formData: FormData): Promise<FormState | undefi
     }
 }
 
-export async function addGasto(formData: FormData): Promise<FormState | undefined> {
+export async function addGasto(prevState: ActionState, formData: FormData): Promise<ActionState> {
     const data = Object.fromEntries(formData.entries());
     const validatedFields = GastoSchema.safeParse(data);
 
     if (!validatedFields.success) {
          return {
             success: false,
-            message: 'Error de validación: ' + JSON.stringify(validatedFields.error.flatten().fieldErrors),
+            message: 'Error de validación.',
+            errors: validatedFields.error.flatten().fieldErrors,
         };
     }
     

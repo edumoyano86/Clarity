@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
+import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { availableIcons } from '@/lib/icons';
 import { Icon } from '../icons';
 import { Loader2 } from 'lucide-react';
-import { saveCategoria } from '@/lib/actions';
+import { saveCategoria, type ActionState } from '@/lib/actions';
 
 function SubmitButton() {
     const { pending } = useFormStatus();
@@ -22,36 +23,45 @@ function SubmitButton() {
     );
 }
 
+const initialState: ActionState = { success: false, message: '' };
+
 export function CategoryForm({ category, onFormSuccess }: { category?: Categoria, onFormSuccess: () => void }) {
     const { toast } = useToast();
+    const [state, dispatch] = useActionState(saveCategoria, initialState);
     const formRef = useRef<HTMLFormElement>(null);
-    const [key, setKey] = useState(0);
+    const [formKey, setFormKey] = useState(Date.now()); // Unique key to force re-render
+
+     useEffect(() => {
+        // When category prop changes, we want to reset the form.
+        // Changing the key of the form element is the easiest way to do this.
+        setFormKey(Date.now());
+    }, [category]);
+
 
     useEffect(() => {
-        // Reset form when category changes
-        setKey(prevKey => prevKey + 1);
-    }, [category]);
-    
-    const handleSubmit = async (formData: FormData) => {
-        const result = await saveCategoria(formData);
-        
-        if (result?.success) {
+        if (state.success) {
             toast({
                 title: 'Éxito',
-                description: result.message,
+                description: state.message,
             });
             onFormSuccess();
-        } else if (result?.message) {
+        } else if (state.message && state.errors) { // Validation errors
             toast({
+                title: 'Error de Validación',
+                description: Object.values(state.errors).flat().join('\n'),
+                variant: 'destructive',
+            });
+        } else if (state.message) { // Other server errors
+             toast({
                 title: 'Error',
-                description: result.message,
+                description: state.message,
                 variant: 'destructive',
             });
         }
-    };
+    }, [state, onFormSuccess, toast]);
 
     return (
-        <form key={key} ref={formRef} action={handleSubmit} className="space-y-4">
+        <form key={formKey} ref={formRef} action={dispatch} className="space-y-4">
             <input type="hidden" name="id" value={category?.id || ''} />
             <div>
                 <Label htmlFor="nombre">Nombre de la Categoría</Label>

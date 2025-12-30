@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
+import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +16,7 @@ import { es } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Categoria } from '@/lib/definitions';
 import { Textarea } from '../ui/textarea';
-import { addGasto } from '@/lib/actions';
+import { addGasto, type ActionState } from '@/lib/actions';
 
 interface ExpenseFormProps {
     categorias: Categoria[];
@@ -31,41 +32,49 @@ function SubmitButton() {
     );
 }
 
+const initialState: ActionState = { success: false, message: '' };
+
 export function ExpenseForm({ categorias, onFormSuccess }: ExpenseFormProps) {
     const { toast } = useToast();
+    const [state, dispatch] = useActionState(addGasto, initialState);
     const [date, setDate] = useState<Date | undefined>(new Date());
     const formRef = useRef<HTMLFormElement>(null);
+    const [formKey, setFormKey] = useState(0);
 
-    const handleSubmit = async (formData: FormData) => {
-        const result = await addGasto(formData);
-
-        if (result?.success) {
+    useEffect(() => {
+        if (state.success) {
             toast({
                 title: 'Éxito',
-                description: result.message,
+                description: state.message,
             });
-            if (result.alertMessage) {
+            if (state.alertMessage) {
                 toast({
                     title: 'Alerta de Presupuesto',
-                    description: result.alertMessage,
+                    description: state.alertMessage,
                     variant: 'destructive',
                     duration: 10000,
                 });
             }
             onFormSuccess();
-            formRef.current?.reset();
             setDate(new Date());
-        } else if (result?.message) {
+            setFormKey(prevKey => prevKey + 1); // Reset form
+        } else if (state.message && state.errors) { // Validation errors
             toast({
+                title: 'Error de Validación',
+                description: Object.values(state.errors).flat().join('\n'),
+                variant: 'destructive',
+            });
+        } else if (state.message) { // Other server errors
+             toast({
                 title: 'Error',
-                description: result.message,
+                description: state.message,
                 variant: 'destructive',
             });
         }
-    };
+    }, [state, onFormSuccess, toast]);
 
     return (
-        <form ref={formRef} action={handleSubmit} className="space-y-4">
+        <form key={formKey} ref={formRef} action={dispatch} className="space-y-4">
             <div>
                 <Label htmlFor="cantidad">Cantidad</Label>
                 <Input id="cantidad" name="cantidad" type="number" step="0.01" placeholder="Ej: 45.50" required />

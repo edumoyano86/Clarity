@@ -1,21 +1,19 @@
 'use server';
 
 import { collection, addDoc, getDocs, doc, updateDoc, query, where, getDoc } from "firebase/firestore";
-import { initializeFirebase } from "@/firebase";
+import { db } from "@/firebase/server"; // Import the server-side db instance
 import { Categoria, Gasto, Ingreso } from "./definitions";
 import { parseISO } from 'date-fns';
 import { generateBudgetAlert } from "@/ai/flows/budget-alerts";
 
 // --- Generic Firestore Functions ---
 const getCollection = async <T>(collectionName: string): Promise<T[]> => {
-    const { firestore } = initializeFirebase();
-    const querySnapshot = await getDocs(collection(firestore, collectionName));
+    const querySnapshot = await getDocs(collection(db, collectionName));
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
 };
 
 const getDocument = async <T>(collectionName: string, id: string): Promise<T | null> => {
-    const { firestore } = initializeFirebase();
-    const docRef = doc(firestore, collectionName, id);
+    const docRef = doc(db, collectionName, id);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
         return { id: docSnap.id, ...docSnap.data() } as T;
@@ -24,14 +22,12 @@ const getDocument = async <T>(collectionName: string, id: string): Promise<T | n
 }
 
 const addDocument = async (collectionName: string, data: any) => {
-    const { firestore } = initializeFirebase();
-    const docRef = await addDoc(collection(firestore, collectionName), data);
+    const docRef = await addDoc(collection(db, collectionName), data);
     return docRef;
 };
 
 const updateDocument = async (collectionName: string, id: string, data: any) => {
-    const { firestore } = initializeFirebase();
-    await updateDoc(doc(firestore, collectionName, id), data);
+    await updateDoc(doc(db, collectionName, id), data);
 }
 
 // --- Categorias ---
@@ -39,11 +35,11 @@ export const getCategorias = async () => getCollection<Categoria>('categorias');
 export const getCategoria = async (id: string) => getDocument<Categoria>('categorias', id);
 
 export const saveCategoria = async (data: Omit<Categoria, 'id'> & { id?: string }) => {
-    if (data.id) {
-        const { id, ...rest } = data;
+    const { id, ...rest } = data;
+    if (id) {
         await updateDocument('categorias', id, rest);
     } else {
-        await addDocument('categorias', data);
+        await addDocument('categorias', rest);
     }
 };
 
@@ -62,8 +58,7 @@ export const addIngreso = async (data: Omit<Ingreso, 'id' | 'fecha'> & { fecha: 
 export const getGastos = async () => getCollection<Gasto>('gastos');
 
 async function getGastosByCategoria(categoriaId: string): Promise<Gasto[]> {
-    const { firestore } = initializeFirebase();
-    const gastosRef = collection(firestore, 'gastos');
+    const gastosRef = collection(db, 'gastos');
     const q = query(gastosRef, where('categoriaId', '==', categoriaId));
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map((doc) => doc.data() as Gasto);
@@ -83,10 +78,11 @@ export const addGasto = async (
 
     if (categoria && categoria.presupuesto && categoria.presupuesto > 0) {
         const gastosCategoria = await getGastosByCategoria(categoria.id);
-        const totalGastado = gastosCategoria.reduce((sum, g) => sum + g.cantidad, 0);
+        const totalGastado = gastosCategoria.reduce((sum, g) => sum + g.cantidad, 0) + gastoData.cantidad;
 
         if (totalGastado > categoria.presupuesto) {
             try {
+                // Assuming 'Usuario' is a placeholder for the actual user name
                 const alertResult = await generateBudgetAlert({
                     category: categoria.nombre,
                     spentAmount: totalGastado,
