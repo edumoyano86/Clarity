@@ -33,6 +33,7 @@ export async function saveCategoria(prevState: any, formData: FormData) {
     return {
       errors: validatedFields.error.flatten().fieldErrors,
       message: 'Error de validación.',
+      success: false,
     };
   }
 
@@ -47,7 +48,7 @@ export async function saveCategoria(prevState: any, formData: FormData) {
     revalidatePath('/');
     return { message: 'Categoría guardada exitosamente.', success: true };
   } catch (e) {
-    return { message: 'Error al guardar la categoría.' };
+    return { message: 'Error al guardar la categoría.', success: false };
   }
 }
 
@@ -65,6 +66,7 @@ export async function addIngreso(prevState: any, formData: FormData) {
     return {
       errors: validatedFields.error.flatten().fieldErrors,
       message: 'Error de validación.',
+      success: false,
     };
   }
   
@@ -75,10 +77,10 @@ export async function addIngreso(prevState: any, formData: FormData) {
     });
     revalidatePath('/ingresos');
     revalidatePath('/');
-    // No return value needed on success, client will handle it
+    return { message: 'Ingreso agregado exitosamente.', success: true };
   } catch (e) {
     console.error(e);
-    return { message: 'Error al agregar el ingreso.' };
+    return { message: 'Error al agregar el ingreso.', success: false };
   }
 }
 
@@ -106,6 +108,7 @@ export async function addGasto(prevState: any, formData: FormData) {
     return {
       errors: validatedFields.error.flatten().fieldErrors,
       message: 'Error de validación.',
+      success: false
     };
   }
 
@@ -140,7 +143,7 @@ export async function addGasto(prevState: any, formData: FormData) {
     return { message: 'Gasto agregado exitosamente.', success: true, alertMessage };
   } catch (e) {
     console.error(e);
-    return { message: 'Error al agregar el gasto.' };
+    return { message: 'Error al agregar el gasto.', success: false };
   }
 }
 
