@@ -1,4 +1,4 @@
-import 'dotenv/config';
+
 import { collection, addDoc, getDocs, doc, updateDoc, query, getDoc } from "firebase/firestore";
 import { initializeFirebase } from "@/firebase";
 import { Categoria, Gasto, Ingreso } from "./definitions";
