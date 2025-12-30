@@ -30,18 +30,18 @@ const updateDocument = async (collectionName: string, id: string, data: any) => 
 }
 
 // Categorias
-export const getCategorias = () => getCollection<Categoria>('categorias');
-export const getCategoria = (id: string) => getDocument<Categoria>('categorias', id);
-export const addCategoria = (data: Omit<Categoria, 'id'>) => addDocument('categorias', data);
-export const updateCategoria = (data: Categoria) => {
+export const getCategorias = async () => getCollection<Categoria>('categorias');
+export const getCategoria = async (id: string) => getDocument<Categoria>('categorias', id);
+export const addCategoria = async (data: Omit<Categoria, 'id'>) => addDocument('categorias', data);
+export const updateCategoria = async (data: Categoria) => {
     const { id, ...rest } = data;
     return updateDocument('categorias', id, rest);
 };
 
 // Ingresos
-export const getIngresos = () => getCollection<Ingreso>('ingresos');
-export const addIngreso = (data: Omit<Ingreso, 'id'>) => addDocument('ingresos', data);
+export const getIngresos = async () => getCollection<Ingreso>('ingresos');
+export const addIngreso = async (data: Omit<Ingreso, 'id'>) => addDocument('ingresos', data);
 
 // Gastos
-export const getGastos = () => getCollection<Gasto>('gastos');
-export const addGasto = (data: Omit<Gasto, 'id'>) => addDocument('gastos', data);
+export const getGastos = async () => getCollection<Gasto>('gastos');
+export const addGasto = async (data: Omit<Gasto, 'id'>) => addDocument('gastos', data);
