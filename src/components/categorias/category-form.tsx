@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useRef, useEffect } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,8 +19,8 @@ function SubmitButton() {
 }
 
 export function CategoryForm({ category, onFormSuccess }: { category?: Categoria, onFormSuccess: () => void }) {
-    const initialState = { message: null, errors: {} };
-    const [state, dispatch] = useFormState(saveCategoria, initialState);
+    const initialState = { message: null, errors: {}, success: false };
+    const [state, dispatch] = useActionState(saveCategoria, initialState);
     const { toast } = useToast();
     const formRef = useRef<HTMLFormElement>(null);
 
@@ -31,7 +32,7 @@ export function CategoryForm({ category, onFormSuccess }: { category?: Categoria
             });
             onFormSuccess();
             formRef.current?.reset();
-        } else if (state.message && !state.success) {
+        } else if (state.message && !state.success && state.errors) {
             toast({
                 title: 'Error',
                 description: state.message,

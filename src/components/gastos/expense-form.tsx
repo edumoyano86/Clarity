@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,8 +29,8 @@ interface ExpenseFormProps {
 }
 
 export function ExpenseForm({ categorias, onFormSuccess }: ExpenseFormProps) {
-    const initialState = { message: null, errors: {}, alertMessage: undefined };
-    const [state, dispatch] = useFormState(addGasto, initialState);
+    const initialState = { message: null, errors: {}, success: false, alertMessage: undefined };
+    const [state, dispatch] = useActionState(addGasto, initialState);
     const { toast } = useToast();
     const [date, setDate] = useState<Date | undefined>(new Date());
     const formRef = useRef<HTMLFormElement>(null);
@@ -51,7 +52,7 @@ export function ExpenseForm({ categorias, onFormSuccess }: ExpenseFormProps) {
             onFormSuccess();
             formRef.current?.reset();
             setDate(new Date());
-        } else if (state.message && !state.success) {
+        } else if (state.message && !state.success && state.errors) {
             toast({
                 title: 'Error',
                 description: state.message,
