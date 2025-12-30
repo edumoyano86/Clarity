@@ -61,7 +61,7 @@ export function IncomeForm({ onFormSuccess }: { onFormSuccess: () => void }) {
             </div>
              <div>
                 <Label htmlFor="fecha">Fecha</Label>
-                <Popover>
+                <Popover modal={true}>
                     <PopoverTrigger asChild>
                     <Button
                         variant={"outline"}

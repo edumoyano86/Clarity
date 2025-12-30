@@ -89,7 +89,7 @@ export function ExpenseForm({ categorias, onFormSuccess }: ExpenseFormProps) {
             </div>
             <div>
                 <Label htmlFor="fecha">Fecha</Label>
-                <Popover>
+                <Popover modal={true}>
                     <PopoverTrigger asChild>
                     <Button
                         variant={"outline"}
