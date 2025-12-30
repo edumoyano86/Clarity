@@ -8,7 +8,7 @@ import { generateSavingsSuggestions } from '@/ai/flows/savings-suggestions';
 import { Categoria } from './definitions';
 import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO } from 'date-fns';
 import { addCategoria, getCategorias, updateCategoria, addIngreso as addIngresoFb, getIngresos as getIngresosFb, addGasto as addGastoFb, getGastos as getGastosFb } from './firebase-actions';
-import { getDocs, query, where, collection, getFirestore } from 'firebase/firestore';
+import { getDocs, query, where, collection } from 'firebase/firestore';
 import { initializeFirebase } from '@/firebase';
 
 export type Periodo = 'mes_actual' | 'mes_pasado' | 'ultimos_3_meses' | 'ano_actual';
