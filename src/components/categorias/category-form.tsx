@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import React, { useEffect, useRef, useState, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,7 +26,7 @@ function SubmitButton() {
 
 export function CategoryForm({ category, onFormSuccess }: { category?: Categoria, onFormSuccess: () => void }) {
     const { toast } = useToast();
-    const [state, dispatch] = useFormState(saveCategoria, initialState);
+    const [state, dispatch] = useActionState(saveCategoria, initialState);
     const formRef = useRef<HTMLFormElement>(null);
     const [formKey, setFormKey] = useState(0);
 

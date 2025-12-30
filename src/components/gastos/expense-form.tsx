@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import React, { useEffect, useRef, useState, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,7 +35,7 @@ function SubmitButton() {
 
 export function ExpenseForm({ categorias, onFormSuccess }: ExpenseFormProps) {
     const { toast } = useToast();
-    const [state, dispatch] = useFormState(addGasto, initialState);
+    const [state, dispatch] = useActionState(addGasto, initialState);
     const [date, setDate] = useState<Date | undefined>(new Date());
     const formRef = useRef<HTMLFormElement>(null);
     const [formKey, setFormKey] = useState(0);
