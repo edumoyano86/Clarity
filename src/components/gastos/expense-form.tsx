@@ -113,7 +113,7 @@ export function ExpenseForm({ categorias, onFormSuccess }: ExpenseFormProps) {
                             />
                     </PopoverContent>
                 </Popover>
-                <input type="hidden" name="fecha" value={date?.toISOString()} />
+                <input type="hidden" name="fecha" value={date?.toISOString() || ''} />
             </div>
              <div>
                 <Label htmlFor="descripcion">Descripción (Opcional)</Label>

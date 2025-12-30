@@ -85,7 +85,7 @@ export function IncomeForm({ onFormSuccess }: { onFormSuccess: () => void }) {
                         />
                     </PopoverContent>
                 </Popover>
-                <input type="hidden" name="fecha" value={date?.toISOString()} />
+                <input type="hidden" name="fecha" value={date?.toISOString() || ''} />
             </div>
             <Button type="submit" disabled={isPending} className="w-full">
                 {isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Agregando...</> : 'Agregar Ingreso'}
