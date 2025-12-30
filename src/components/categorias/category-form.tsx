@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useRef, useTransition } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useFormState, useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,85 +11,58 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { availableIcons } from '@/lib/icons';
 import { Icon } from '../icons';
 import { Loader2 } from 'lucide-react';
-import { z } from 'zod';
-import { useFirestore } from '@/firebase';
-import { saveCategoria } from '@/lib/client-actions';
+import { saveCategoria } from '@/lib/actions';
 
-const CategoriaSchema = z.object({
-  id: z.string().optional(),
-  nombre: z.string().min(1, 'El nombre es requerido'),
-  icono: z.string().min(1, 'El icono es requerido'),
-  presupuesto: z.coerce.number().min(0, 'El presupuesto debe ser un número positivo').optional(),
-});
+const initialState = { success: false, message: '', errors: {} };
+
+function SubmitButton() {
+    const { pending } = useFormStatus();
+    return (
+        <Button type="submit" disabled={pending} className="w-full">
+            {pending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</> : 'Guardar Categoría'}
+        </Button>
+    );
+}
 
 export function CategoryForm({ category, onFormSuccess }: { category?: Categoria, onFormSuccess: () => void }) {
     const { toast } = useToast();
-    const firestore = useFirestore();
+    const [state, dispatch] = useFormState(saveCategoria, initialState);
     const formRef = useRef<HTMLFormElement>(null);
-    const [isPending, startTransition] = useTransition();
+    const [formKey, setFormKey] = useState(0);
 
-    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        if (!firestore) {
-            toast({ title: 'Error', description: 'No se pudo conectar a la base de datos.', variant: 'destructive' });
-            return;
-        }
-
-        const formData = new FormData(event.currentTarget);
-        const data = {
-            id: formData.get('id') || undefined,
-            nombre: formData.get('nombre'),
-            icono: formData.get('icono'),
-            presupuesto: formData.get('presupuesto') || 0,
-        };
-
-        const validatedFields = CategoriaSchema.safeParse(data);
-
-         if (!validatedFields.success) {
-            Object.values(validatedFields.error.flatten().fieldErrors).forEach(error => {
-                toast({
-                    title: 'Error de validación',
-                    description: (error as string[]).join(', '),
-                    variant: 'destructive',
-                });
+    useEffect(() => {
+        if (state.success) {
+            toast({
+                title: 'Éxito',
+                description: state.message,
             });
-            return;
+            onFormSuccess();
+            setFormKey(k => k + 1); // Reset form
+        } else if (state.message) {
+            toast({
+                title: 'Error',
+                description: state.message,
+                variant: 'destructive',
+            });
         }
-
-
-        startTransition(async () => {
-            try {
-                await saveCategoria(firestore, validatedFields.data);
-                toast({
-                    title: 'Éxito',
-                    description: 'Categoría guardada exitosamente.',
-                });
-                onFormSuccess();
-            } catch (e) {
-                console.error(e);
-                 toast({
-                    title: 'Error',
-                    description: 'No se pudo guardar la categoría.',
-                    variant: 'destructive',
-                });
-            }
-        });
-    };
+    }, [state, onFormSuccess, toast]);
 
     return (
-        <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+        <form key={formKey} ref={formRef} action={dispatch} className="space-y-4">
             <input type="hidden" name="id" value={category?.id || ''} />
             <div>
                 <Label htmlFor="nombre">Nombre de la Categoría</Label>
-                <Input id="nombre" name="nombre" defaultValue={category?.nombre} required disabled={isPending} />
+                <Input id="nombre" name="nombre" defaultValue={category?.nombre} required />
+                {state.errors?.nombre && <p className="text-sm text-destructive mt-1">{state.errors.nombre[0]}</p>}
             </div>
             <div>
                 <Label htmlFor="presupuesto">Presupuesto (Opcional)</Label>
-                <Input id="presupuesto" name="presupuesto" type="number" step="0.01" defaultValue={category?.presupuesto} placeholder="Ej: 500" disabled={isPending} />
+                <Input id="presupuesto" name="presupuesto" type="number" step="0.01" defaultValue={category?.presupuesto} placeholder="Ej: 500" />
+                 {state.errors?.presupuesto && <p className="text-sm text-destructive mt-1">{state.errors.presupuesto[0]}</p>}
             </div>
             <div>
                 <Label htmlFor="icono">Icono</Label>
-                <Select name="icono" defaultValue={category?.icono} required disabled={isPending}>
+                <Select name="icono" defaultValue={category?.icono} required>
                     <SelectTrigger>
                         <SelectValue placeholder="Selecciona un icono" />
                     </SelectTrigger>
@@ -103,10 +77,9 @@ export function CategoryForm({ category, onFormSuccess }: { category?: Categoria
                         ))}
                     </SelectContent>
                 </Select>
+                 {state.errors?.icono && <p className="text-sm text-destructive mt-1">{state.errors.icono[0]}</p>}
             </div>
-            <Button type="submit" disabled={isPending} className="w-full">
-                 {isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</> : 'Guardar Categoría'}
-            </Button>
+            <SubmitButton />
         </form>
     );
 }

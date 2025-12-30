@@ -1,16 +1,107 @@
-
 'use server';
 
 import { revalidatePath } from 'next/cache';
 import { generateSavingsSuggestions } from '@/ai/flows/savings-suggestions';
 import { Categoria, Gasto, Ingreso } from './definitions';
-import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO } from 'date-fns';
-import { getCategorias, getIngresos, getGastos } from './firebase-actions';
+import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { getCategorias, getIngresos, getGastos, addGasto as addGastoToDb, addIngreso as addIngresoToDb, saveCategoria as saveCategoriaToDb } from './firebase-actions';
+import { generateBudgetAlert } from '@/ai/flows/budget-alerts';
+import { z } from 'zod';
 
 export type Periodo = 'mes_actual' | 'mes_pasado' | 'ultimos_3_meses' | 'ano_actual';
 
-// Note: Form submission actions have been moved to client-side actions in `src/lib/client-actions.ts`
-// to resolve persistent server response errors. The data fetching functions remain here.
+const CategoriaSchema = z.object({
+  id: z.string().optional(),
+  nombre: z.string().min(1, 'El nombre es requerido'),
+  icono: z.string().min(1, 'El icono es requerido'),
+  presupuesto: z.coerce.number().min(0, 'El presupuesto debe ser un número positivo').optional(),
+});
+
+const IngresoSchema = z.object({
+  fuente: z.string().min(1, 'La fuente es requerida'),
+  cantidad: z.coerce.number().positive('La cantidad debe ser un número positivo'),
+  fecha: z.string().min(1, 'La fecha es requerida'),
+});
+
+const GastoSchema = z.object({
+  descripcion: z.string().optional(),
+  cantidad: z.coerce.number().positive('La cantidad debe ser un número positivo'),
+  categoriaId: z.string().min(1, 'La categoría es requerida'),
+  fecha: z.string().min(1, 'La fecha es requerida'),
+});
+
+type FormState = {
+    success: boolean;
+    message: string;
+    errors?: Record<string, string[] | undefined>;
+    alertMessage?: string;
+};
+
+export async function saveCategoria(prevState: FormState, formData: FormData): Promise<FormState> {
+    const data = Object.fromEntries(formData.entries());
+    const validatedFields = CategoriaSchema.safeParse(data);
+    
+    if (!validatedFields.success) {
+        return {
+            success: false,
+            message: 'Error de validación.',
+            errors: validatedFields.error.flatten().fieldErrors,
+        };
+    }
+
+    try {
+        await saveCategoriaToDb(validatedFields.data);
+        revalidatePath('/categorias');
+        return { success: true, message: 'Categoría guardada exitosamente.' };
+    } catch (e) {
+        return { success: false, message: 'Error al guardar la categoría.' };
+    }
+}
+
+export async function addIngreso(prevState: FormState, formData: FormData): Promise<FormState> {
+    const data = Object.fromEntries(formData.entries());
+    const validatedFields = IngresoSchema.safeParse(data);
+
+    if (!validatedFields.success) {
+        return {
+            success: false,
+            message: 'Error de validación.',
+            errors: validatedFields.error.flatten().fieldErrors,
+        };
+    }
+    
+    try {
+        await addIngresoToDb(validatedFields.data);
+        revalidatePath('/ingresos');
+        revalidatePath('/');
+        return { success: true, message: 'Ingreso agregado exitosamente.' };
+    } catch (e) {
+        return { success: false, message: 'Error al agregar el ingreso.' };
+    }
+}
+
+export async function addGasto(prevState: FormState, formData: FormData): Promise<FormState> {
+    const data = Object.fromEntries(formData.entries());
+    const validatedFields = GastoSchema.safeParse(data);
+
+    if (!validatedFields.success) {
+        return {
+            success: false,
+            message: 'Error de validación.',
+            errors: validatedFields.error.flatten().fieldErrors,
+        };
+    }
+    
+    try {
+        const alertMessage = await addGastoToDb(validatedFields.data);
+        revalidatePath('/gastos');
+        revalidatePath('/');
+        return { success: true, message: 'Gasto agregado exitosamente.', alertMessage };
+    } catch (e) {
+        return { success: false, message: 'Error al agregar el gasto.' };
+    }
+}
+
 
 export async function getDashboardData(periodo: Periodo = 'mes_actual') {
   const now = new Date();
@@ -97,7 +188,6 @@ export async function getSavingsSuggestionsAction() {
     const result = await generateSavingsSuggestions({
       spendingData: `Datos de gastos del usuario: ${spendingData}`
     });
-    // This action needs to revalidate paths if data it depends on changes.
     revalidatePath('/');
     return result;
   } catch (error) {

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useRef, useState, useTransition } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useFormState, useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,74 +12,63 @@ import { format } from 'date-fns';
 import { Calendar } from '../ui/calendar';
 import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
-import { z } from 'zod';
-import { useFirestore } from '@/firebase';
-import { addIngreso } from '@/lib/client-actions';
+import { addIngreso } from '@/lib/actions';
 
-const IngresoSchema = z.object({
-  fuente: z.string().min(1, 'La fuente es requerida'),
-  cantidad: z.coerce.number().positive('La cantidad debe ser un número positivo'),
-  fecha: z.string().min(1, 'La fecha es requerida'),
-});
+const initialState = { success: false, message: '', errors: {} };
+
+function SubmitButton() {
+    const { pending } = useFormStatus();
+    return (
+        <Button type="submit" disabled={pending} className="w-full">
+            {pending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Agregando...</> : 'Agregar Ingreso'}
+        </Button>
+    );
+}
 
 export function IncomeForm({ onFormSuccess }: { onFormSuccess: () => void }) {
     const { toast } = useToast();
-    const firestore = useFirestore();
+    const [state, dispatch] = useFormState(addIngreso, initialState);
     const [date, setDate] = useState<Date | undefined>(new Date());
     const formRef = useRef<HTMLFormElement>(null);
-    const [isPending, startTransition] = useTransition();
+    const [formKey, setFormKey] = useState(0);
 
-    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        if (!firestore) {
-            toast({ title: 'Error', description: 'No se pudo conectar a la base de datos.', variant: 'destructive' });
-            return;
-        }
-
-        const formData = new FormData(event.currentTarget);
-        const data = Object.fromEntries(formData.entries());
-
-        const validatedFields = IngresoSchema.safeParse(data);
-
-        if (!validatedFields.success) {
-            Object.values(validatedFields.error.flatten().fieldErrors).forEach(error => {
-                toast({
-                    title: 'Error de validación',
-                    description: (error as string[]).join(', '),
-                    variant: 'destructive',
-                });
+    useEffect(() => {
+        if (state.success) {
+            toast({
+                title: 'Éxito',
+                description: state.message,
             });
-            return;
-        }
-
-        startTransition(async () => {
-            try {
-                await addIngreso(firestore, validatedFields.data);
-                toast({
-                    title: 'Éxito',
-                    description: 'Ingreso agregado exitosamente.',
+            onFormSuccess();
+            setFormKey(k => k + 1); // Reset form by changing key
+            setDate(new Date()); // Reset date picker
+        } else if (state.message && !state.success) {
+             if (state.errors) {
+                 Object.values(state.errors).flat().forEach(error => {
+                    toast({
+                        title: 'Error de validación',
+                        description: error,
+                        variant: 'destructive',
+                    });
                 });
-                onFormSuccess();
-            } catch (e) {
-                console.error(e);
-                toast({
+            } else {
+                 toast({
                     title: 'Error',
-                    description: 'No se pudo agregar el ingreso.',
+                    description: state.message,
                     variant: 'destructive',
                 });
             }
-        });
-    };
+        }
+    }, [state, onFormSuccess, toast]);
 
     return (
-        <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+        <form key={formKey} ref={formRef} action={dispatch} className="space-y-4">
             <div>
                 <Label htmlFor="fuente">Fuente del Ingreso</Label>
-                <Input id="fuente" name="fuente" placeholder="Ej: Salario, Venta online" required disabled={isPending} />
+                <Input id="fuente" name="fuente" placeholder="Ej: Salario, Venta online" required />
             </div>
             <div>
                 <Label htmlFor="cantidad">Cantidad</Label>
-                <Input id="cantidad" name="cantidad" type="number" step="0.01" placeholder="Ej: 1500.00" required disabled={isPending} />
+                <Input id="cantidad" name="cantidad" type="number" step="0.01" placeholder="Ej: 1500.00" required />
             </div>
              <div>
                 <Label htmlFor="fecha">Fecha</Label>
@@ -90,7 +80,6 @@ export function IncomeForm({ onFormSuccess }: { onFormSuccess: () => void }) {
                         "w-full justify-start text-left font-normal",
                         !date && "text-muted-foreground"
                         )}
-                        disabled={isPending}
                     >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {date ? format(date, "PPP", { locale: es }) : <span>Selecciona una fecha</span>}
@@ -108,9 +97,7 @@ export function IncomeForm({ onFormSuccess }: { onFormSuccess: () => void }) {
                 </Popover>
                 <input type="hidden" name="fecha" value={date?.toISOString() || ''} />
             </div>
-             <Button type="submit" disabled={isPending} className="w-full">
-                {isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Agregando...</> : 'Agregar Ingreso'}
-            </Button>
+             <SubmitButton />
         </form>
     );
 }
