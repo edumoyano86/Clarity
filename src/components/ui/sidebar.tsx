@@ -560,12 +560,12 @@ const SidebarMenuButton = React.forwardRef<
     const { isMobile, state } = useSidebar()
 
     const buttonContent = (
-      <div className="flex items-center gap-2">
-        {icon}
-        <span className="truncate">{children}</span>
-      </div>
+        <div className="flex items-center gap-2">
+            {icon}
+            <span className="truncate">{children}</span>
+        </div>
     );
-    
+
     const button = (
       <Comp
         ref={ref}
@@ -583,21 +583,18 @@ const SidebarMenuButton = React.forwardRef<
       return button
     }
 
-    if (typeof tooltip === "string") {
-      tooltip = {
-        children: tooltip,
-      }
-    }
-
     return (
       <Tooltip>
-        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipTrigger asChild>
+          {button}
+        </TooltipTrigger>
         <TooltipContent
           side="right"
           align="center"
           hidden={state !== "collapsed" || isMobile}
-          {...tooltip}
-        />
+        >
+          {tooltip}
+        </TooltipContent>
       </Tooltip>
     )
   }
