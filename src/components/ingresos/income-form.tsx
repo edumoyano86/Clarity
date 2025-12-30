@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useActionState, useEffect, useState } from 'react';
-import { useFormStatus } from 'react-dom';
+import React, { useRef, useEffect, useState } from 'react';
+import { useFormState, useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,9 +21,10 @@ function SubmitButton() {
 
 export function IncomeForm({ onFormSuccess }: { onFormSuccess: () => void }) {
     const initialState = { message: null, errors: {} };
-    const [state, dispatch] = useActionState(addIngreso, initialState);
+    const [state, dispatch] = useFormState(addIngreso, initialState);
     const { toast } = useToast();
     const [date, setDate] = useState<Date | undefined>(new Date());
+    const formRef = useRef<HTMLFormElement>(null);
 
     useEffect(() => {
         if (state.success) {
@@ -32,7 +33,9 @@ export function IncomeForm({ onFormSuccess }: { onFormSuccess: () => void }) {
                 description: state.message,
             });
             onFormSuccess();
-        } else if (state.message && !state.errors) {
+            formRef.current?.reset();
+            setDate(new Date());
+        } else if (state.message && !state.success) {
             toast({
                 title: 'Error',
                 description: state.message,
@@ -42,7 +45,7 @@ export function IncomeForm({ onFormSuccess }: { onFormSuccess: () => void }) {
     }, [state, toast, onFormSuccess]);
 
     return (
-        <form action={dispatch} className="space-y-4">
+        <form ref={formRef} action={dispatch} className="space-y-4">
             <div>
                 <Label htmlFor="fuente">Fuente del Ingreso</Label>
                 <Input id="fuente" name="fuente" placeholder="Ej: Salario, Venta online" required />

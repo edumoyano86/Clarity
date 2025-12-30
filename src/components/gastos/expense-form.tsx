@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useActionState, useEffect, useState } from 'react';
-import { useFormStatus } from 'react-dom';
+import React, { useRef, useEffect, useState } from 'react';
+import { useFormState, useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,9 +29,10 @@ interface ExpenseFormProps {
 
 export function ExpenseForm({ categorias, onFormSuccess }: ExpenseFormProps) {
     const initialState = { message: null, errors: {}, alertMessage: undefined };
-    const [state, dispatch] = useActionState(addGasto, initialState);
+    const [state, dispatch] = useFormState(addGasto, initialState);
     const { toast } = useToast();
     const [date, setDate] = useState<Date | undefined>(new Date());
+    const formRef = useRef<HTMLFormElement>(null);
 
     useEffect(() => {
         if (state.success) {
@@ -48,7 +49,9 @@ export function ExpenseForm({ categorias, onFormSuccess }: ExpenseFormProps) {
                 });
             }
             onFormSuccess();
-        } else if (state.message && !state.errors) {
+            formRef.current?.reset();
+            setDate(new Date());
+        } else if (state.message && !state.success) {
             toast({
                 title: 'Error',
                 description: state.message,
@@ -58,7 +61,7 @@ export function ExpenseForm({ categorias, onFormSuccess }: ExpenseFormProps) {
     }, [state, toast, onFormSuccess]);
 
     return (
-        <form action={dispatch} className="space-y-4">
+        <form ref={formRef} action={dispatch} className="space-y-4">
             <div>
                 <Label htmlFor="cantidad">Cantidad</Label>
                 <Input id="cantidad" name="cantidad" type="number" step="0.01" placeholder="Ej: 45.50" required />
