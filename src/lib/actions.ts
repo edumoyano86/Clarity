@@ -1,3 +1,4 @@
+
 'use server';
 
 import { revalidatePath } from 'next/cache';
@@ -6,7 +7,9 @@ import { generateBudgetAlert } from '@/ai/flows/budget-alerts';
 import { generateSavingsSuggestions } from '@/ai/flows/savings-suggestions';
 import { addMockCategoria, addMockGasto, addMockIngreso, getMockCategorias, getMockGastos, getMockGastosByCategoria, getMockIngresos, updateMockCategoria } from './data';
 import { Categoria, Gasto, Ingreso } from './definitions';
+import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear, subYears } from 'date-fns';
 
+export type Periodo = 'mes_actual' | 'mes_pasado' | 'ultimos_3_meses' | 'ano_actual';
 
 // Schema for category form
 const CategoriaSchema = z.object({
@@ -134,18 +137,52 @@ export async function getGastos(): Promise<Gasto[]> {
   return await getMockGastos();
 }
 
-export async function getDashboardData() {
+export async function getDashboardData(periodo: Periodo = 'mes_actual') {
+  const now = new Date();
+  let startDate: Date;
+  let endDate: Date = now;
+
+  switch (periodo) {
+    case 'mes_actual':
+      startDate = startOfMonth(now);
+      endDate = endOfMonth(now);
+      break;
+    case 'mes_pasado':
+      startDate = startOfMonth(subMonths(now, 1));
+      endDate = endOfMonth(subMonths(now, 1));
+      break;
+    case 'ultimos_3_meses':
+      startDate = startOfMonth(subMonths(now, 2));
+      endDate = endOfMonth(now);
+      break;
+    case 'ano_actual':
+      startDate = startOfYear(now);
+      endDate = endOfYear(now);
+      break;
+    default:
+      startDate = startOfMonth(now);
+      endDate = endOfMonth(now);
+  }
+
   const [ingresos, gastos, categorias] = await Promise.all([
     getIngresos(),
     getGastos(),
     getCategorias(),
   ]);
 
-  const totalIngresos = ingresos.reduce((sum, i) => sum + i.cantidad, 0);
-  const totalGastos = gastos.reduce((sum, g) => sum + g.cantidad, 0);
+  const filterByDate = (item: { fecha: string }) => {
+    const itemDate = new Date(item.fecha);
+    return itemDate >= startDate && itemDate <= endDate;
+  };
+
+  const ingresosFiltrados = ingresos.filter(filterByDate);
+  const gastosFiltrados = gastos.filter(filterByDate);
+
+  const totalIngresos = ingresosFiltrados.reduce((sum, i) => sum + i.cantidad, 0);
+  const totalGastos = gastosFiltrados.reduce((sum, g) => sum + g.cantidad, 0);
 
   const gastosPorCategoria = categorias.map(cat => {
-    const gastosEnCategoria = gastos.filter(g => g.categoriaId === cat.id);
+    const gastosEnCategoria = gastosFiltrados.filter(g => g.categoriaId === cat.id);
     const total = gastosEnCategoria.reduce((sum, g) => sum + g.cantidad, 0);
     return {
       name: cat.nombre,

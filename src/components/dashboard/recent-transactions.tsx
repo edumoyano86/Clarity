@@ -22,7 +22,7 @@ export function RecentTransactions({ transactions, categorias }: RecentTransacti
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Transacciones Recientes</CardTitle>
+        <CardTitle>Últimas 5 Transacciones</CardTitle>
       </CardHeader>
       <CardContent>
         <Table>
