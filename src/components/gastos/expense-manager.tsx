@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -5,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from "@/components/ui/table";
 import { Categoria, Gasto } from "@/lib/definitions";
 import { ManagerPage } from '../shared/manager-page';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { ExpenseForm } from './expense-form';
 import { Badge } from '../ui/badge';
 import { Icon } from '../icons';
@@ -72,6 +73,9 @@ export function ExpenseManager({ gastos, categorias }: ExpenseManagerProps) {
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Nuevo Gasto</DialogTitle>
+                         <DialogDescription>
+                            Completa los detalles de tu gasto.
+                        </DialogDescription>
                     </DialogHeader>
                     <ExpenseForm categorias={categorias} onFormSuccess={() => setIsDialogOpen(false)} />
                 </DialogContent>

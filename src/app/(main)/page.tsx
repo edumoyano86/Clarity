@@ -1,35 +1,36 @@
-
 'use client';
 import { useEffect, useState } from "react";
-import { getCategorias, getDashboardData, type Periodo } from "@/lib/actions";
+import { getDashboardData, type Periodo } from "@/lib/actions";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { ExpensesChart } from "@/components/dashboard/expenses-chart";
 import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 import { SavingsSuggestions } from "@/components/dashboard/savings-suggestions";
 import { Categoria } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
+import { useCollection, useFirestore } from "@/firebase";
+import { collection } from "firebase/firestore";
 
 type DashboardData = Awaited<ReturnType<typeof getDashboardData>>;
 
 export default function DashboardPage() {
+  const firestore = useFirestore();
   const [data, setData] = useState<DashboardData | null>(null);
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const { data: categorias, loading: loadingCategorias } = useCollection<Categoria>(
+    firestore ? collection(firestore, 'categorias') : null
+  );
   const [periodo, setPeriodo] = useState<Periodo>('mes_actual');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (!firestore) return;
     const fetchData = async () => {
       setIsLoading(true);
-      const [dashboardData, categoriasData] = await Promise.all([
-        getDashboardData(periodo),
-        getCategorias()
-      ]);
+      const dashboardData = await getDashboardData(periodo)
       setData(dashboardData);
-      setCategorias(categoriasData);
       setIsLoading(false);
     };
     fetchData();
-  }, [periodo]);
+  }, [periodo, firestore]);
 
   const periodos: { key: Periodo, label: string }[] = [
     { key: 'mes_actual', label: 'Este Mes' },
@@ -56,7 +57,7 @@ export default function DashboardPage() {
         </div>
       </div>
       
-      {isLoading ? (
+      {isLoading || loadingCategorias ? (
         <p>Cargando datos...</p>
       ) : data ? (
         <>
@@ -71,7 +72,7 @@ export default function DashboardPage() {
               <ExpensesChart data={data.gastosPorCategoria} />
             </div>
             <div className="lg:col-span-1">
-              <RecentTransactions transactions={data.transaccionesRecientes} categorias={categorias} />
+              <RecentTransactions transactions={data.transaccionesRecientes} categorias={categorias || []} />
             </div>
           </div>
           <SavingsSuggestions />

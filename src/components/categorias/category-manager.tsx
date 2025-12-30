@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -5,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from "@/components/ui/table";
 import { Categoria } from "@/lib/definitions";
 import { ManagerPage } from '../shared/manager-page';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { CategoryForm } from './category-form';
 import { Button } from '../ui/button';
 import { Edit } from 'lucide-react';
@@ -72,6 +73,9 @@ export function CategoryManager({ categorias }: { categorias: Categoria[] }) {
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{selectedCategory ? 'Editar' : 'Nueva'} Categoría</DialogTitle>
+                        <DialogDescription>
+                            Completa los detalles de la categoría.
+                        </DialogDescription>
                     </DialogHeader>
                     <CategoryForm category={selectedCategory} onFormSuccess={handleCloseDialog} />
                 </DialogContent>

@@ -1,9 +1,20 @@
-import { getIngresos } from "@/lib/actions";
+'use client';
+import { useCollection } from "@/firebase";
+import { Ingreso } from "@/lib/definitions";
 import { IncomeManager } from "@/components/ingresos/income-manager";
+import { collection, orderBy, query } from "firebase/firestore";
+import { useFirestore } from "@/firebase";
 
-export default async function IngresosPage() {
-    const ingresos = await getIngresos();
-    const sortedIngresos = ingresos.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 
-    return <IncomeManager ingresos={sortedIngresos} />;
+export default function IngresosPage() {
+    const firestore = useFirestore();
+    const { data: ingresos, loading } = useCollection<Ingreso>(
+        firestore ? query(collection(firestore, 'ingresos'), orderBy('fecha', 'desc')) : null
+    );
+
+    if (loading || !firestore) {
+        return <p>Cargando ingresos...</p>;
+    }
+
+    return <IncomeManager ingresos={ingresos || []} />;
 }

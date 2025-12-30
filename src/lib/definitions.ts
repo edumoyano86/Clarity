@@ -11,14 +11,14 @@ export type Ingreso = {
   id: string;
   fuente: string;
   cantidad: number;
-  fecha: string; // ISO string
+  fecha: number; // timestamp
 };
 
 export type Gasto = {
   id: string;
   cantidad: number;
   categoriaId: string;
-  fecha: string; // ISO string
+  fecha: number; // timestamp
   descripcion?: string;
 };
 

@@ -5,9 +5,11 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { generateBudgetAlert } from '@/ai/flows/budget-alerts';
 import { generateSavingsSuggestions } from '@/ai/flows/savings-suggestions';
-import { addMockCategoria, addMockGasto, addMockIngreso, getMockCategorias, getMockGastos, getMockGastosByCategoria, getMockIngresos, updateMockCategoria } from './data';
-import { Categoria, Gasto, Ingreso } from './definitions';
-import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear, subYears } from 'date-fns';
+import { Categoria } from './definitions';
+import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO } from 'date-fns';
+import { addCategoria, getCategorias, updateCategoria, addIngreso as addIngresoFb, getIngresos as getIngresosFb, addGasto as addGastoFb, getGastos as getGastosFb } from './firebase-actions';
+import { getDocs, query, where, collection, getFirestore } from 'firebase/firestore';
+import { initializeFirebase } from '@/firebase';
 
 export type Periodo = 'mes_actual' | 'mes_pasado' | 'ultimos_3_meses' | 'ano_actual';
 
@@ -24,7 +26,7 @@ export async function saveCategoria(prevState: any, formData: FormData) {
     id: formData.get('id') || undefined,
     nombre: formData.get('nombre'),
     icono: formData.get('icono'),
-    presupuesto: formData.get('presupuesto'),
+    presupuesto: formData.get('presupuesto') || 0,
   });
 
   if (!validatedFields.success) {
@@ -36,9 +38,9 @@ export async function saveCategoria(prevState: any, formData: FormData) {
 
   try {
     if (validatedFields.data.id) {
-      await updateMockCategoria(validatedFields.data as Categoria);
+      await updateCategoria(validatedFields.data as Categoria);
     } else {
-      await addMockCategoria(validatedFields.data);
+      await addCategoria(validatedFields.data);
     }
     revalidatePath('/categorias');
     revalidatePath('/');
@@ -66,11 +68,15 @@ export async function addIngreso(prevState: any, formData: FormData) {
   }
   
   try {
-    await addMockIngreso(validatedFields.data);
+    await addIngresoFb({
+      ...validatedFields.data,
+      fecha: parseISO(validatedFields.data.fecha).getTime()
+    });
     revalidatePath('/ingresos');
     revalidatePath('/');
     return { message: 'Ingreso agregado exitosamente.', success: true };
   } catch (e) {
+    console.error(e);
     return { message: 'Error al agregar el ingreso.' };
   }
 }
@@ -82,6 +88,15 @@ const GastoSchema = z.object({
   categoriaId: z.string().min(1, 'La categoría es requerida'),
   fecha: z.string().min(1, 'La fecha es requerida'),
 });
+
+async function getGastosByCategoria(categoriaId: string) {
+    const { firestore } = initializeFirebase();
+    const gastosRef = collection(firestore, 'gastos');
+    const q = query(gastosRef, where('categoriaId', '==', categoriaId));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => doc.data());
+}
+
 
 export async function addGasto(prevState: any, formData: FormData) {
   const validatedFields = GastoSchema.safeParse(Object.fromEntries(formData.entries()));
@@ -96,7 +111,10 @@ export async function addGasto(prevState: any, formData: FormData) {
   let alertMessage: string | undefined = undefined;
 
   try {
-    await addMockGasto(validatedFields.data);
+    await addGastoFb({
+        ...validatedFields.data,
+        fecha: parseISO(validatedFields.data.fecha).getTime()
+    });
     revalidatePath('/gastos');
     revalidatePath('/');
     
@@ -104,7 +122,7 @@ export async function addGasto(prevState: any, formData: FormData) {
     const categorias = await getCategorias();
     const categoria = categorias.find(c => c.id === validatedFields.data.categoriaId);
     if (categoria && categoria.presupuesto && categoria.presupuesto > 0) {
-      const gastosCategoria = await getMockGastosByCategoria(categoria.id);
+      const gastosCategoria = await getGastosByCategoria(categoria.id);
       const totalGastado = gastosCategoria.reduce((sum, g) => sum + g.cantidad, 0);
 
       if (totalGastado > categoria.presupuesto) {
@@ -120,21 +138,9 @@ export async function addGasto(prevState: any, formData: FormData) {
 
     return { message: 'Gasto agregado exitosamente.', success: true, alertMessage };
   } catch (e) {
+    console.error(e);
     return { message: 'Error al agregar el gasto.' };
   }
-}
-
-
-export async function getCategorias(): Promise<Categoria[]> {
-  return await getMockCategorias();
-}
-
-export async function getIngresos(): Promise<Ingreso[]> {
-  return await getMockIngresos();
-}
-
-export async function getGastos(): Promise<Gasto[]> {
-  return await getMockGastos();
 }
 
 export async function getDashboardData(periodo: Periodo = 'mes_actual') {
@@ -165,12 +171,12 @@ export async function getDashboardData(periodo: Periodo = 'mes_actual') {
   }
 
   const [ingresos, gastos, categorias] = await Promise.all([
-    getIngresos(),
-    getGastos(),
+    getIngresosFb(),
+    getGastosFb(),
     getCategorias(),
   ]);
 
-  const filterByDate = (item: { fecha: string }) => {
+  const filterByDate = (item: { fecha: number }) => {
     const itemDate = new Date(item.fecha);
     return itemDate >= startDate && itemDate <= endDate;
   };
@@ -194,7 +200,7 @@ export async function getDashboardData(periodo: Periodo = 'mes_actual') {
   const transaccionesRecientes = [
     ...ingresos.map(i => ({...i, tipo: 'ingreso' as const})),
     ...gastos.map(g => ({...g, tipo: 'gasto' as const}))
-  ].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()).slice(0, 5);
+  ].sort((a, b) => b.fecha - a.fecha).slice(0, 5);
 
   return {
     totalIngresos,
@@ -206,7 +212,7 @@ export async function getDashboardData(periodo: Periodo = 'mes_actual') {
 }
 
 export async function getSavingsSuggestionsAction() {
-  const gastos = await getGastos();
+  const gastos = await getGastosFb();
   const categorias = await getCategorias();
 
   if (gastos.length === 0) {

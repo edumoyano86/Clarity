@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -5,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from "@/components/ui/table";
 import { Ingreso } from "@/lib/definitions";
 import { ManagerPage } from '../shared/manager-page';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { IncomeForm } from './income-form';
 import { Badge } from '../ui/badge';
 
@@ -55,6 +56,9 @@ export function IncomeManager({ ingresos }: { ingresos: Ingreso[] }) {
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Nuevo Ingreso</DialogTitle>
+                        <DialogDescription>
+                            Completa los detalles de tu ingreso.
+                        </DialogDescription>
                     </DialogHeader>
                     <IncomeForm onFormSuccess={() => setIsDialogOpen(false)} />
                 </DialogContent>
