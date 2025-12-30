@@ -1,47 +1,74 @@
 'use client';
 
-import React, { useRef, useState, useTransition } from 'react';
+import React, { useRef, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { saveCategoria } from '@/lib/actions';
 import { Categoria } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { availableIcons } from '@/lib/icons';
 import { Icon } from '../icons';
 import { Loader2 } from 'lucide-react';
+import { z } from 'zod';
+import { useFirestore } from '@/firebase';
+import { saveCategoria } from '@/lib/client-actions';
+
+const CategoriaSchema = z.object({
+  id: z.string().optional(),
+  nombre: z.string().min(1, 'El nombre es requerido'),
+  icono: z.string().min(1, 'El icono es requerido'),
+  presupuesto: z.coerce.number().min(0, 'El presupuesto debe ser un número positivo').optional(),
+});
 
 export function CategoryForm({ category, onFormSuccess }: { category?: Categoria, onFormSuccess: () => void }) {
     const { toast } = useToast();
+    const firestore = useFirestore();
     const formRef = useRef<HTMLFormElement>(null);
     const [isPending, startTransition] = useTransition();
 
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+        if (!firestore) {
+            toast({ title: 'Error', description: 'No se pudo conectar a la base de datos.', variant: 'destructive' });
+            return;
+        }
+
         const formData = new FormData(event.currentTarget);
+        const data = {
+            id: formData.get('id') || undefined,
+            nombre: formData.get('nombre'),
+            icono: formData.get('icono'),
+            presupuesto: formData.get('presupuesto') || 0,
+        };
+
+        const validatedFields = CategoriaSchema.safeParse(data);
+
+         if (!validatedFields.success) {
+            Object.values(validatedFields.error.flatten().fieldErrors).forEach(error => {
+                toast({
+                    title: 'Error de validación',
+                    description: (error as string[]).join(', '),
+                    variant: 'destructive',
+                });
+            });
+            return;
+        }
+
 
         startTransition(async () => {
-            const result = await saveCategoria(null, formData);
-
-            if (result.success) {
+            try {
+                await saveCategoria(firestore, validatedFields.data);
                 toast({
                     title: 'Éxito',
-                    description: result.message,
+                    description: 'Categoría guardada exitosamente.',
                 });
                 onFormSuccess();
-            } else if (result.errors) {
-                 Object.values(result.errors).forEach(error => {
-                    toast({
-                        title: 'Error de validación',
-                        description: (error as string[]).join(', '),
-                        variant: 'destructive',
-                    });
-                });
-            } else if (result.message) {
+            } catch (e) {
+                console.error(e);
                  toast({
                     title: 'Error',
-                    description: result.message,
+                    description: 'No se pudo guardar la categoría.',
                     variant: 'destructive',
                 });
             }

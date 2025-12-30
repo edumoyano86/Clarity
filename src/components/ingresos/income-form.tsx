@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useRef, useState, useEffect, useTransition } from 'react';
+import React, { useRef, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { addIngreso } from '@/lib/actions';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { CalendarIcon, Loader2 } from 'lucide-react';
@@ -12,38 +11,59 @@ import { format } from 'date-fns';
 import { Calendar } from '../ui/calendar';
 import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
+import { z } from 'zod';
+import { useFirestore } from '@/firebase';
+import { addIngreso } from '@/lib/client-actions';
+
+const IngresoSchema = z.object({
+  fuente: z.string().min(1, 'La fuente es requerida'),
+  cantidad: z.coerce.number().positive('La cantidad debe ser un número positivo'),
+  fecha: z.string().min(1, 'La fecha es requerida'),
+});
 
 export function IncomeForm({ onFormSuccess }: { onFormSuccess: () => void }) {
     const { toast } = useToast();
+    const firestore = useFirestore();
     const [date, setDate] = useState<Date | undefined>(new Date());
     const formRef = useRef<HTMLFormElement>(null);
     const [isPending, startTransition] = useTransition();
 
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+        if (!firestore) {
+            toast({ title: 'Error', description: 'No se pudo conectar a la base de datos.', variant: 'destructive' });
+            return;
+        }
+
         const formData = new FormData(event.currentTarget);
+        const data = Object.fromEntries(formData.entries());
+
+        const validatedFields = IngresoSchema.safeParse(data);
+
+        if (!validatedFields.success) {
+            Object.values(validatedFields.error.flatten().fieldErrors).forEach(error => {
+                toast({
+                    title: 'Error de validación',
+                    description: (error as string[]).join(', '),
+                    variant: 'destructive',
+                });
+            });
+            return;
+        }
 
         startTransition(async () => {
-            const result = await addIngreso(null, formData);
-
-            if (result.success) {
+            try {
+                await addIngreso(firestore, validatedFields.data);
                 toast({
                     title: 'Éxito',
-                    description: result.message,
+                    description: 'Ingreso agregado exitosamente.',
                 });
                 onFormSuccess();
-            } else if (result.errors) {
-                 Object.values(result.errors).forEach(error => {
-                    toast({
-                        title: 'Error de validación',
-                        description: (error as string[]).join(', '),
-                        variant: 'destructive',
-                    });
-                });
-            } else if (result.message) {
-                 toast({
+            } catch (e) {
+                console.error(e);
+                toast({
                     title: 'Error',
-                    description: result.message,
+                    description: 'No se pudo agregar el ingreso.',
                     variant: 'destructive',
                 });
             }
@@ -62,7 +82,7 @@ export function IncomeForm({ onFormSuccess }: { onFormSuccess: () => void }) {
             </div>
              <div>
                 <Label htmlFor="fecha">Fecha</Label>
-                <Popover modal={true}>
+                <Popover>
                     <PopoverTrigger asChild>
                     <Button
                         variant={"outline"}

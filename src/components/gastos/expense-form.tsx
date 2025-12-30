@@ -4,7 +4,6 @@ import React, { useRef, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { addGasto } from '@/lib/actions';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { CalendarIcon, Loader2 } from 'lucide-react';
@@ -15,51 +14,72 @@ import { es } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Categoria } from '@/lib/definitions';
 import { Textarea } from '../ui/textarea';
+import { z } from 'zod';
+import { useFirestore } from '@/firebase';
+import { addGasto } from '@/lib/client-actions';
 
 interface ExpenseFormProps {
     categorias: Categoria[];
     onFormSuccess: () => void;
 }
 
+const GastoSchema = z.object({
+  descripcion: z.string().optional(),
+  cantidad: z.coerce.number().positive('La cantidad debe ser un número positivo'),
+  categoriaId: z.string().min(1, 'La categoría es requerida'),
+  fecha: z.string().min(1, 'La fecha es requerida'),
+});
+
 export function ExpenseForm({ categorias, onFormSuccess }: ExpenseFormProps) {
     const { toast } = useToast();
+    const firestore = useFirestore();
     const [date, setDate] = useState<Date | undefined>(new Date());
     const formRef = useRef<HTMLFormElement>(null);
     const [isPending, startTransition] = useTransition();
 
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+        if (!firestore) {
+            toast({ title: 'Error', description: 'No se pudo conectar a la base de datos.', variant: 'destructive' });
+            return;
+        }
+
         const formData = new FormData(event.currentTarget);
+        const data = Object.fromEntries(formData.entries());
+        const validatedFields = GastoSchema.safeParse(data);
+
+        if (!validatedFields.success) {
+            Object.values(validatedFields.error.flatten().fieldErrors).forEach(error => {
+                toast({
+                    title: 'Error de validación',
+                    description: (error as string[]).join(', '),
+                    variant: 'destructive',
+                });
+            });
+            return;
+        }
 
         startTransition(async () => {
-            const result = await addGasto(null, formData);
-
-            if (result.success) {
+            try {
+                const alertMessage = await addGasto(firestore, validatedFields.data, categorias);
                 toast({
                     title: 'Éxito',
-                    description: result.message,
+                    description: 'Gasto agregado exitosamente.',
                 });
-                if (result.alertMessage) {
+                 if (alertMessage) {
                     toast({
                         title: 'Alerta de Presupuesto',
-                        description: result.alertMessage,
+                        description: alertMessage,
                         variant: 'destructive',
                         duration: 10000,
                     });
                 }
                 onFormSuccess();
-            } else if (result.errors) {
-                 Object.values(result.errors).forEach(error => {
-                    toast({
-                        title: 'Error de validación',
-                        description: (error as string[]).join(', '),
-                        variant: 'destructive',
-                    });
-                });
-            } else if (result.message) {
-                 toast({
+            } catch (e) {
+                console.error(e);
+                toast({
                     title: 'Error',
-                    description: result.message,
+                    description: 'No se pudo agregar el gasto.',
                     variant: 'destructive',
                 });
             }
@@ -89,7 +109,7 @@ export function ExpenseForm({ categorias, onFormSuccess }: ExpenseFormProps) {
             </div>
             <div>
                 <Label htmlFor="fecha">Fecha</Label>
-                <Popover modal={true}>
+                <Popover>
                     <PopoverTrigger asChild>
                     <Button
                         variant={"outline"}

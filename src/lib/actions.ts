@@ -2,150 +2,15 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
-import { generateBudgetAlert } from '@/ai/flows/budget-alerts';
 import { generateSavingsSuggestions } from '@/ai/flows/savings-suggestions';
-import { Categoria } from './definitions';
+import { Categoria, Gasto, Ingreso } from './definitions';
 import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO } from 'date-fns';
-import { addCategoria as addCategoriaFb, getCategorias, updateCategoria as updateCategoriaFb, addIngreso as addIngresoFb, getIngresos as getIngresosFb, addGasto as addGastoFb, getGastos as getGastosFb } from './firebase-actions';
-import { getDocs, query, where, collection } from 'firebase/firestore';
-import { initializeFirebase } from '@/firebase';
+import { getCategorias, getIngresos, getGastos } from './firebase-actions';
 
 export type Periodo = 'mes_actual' | 'mes_pasado' | 'ultimos_3_meses' | 'ano_actual';
 
-// Schema for category form
-const CategoriaSchema = z.object({
-  id: z.string().optional(),
-  nombre: z.string().min(1, 'El nombre es requerido'),
-  icono: z.string().min(1, 'El icono es requerido'),
-  presupuesto: z.coerce.number().min(0, 'El presupuesto debe ser un número positivo').optional(),
-});
-
-export async function saveCategoria(prevState: any, formData: FormData) {
-  const validatedFields = CategoriaSchema.safeParse({
-    id: formData.get('id') || undefined,
-    nombre: formData.get('nombre'),
-    icono: formData.get('icono'),
-    presupuesto: formData.get('presupuesto') || 0,
-  });
-
-  if (!validatedFields.success) {
-    return {
-      errors: validatedFields.error.flatten().fieldErrors,
-      message: 'Error de validación.',
-      success: false,
-    };
-  }
-
-  try {
-    const data = validatedFields.data;
-    if (data.id) {
-      await updateCategoriaFb({ ...data, id: data.id });
-    } else {
-      await addCategoriaFb(data);
-    }
-    revalidatePath('/categorias');
-    revalidatePath('/');
-    return { message: 'Categoría guardada exitosamente.', success: true };
-  } catch (e) {
-    return { message: 'Error al guardar la categoría.', success: false };
-  }
-}
-
-// Schema for income form
-const IngresoSchema = z.object({
-  fuente: z.string().min(1, 'La fuente es requerida'),
-  cantidad: z.coerce.number().positive('La cantidad debe ser un número positivo'),
-  fecha: z.string().min(1, 'La fecha es requerida'),
-});
-
-export async function addIngreso(prevState: any, formData: FormData) {
-  const validatedFields = IngresoSchema.safeParse(Object.fromEntries(formData.entries()));
-
-  if (!validatedFields.success) {
-    return {
-      errors: validatedFields.error.flatten().fieldErrors,
-      message: 'Error de validación.',
-      success: false,
-    };
-  }
-  
-  try {
-    await addIngresoFb({
-      ...validatedFields.data,
-      fecha: parseISO(validatedFields.data.fecha).getTime()
-    });
-    revalidatePath('/ingresos');
-    revalidatePath('/');
-    return { message: 'Ingreso agregado exitosamente.', success: true };
-  } catch (e) {
-    console.error(e);
-    return { message: 'Error al agregar el ingreso.', success: false };
-  }
-}
-
-// Schema for expense form
-const GastoSchema = z.object({
-  descripcion: z.string().optional(),
-  cantidad: z.coerce.number().positive('La cantidad debe ser un número positivo'),
-  categoriaId: z.string().min(1, 'La categoría es requerida'),
-  fecha: z.string().min(1, 'La fecha es requerida'),
-});
-
-async function getGastosByCategoria(categoriaId: string) {
-    const { firestore } = initializeFirebase();
-    const gastosRef = collection(firestore, 'gastos');
-    const q = query(gastosRef, where('categoriaId', '==', categoriaId));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => doc.data());
-}
-
-
-export async function addGasto(prevState: any, formData: FormData) {
-  const validatedFields = GastoSchema.safeParse(Object.fromEntries(formData.entries()));
-
-  if (!validatedFields.success) {
-    return {
-      errors: validatedFields.error.flatten().fieldErrors,
-      message: 'Error de validación.',
-      success: false
-    };
-  }
-
-  let alertMessage: string | undefined = undefined;
-
-  try {
-    await addGastoFb({
-        ...validatedFields.data,
-        fecha: parseISO(validatedFields.data.fecha).getTime()
-    });
-    revalidatePath('/gastos');
-    revalidatePath('/');
-    
-    // Check for budget alert
-    const categorias = await getCategorias();
-    const categoria = categorias.find(c => c.id === validatedFields.data.categoriaId);
-    if (categoria && categoria.presupuesto && categoria.presupuesto > 0) {
-      const gastosCategoria = await getGastosByCategoria(categoria.id);
-      const totalGastado = gastosCategoria.reduce((sum, g) => sum + g.cantidad, 0);
-
-      if (totalGastado > categoria.presupuesto) {
-        const alertResult = await generateBudgetAlert({
-          category: categoria.nombre,
-          spentAmount: totalGastado,
-          budgetLimit: categoria.presupuesto,
-          userName: "Usuario",
-        });
-        alertMessage = alertResult.alertMessage;
-      }
-    }
-
-    return { message: 'Gasto agregado exitosamente.', success: true, alertMessage };
-  } catch (e) {
-    console.error(e);
-    return { message: 'Error al agregar el gasto.', success: false };
-  }
-}
+// Note: Form submission actions have been moved to client-side actions in `src/lib/client-actions.ts`
+// to resolve persistent server response errors. The data fetching functions remain here.
 
 export async function getDashboardData(periodo: Periodo = 'mes_actual') {
   const now = new Date();
@@ -175,8 +40,8 @@ export async function getDashboardData(periodo: Periodo = 'mes_actual') {
   }
 
   const [ingresos, gastos, categorias] = await Promise.all([
-    getIngresosFb(),
-    getGastosFb(),
+    getIngresos(),
+    getGastos(),
     getCategorias(),
   ]);
 
@@ -216,7 +81,7 @@ export async function getDashboardData(periodo: Periodo = 'mes_actual') {
 }
 
 export async function getSavingsSuggestionsAction() {
-  const gastos = await getGastosFb();
+  const gastos = await getGastos();
   const categorias = await getCategorias();
 
   if (gastos.length === 0) {
@@ -232,6 +97,8 @@ export async function getSavingsSuggestionsAction() {
     const result = await generateSavingsSuggestions({
       spendingData: `Datos de gastos del usuario: ${spendingData}`
     });
+    // This action needs to revalidate paths if data it depends on changes.
+    revalidatePath('/');
     return result;
   } catch (error) {
     console.error("Error getting savings suggestions:", error);
