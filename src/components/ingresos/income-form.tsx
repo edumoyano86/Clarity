@@ -1,11 +1,11 @@
 'use client';
 
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState, useEffect, useState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { addIngreso } from '@/lib/actions';
-import { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { CalendarIcon } from 'lucide-react';
@@ -21,9 +21,9 @@ function SubmitButton() {
 
 export function IncomeForm({ onFormSuccess }: { onFormSuccess: () => void }) {
     const initialState = { message: null, errors: {} };
-    const [state, dispatch] = useFormState(addIngreso, initialState);
+    const [state, dispatch] = useActionState(addIngreso, initialState);
     const { toast } = useToast();
-    const [date, setDate] = React.useState<Date>();
+    const [date, setDate] = useState<Date>();
 
     useEffect(() => {
         if (state.success) {

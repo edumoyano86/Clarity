@@ -1,15 +1,15 @@
 'use client';
 
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState, useEffect } from 'react';
+import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { saveCategoria } from '@/lib/actions';
 import { Categoria } from '@/lib/definitions';
-import { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { availableIcons, iconMap } from '@/lib/icons';
+import { availableIcons } from '@/lib/icons';
 import { Icon } from '../icons';
 
 function SubmitButton() {
@@ -19,7 +19,7 @@ function SubmitButton() {
 
 export function CategoryForm({ category, onFormSuccess }: { category?: Categoria, onFormSuccess: () => void }) {
     const initialState = { message: null, errors: {} };
-    const [state, dispatch] = useFormState(saveCategoria, initialState);
+    const [state, dispatch] = useActionState(saveCategoria, initialState);
     const { toast } = useToast();
 
     useEffect(() => {

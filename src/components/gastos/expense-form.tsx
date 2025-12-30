@@ -1,11 +1,11 @@
 'use client';
 
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState, useEffect, useState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { addGasto } from '@/lib/actions';
-import { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { CalendarIcon } from 'lucide-react';
@@ -29,7 +29,7 @@ interface ExpenseFormProps {
 
 export function ExpenseForm({ categorias, onFormSuccess }: ExpenseFormProps) {
     const initialState = { message: null, errors: {}, alertMessage: undefined };
-    const [state, dispatch] = useFormState(addGasto, initialState);
+    const [state, dispatch] = useActionState(addGasto, initialState);
     const { toast } = useToast();
     const [date, setDate] = useState<Date | undefined>(new Date());
 

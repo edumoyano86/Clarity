@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -560,10 +561,10 @@ const SidebarMenuButton = React.forwardRef<
     const { isMobile, state } = useSidebar()
 
     const buttonContent = (
-      <div className="flex gap-2 items-center">
-          {icon}
-          <span className="truncate">{children}</span>
-      </div>
+        <div className="flex gap-2 items-center">
+            {icon}
+            <span className="truncate">{children}</span>
+        </div>
     );
 
     const button = (
@@ -575,7 +576,12 @@ const SidebarMenuButton = React.forwardRef<
         className={cn(sidebarMenuButtonVariants({ variant, size, className }))}
         {...props}
       >
-        {asChild ? children : buttonContent}
+        {asChild ? (
+            <div className="flex gap-2 items-center">
+                {icon}
+                {children}
+            </div>
+        ) : buttonContent }
       </Comp>
     )
 
