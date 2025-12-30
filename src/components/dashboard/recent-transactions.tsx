@@ -11,7 +11,7 @@ type RecentTransactionsProps = {
 };
 
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount);
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
 };
 
 export function RecentTransactions({ transactions, categorias }: RecentTransactionsProps) {

@@ -13,7 +13,7 @@ import { Icon } from '../icons';
 
 const formatCurrency = (amount?: number) => {
     if (typeof amount !== 'number') return '-';
-    return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount);
+    return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
 };
 
 export function CategoryManager({ categorias }: { categorias: Categoria[] }) {
