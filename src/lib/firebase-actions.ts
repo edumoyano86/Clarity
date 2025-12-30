@@ -19,9 +19,9 @@ const getDocument = async <T>(collectionName: string, id: string): Promise<T | n
     return null;
 }
 
-const addDocument = async <T>(collectionName: string, data: T) => {
+const addDocument = async (collectionName: string, data: any) => {
     const { firestore } = initializeFirebase();
-    await addDoc(collection(firestore, collectionName), data as any);
+    await addDoc(collection(firestore, collectionName), data);
 };
 
 const updateDocument = async (collectionName: string, id: string, data: any) => {
@@ -35,7 +35,7 @@ export const getCategoria = async (id: string) => getDocument<Categoria>('catego
 export const addCategoria = async (data: Omit<Categoria, 'id'>) => addDocument('categorias', data);
 export const updateCategoria = async (data: Categoria) => {
     const { id, ...rest } = data;
-    return updateDocument('categorias', id, rest);
+    await updateDocument('categorias', id, rest);
 };
 
 // Ingresos

@@ -1,8 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
-import { useActionState } from 'react';
-import { useFormStatus } from 'react-dom';
+import React, { useRef, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,51 +10,54 @@ import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { availableIcons } from '@/lib/icons';
 import { Icon } from '../icons';
-
-function SubmitButton() {
-    const { pending } = useFormStatus();
-    return <Button type="submit" disabled={pending}>{pending ? 'Guardando...' : 'Guardar Categoría'}</Button>;
-}
+import { Loader2 } from 'lucide-react';
 
 export function CategoryForm({ category, onFormSuccess }: { category?: Categoria, onFormSuccess: () => void }) {
-    const initialState = { message: null, errors: {}, success: false };
-    const [state, dispatch] = useActionState(saveCategoria, initialState);
     const { toast } = useToast();
     const formRef = useRef<HTMLFormElement>(null);
+    const [isPending, startTransition] = useTransition();
 
-    useEffect(() => {
-        if (state.success) {
-            toast({
-                title: 'Éxito',
-                description: state.message,
-            });
-            onFormSuccess();
-            formRef.current?.reset();
-        } else if (state.message && !state.success && state.errors) {
-            toast({
-                title: 'Error',
-                description: state.message,
-                variant: 'destructive',
-            });
-        }
-    }, [state, toast, onFormSuccess]);
+    const handleSubmit = (formData: FormData) => {
+        startTransition(async () => {
+            const result = await saveCategoria(null, formData);
+            if (result?.errors) {
+                Object.values(result.errors).forEach(error => {
+                    toast({
+                        title: 'Error de validación',
+                        description: (error as string[]).join(', '),
+                        variant: 'destructive',
+                    });
+                });
+            } else if (result?.message && !result.success) {
+                 toast({
+                    title: 'Error',
+                    description: result.message,
+                    variant: 'destructive',
+                });
+            } else {
+                toast({
+                    title: 'Éxito',
+                    description: result.message,
+                });
+                onFormSuccess();
+            }
+        });
+    };
 
     return (
-        <form ref={formRef} action={dispatch} className="space-y-4">
+        <form ref={formRef} action={handleSubmit} className="space-y-4">
             <input type="hidden" name="id" value={category?.id || ''} />
             <div>
                 <Label htmlFor="nombre">Nombre de la Categoría</Label>
-                <Input id="nombre" name="nombre" defaultValue={category?.nombre} required />
-                {state.errors?.nombre && <p className="text-sm text-destructive mt-1">{state.errors.nombre}</p>}
+                <Input id="nombre" name="nombre" defaultValue={category?.nombre} required disabled={isPending} />
             </div>
             <div>
                 <Label htmlFor="presupuesto">Presupuesto (Opcional)</Label>
-                <Input id="presupuesto" name="presupuesto" type="number" step="0.01" defaultValue={category?.presupuesto} placeholder="Ej: 500" />
-                {state.errors?.presupuesto && <p className="text-sm text-destructive mt-1">{state.errors.presupuesto}</p>}
+                <Input id="presupuesto" name="presupuesto" type="number" step="0.01" defaultValue={category?.presupuesto} placeholder="Ej: 500" disabled={isPending} />
             </div>
             <div>
                 <Label htmlFor="icono">Icono</Label>
-                <Select name="icono" defaultValue={category?.icono}>
+                <Select name="icono" defaultValue={category?.icono} disabled={isPending}>
                     <SelectTrigger>
                         <SelectValue placeholder="Selecciona un icono" />
                     </SelectTrigger>
@@ -71,9 +72,10 @@ export function CategoryForm({ category, onFormSuccess }: { category?: Categoria
                         ))}
                     </SelectContent>
                 </Select>
-                 {state.errors?.icono && <p className="text-sm text-destructive mt-1">{state.errors.icono}</p>}
             </div>
-            <SubmitButton />
+            <Button type="submit" disabled={isPending}>
+                {isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</> : 'Guardar Categoría'}
+            </Button>
         </form>
     );
 }

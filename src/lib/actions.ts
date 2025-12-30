@@ -7,7 +7,7 @@ import { generateBudgetAlert } from '@/ai/flows/budget-alerts';
 import { generateSavingsSuggestions } from '@/ai/flows/savings-suggestions';
 import { Categoria } from './definitions';
 import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO } from 'date-fns';
-import { addCategoria, getCategorias, updateCategoria, addIngreso as addIngresoFb, getIngresos as getIngresosFb, addGasto as addGastoFb, getGastos as getGastosFb } from './firebase-actions';
+import { addCategoria as addCategoriaFb, getCategorias, updateCategoria as updateCategoriaFb, addIngreso as addIngresoFb, getIngresos as getIngresosFb, addGasto as addGastoFb, getGastos as getGastosFb } from './firebase-actions';
 import { getDocs, query, where, collection } from 'firebase/firestore';
 import { initializeFirebase } from '@/firebase';
 
@@ -37,10 +37,11 @@ export async function saveCategoria(prevState: any, formData: FormData) {
   }
 
   try {
-    if (validatedFields.data.id) {
-      await updateCategoria(validatedFields.data as Categoria);
+    const data = validatedFields.data;
+    if (data.id) {
+      await updateCategoriaFb({ ...data, id: data.id });
     } else {
-      await addCategoria(validatedFields.data);
+      await addCategoriaFb(data);
     }
     revalidatePath('/categorias');
     revalidatePath('/');
@@ -74,7 +75,7 @@ export async function addIngreso(prevState: any, formData: FormData) {
     });
     revalidatePath('/ingresos');
     revalidatePath('/');
-    return { message: 'Ingreso agregado exitosamente.', success: true };
+    // No return value needed on success, client will handle it
   } catch (e) {
     console.error(e);
     return { message: 'Error al agregar el ingreso.' };
