@@ -1,4 +1,3 @@
-// @ts-nocheck
 // It's not recommended to store API keys in your source code.
 // This is just for demonstration purposes.
 // For more information, see: https://firebase.google.com/docs/web/setup#secure-your-api-keys

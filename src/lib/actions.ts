@@ -1,6 +1,6 @@
 
 'use server';
-
+import 'dotenv/config';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { generateBudgetAlert } from '@/ai/flows/budget-alerts';
