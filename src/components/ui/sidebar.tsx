@@ -559,6 +559,13 @@ const SidebarMenuButton = React.forwardRef<
     const Comp = asChild ? Slot : "button"
     const { isMobile, state } = useSidebar()
 
+    const buttonContent = (
+      <div className="flex items-center gap-2">
+        {icon}
+        <span className="truncate">{children}</span>
+      </div>
+    );
+    
     const button = (
       <Comp
         ref={ref}
@@ -568,10 +575,7 @@ const SidebarMenuButton = React.forwardRef<
         className={cn(sidebarMenuButtonVariants({ variant, size, className }))}
         {...props}
       >
-        <div className="flex gap-2 items-center">
-            {icon}
-            <span className="truncate">{children}</span>
-        </div>
+        {asChild ? children : buttonContent}
       </Comp>
     )
 
@@ -769,5 +773,3 @@ export {
   SidebarTrigger,
   useSidebar,
 }
-
-    

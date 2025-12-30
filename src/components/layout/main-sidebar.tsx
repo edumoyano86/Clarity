@@ -43,11 +43,11 @@ export function MainSidebar() {
               <SidebarMenuButton
                 asChild
                 isActive={pathname === item.href}
-                icon={<item.icon />}
                 tooltip={item.label}
               >
                 <Link href={item.href}>
-                  {item.label}
+                  <item.icon />
+                  <span className="truncate">{item.label}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
