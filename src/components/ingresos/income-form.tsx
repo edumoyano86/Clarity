@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useActionState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,8 +14,6 @@ import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
 import { addIngreso } from '@/lib/actions';
 
-const initialState = { success: false, message: '', errors: {} };
-
 function SubmitButton() {
     const { pending } = useFormStatus();
     return (
@@ -27,41 +25,31 @@ function SubmitButton() {
 
 export function IncomeForm({ onFormSuccess }: { onFormSuccess: () => void }) {
     const { toast } = useToast();
-    const [state, dispatch] = useActionState(addIngreso, initialState);
     const [date, setDate] = useState<Date | undefined>(new Date());
     const formRef = useRef<HTMLFormElement>(null);
-    const [formKey, setFormKey] = useState(0);
 
-    useEffect(() => {
-        if (state.success) {
+    const handleSubmit = async (formData: FormData) => {
+        const result = await addIngreso(formData);
+        
+        if (result?.success) {
             toast({
                 title: 'Éxito',
-                description: state.message,
+                description: result.message,
             });
             onFormSuccess();
-            setFormKey(k => k + 1); // Reset form by changing key
-            setDate(new Date()); // Reset date picker
-        } else if (state.message && !state.success) {
-             if (state.errors) {
-                 Object.values(state.errors).flat().forEach(error => {
-                    toast({
-                        title: 'Error de validación',
-                        description: error,
-                        variant: 'destructive',
-                    });
-                });
-            } else {
-                 toast({
-                    title: 'Error',
-                    description: state.message,
-                    variant: 'destructive',
-                });
-            }
+            formRef.current?.reset();
+            setDate(new Date());
+        } else if (result?.message) {
+            toast({
+                title: 'Error',
+                description: result.message,
+                variant: 'destructive',
+            });
         }
-    }, [state, onFormSuccess, toast]);
-
+    };
+    
     return (
-        <form key={formKey} ref={formRef} action={dispatch} className="space-y-4">
+        <form ref={formRef} action={handleSubmit} className="space-y-4">
             <div>
                 <Label htmlFor="fuente">Fuente del Ingreso</Label>
                 <Input id="fuente" name="fuente" placeholder="Ej: Salario, Venta online" required />

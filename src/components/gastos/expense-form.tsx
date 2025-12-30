@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useActionState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,8 +22,6 @@ interface ExpenseFormProps {
     onFormSuccess: () => void;
 }
 
-const initialState = { success: false, message: '', errors: {}, alertMessage: undefined };
-
 function SubmitButton() {
     const { pending } = useFormStatus();
     return (
@@ -35,50 +33,39 @@ function SubmitButton() {
 
 export function ExpenseForm({ categorias, onFormSuccess }: ExpenseFormProps) {
     const { toast } = useToast();
-    const [state, dispatch] = useActionState(addGasto, initialState);
     const [date, setDate] = useState<Date | undefined>(new Date());
     const formRef = useRef<HTMLFormElement>(null);
-    const [formKey, setFormKey] = useState(0);
 
-    useEffect(() => {
-        if (state.success) {
+    const handleSubmit = async (formData: FormData) => {
+        const result = await addGasto(formData);
+
+        if (result?.success) {
             toast({
                 title: 'Éxito',
-                description: state.message,
+                description: result.message,
             });
-            if (state.alertMessage) {
+            if (result.alertMessage) {
                 toast({
                     title: 'Alerta de Presupuesto',
-                    description: state.alertMessage,
+                    description: result.alertMessage,
                     variant: 'destructive',
                     duration: 10000,
                 });
             }
             onFormSuccess();
-            setFormKey(k => k + 1); // Reset form
-            setDate(new Date()); // Reset date picker
-        } else if (state.message && !state.success) {
-            // Display validation errors or a general error message
-            if (state.errors) {
-                 Object.values(state.errors).flat().forEach(error => {
-                    toast({
-                        title: 'Error de validación',
-                        description: error,
-                        variant: 'destructive',
-                    });
-                });
-            } else {
-                 toast({
-                    title: 'Error',
-                    description: state.message,
-                    variant: 'destructive',
-                });
-            }
+            formRef.current?.reset();
+            setDate(new Date());
+        } else if (result?.message) {
+            toast({
+                title: 'Error',
+                description: result.message,
+                variant: 'destructive',
+            });
         }
-    }, [state, onFormSuccess, toast]);
+    };
 
     return (
-        <form key={formKey} ref={formRef} action={dispatch} className="space-y-4">
+        <form ref={formRef} action={handleSubmit} className="space-y-4">
             <div>
                 <Label htmlFor="cantidad">Cantidad</Label>
                 <Input id="cantidad" name="cantidad" type="number" step="0.01" placeholder="Ej: 45.50" required />

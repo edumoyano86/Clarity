@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useActionState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,8 +13,6 @@ import { Icon } from '../icons';
 import { Loader2 } from 'lucide-react';
 import { saveCategoria } from '@/lib/actions';
 
-const initialState = { success: false, message: '', errors: {} };
-
 function SubmitButton() {
     const { pending } = useFormStatus();
     return (
@@ -26,39 +24,42 @@ function SubmitButton() {
 
 export function CategoryForm({ category, onFormSuccess }: { category?: Categoria, onFormSuccess: () => void }) {
     const { toast } = useToast();
-    const [state, dispatch] = useActionState(saveCategoria, initialState);
     const formRef = useRef<HTMLFormElement>(null);
-    const [formKey, setFormKey] = useState(0);
+    const [key, setKey] = useState(0);
 
     useEffect(() => {
-        if (state.success) {
+        // Reset form when category changes
+        setKey(prevKey => prevKey + 1);
+    }, [category]);
+    
+    const handleSubmit = async (formData: FormData) => {
+        const result = await saveCategoria(formData);
+        
+        if (result?.success) {
             toast({
                 title: 'Éxito',
-                description: state.message,
+                description: result.message,
             });
             onFormSuccess();
-            setFormKey(k => k + 1); // Reset form
-        } else if (state.message) {
+        } else if (result?.message) {
             toast({
                 title: 'Error',
-                description: state.message,
+                description: result.message,
                 variant: 'destructive',
             });
         }
-    }, [state, onFormSuccess, toast]);
+    };
 
     return (
-        <form key={formKey} ref={formRef} action={dispatch} className="space-y-4">
+        <form key={key} ref={formRef} action={handleSubmit} className="space-y-4">
             <input type="hidden" name="id" value={category?.id || ''} />
             <div>
                 <Label htmlFor="nombre">Nombre de la Categoría</Label>
                 <Input id="nombre" name="nombre" defaultValue={category?.nombre} required />
-                {state.errors?.nombre && <p className="text-sm text-destructive mt-1">{state.errors.nombre[0]}</p>}
             </div>
             <div>
                 <Label htmlFor="presupuesto">Presupuesto (Opcional)</Label>
                 <Input id="presupuesto" name="presupuesto" type="number" step="0.01" defaultValue={category?.presupuesto} placeholder="Ej: 500" />
-                 {state.errors?.presupuesto && <p className="text-sm text-destructive mt-1">{state.errors.presupuesto[0]}</p>}
             </div>
             <div>
                 <Label htmlFor="icono">Icono</Label>
@@ -77,7 +78,6 @@ export function CategoryForm({ category, onFormSuccess }: { category?: Categoria
                         ))}
                     </SelectContent>
                 </Select>
-                 {state.errors?.icono && <p className="text-sm text-destructive mt-1">{state.errors.icono[0]}</p>}
             </div>
             <SubmitButton />
         </form>

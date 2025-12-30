@@ -11,7 +11,7 @@ import { z } from 'zod';
 export type Periodo = 'mes_actual' | 'mes_pasado' | 'ultimos_3_meses' | 'ano_actual';
 
 const CategoriaSchema = z.object({
-  id: z.string().optional(),
+  id: z.string().optional().or(z.literal('')),
   nombre: z.string().min(1, 'El nombre es requerido'),
   icono: z.string().min(1, 'El icono es requerido'),
   presupuesto: z.coerce.number().min(0, 'El presupuesto debe ser un número positivo').optional(),
@@ -37,15 +37,14 @@ type FormState = {
     alertMessage?: string;
 };
 
-export async function saveCategoria(prevState: FormState, formData: FormData): Promise<FormState> {
+export async function saveCategoria(formData: FormData): Promise<FormState | undefined> {
     const data = Object.fromEntries(formData.entries());
     const validatedFields = CategoriaSchema.safeParse(data);
     
     if (!validatedFields.success) {
         return {
             success: false,
-            message: 'Error de validación.',
-            errors: validatedFields.error.flatten().fieldErrors,
+            message: 'Error de validación: ' + validatedFields.error.flatten().fieldErrors.nombre,
         };
     }
 
@@ -54,19 +53,19 @@ export async function saveCategoria(prevState: FormState, formData: FormData): P
         revalidatePath('/categorias');
         return { success: true, message: 'Categoría guardada exitosamente.' };
     } catch (e) {
-        return { success: false, message: 'Error al guardar la categoría.' };
+        const errorMessage = e instanceof Error ? e.message : 'Error desconocido';
+        return { success: false, message: `Error al guardar la categoría: ${errorMessage}` };
     }
 }
 
-export async function addIngreso(prevState: FormState, formData: FormData): Promise<FormState> {
+export async function addIngreso(formData: FormData): Promise<FormState | undefined> {
     const data = Object.fromEntries(formData.entries());
     const validatedFields = IngresoSchema.safeParse(data);
 
     if (!validatedFields.success) {
         return {
             success: false,
-            message: 'Error de validación.',
-            errors: validatedFields.error.flatten().fieldErrors,
+            message: 'Error de validación: ' + JSON.stringify(validatedFields.error.flatten().fieldErrors),
         };
     }
     
@@ -76,19 +75,19 @@ export async function addIngreso(prevState: FormState, formData: FormData): Prom
         revalidatePath('/');
         return { success: true, message: 'Ingreso agregado exitosamente.' };
     } catch (e) {
-        return { success: false, message: 'Error al agregar el ingreso.' };
+        const errorMessage = e instanceof Error ? e.message : 'Error desconocido';
+        return { success: false, message: `Error al agregar el ingreso: ${errorMessage}` };
     }
 }
 
-export async function addGasto(prevState: FormState, formData: FormData): Promise<FormState> {
+export async function addGasto(formData: FormData): Promise<FormState | undefined> {
     const data = Object.fromEntries(formData.entries());
     const validatedFields = GastoSchema.safeParse(data);
 
     if (!validatedFields.success) {
-        return {
+         return {
             success: false,
-            message: 'Error de validación.',
-            errors: validatedFields.error.flatten().fieldErrors,
+            message: 'Error de validación: ' + JSON.stringify(validatedFields.error.flatten().fieldErrors),
         };
     }
     
@@ -98,7 +97,8 @@ export async function addGasto(prevState: FormState, formData: FormData): Promis
         revalidatePath('/');
         return { success: true, message: 'Gasto agregado exitosamente.', alertMessage };
     } catch (e) {
-        return { success: false, message: 'Error al agregar el gasto.' };
+        const errorMessage = e instanceof Error ? e.message : 'Error desconocido';
+        return { success: false, message: `Error al agregar el gasto: ${errorMessage}` };
     }
 }
 
