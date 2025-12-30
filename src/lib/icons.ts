@@ -1,0 +1,45 @@
+import {
+  Home,
+  Utensils,
+  Car,
+  Plane,
+  Film,
+  Gift,
+  GraduationCap,
+  HeartPulse,
+  ShoppingBag,
+  Briefcase,
+  PiggyBank,
+  Landmark,
+  type LucideIcon,
+} from "lucide-react";
+
+export const iconMap: { [key: string]: LucideIcon } = {
+  Home,
+  Utensils,
+  Car,
+  Plane,
+  Film,
+  Gift,
+  GraduationCap,
+  HeartPulse,
+  ShoppingBag,
+  Briefcase,
+  PiggyBank,
+  Landmark,
+};
+
+export const availableIcons = [
+  { name: "Home", label: "Vivienda" },
+  { name: "Utensils", label: "Comida" },
+  { name: "Car", label: "Transporte" },
+  { name: "Plane", label: "Viajes" },
+  { name: "Film", label: "Entretenimiento" },
+  { name: "Gift", label: "Regalos" },
+  { name: "GraduationCap", label: "Educación" },
+  { name: "HeartPulse", label: "Salud" },
+  { name: "ShoppingBag", label: "Compras" },
+  { name: "Briefcase", label: "Trabajo" },
+  { name: "PiggyBank", label: "Ahorros" },
+  { name: "Landmark", label: "Finanzas" },
+];
