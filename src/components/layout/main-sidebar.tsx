@@ -40,16 +40,16 @@ export function MainSidebar() {
         <SidebarMenu>
           {menuItems.map((item) => (
             <SidebarMenuItem key={item.href}>
-                <Link href={item.href} passHref>
-                    <SidebarMenuButton
-                        asChild
-                        isActive={pathname === item.href}
-                        tooltip={item.label}
-                        icon={<item.icon />}
-                    >
-                        {item.label}
-                    </SidebarMenuButton>
+              <SidebarMenuButton
+                isActive={pathname === item.href}
+                tooltip={item.label}
+                icon={<item.icon />}
+                asChild
+              >
+                <Link href={item.href}>
+                  {item.label}
                 </Link>
+              </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
