@@ -23,7 +23,7 @@ export function IncomeForm({ onFormSuccess }: { onFormSuccess: () => void }) {
     const initialState = { message: null, errors: {} };
     const [state, dispatch] = useActionState(addIngreso, initialState);
     const { toast } = useToast();
-    const [date, setDate] = useState<Date>();
+    const [date, setDate] = useState<Date | undefined>(new Date());
 
     useEffect(() => {
         if (state.success) {
