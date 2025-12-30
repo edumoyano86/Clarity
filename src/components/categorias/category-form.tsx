@@ -17,7 +17,10 @@ export function CategoryForm({ category, onFormSuccess }: { category?: Categoria
     const formRef = useRef<HTMLFormElement>(null);
     const [isPending, startTransition] = useTransition();
 
-    const handleSubmit = (formData: FormData) => {
+    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+
         startTransition(async () => {
             const result = await saveCategoria(null, formData);
             if (result?.errors) {
@@ -45,7 +48,7 @@ export function CategoryForm({ category, onFormSuccess }: { category?: Categoria
     };
 
     return (
-        <form ref={formRef} action={handleSubmit} className="space-y-4">
+        <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
             <input type="hidden" name="id" value={category?.id || ''} />
             <div>
                 <Label htmlFor="nombre">Nombre de la Categoría</Label>
@@ -57,7 +60,7 @@ export function CategoryForm({ category, onFormSuccess }: { category?: Categoria
             </div>
             <div>
                 <Label htmlFor="icono">Icono</Label>
-                <Select name="icono" defaultValue={category?.icono} disabled={isPending}>
+                <Select name="icono" defaultValue={category?.icono} required disabled={isPending}>
                     <SelectTrigger>
                         <SelectValue placeholder="Selecciona un icono" />
                     </SelectTrigger>
@@ -73,7 +76,7 @@ export function CategoryForm({ category, onFormSuccess }: { category?: Categoria
                     </SelectContent>
                 </Select>
             </div>
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" disabled={isPending} className="w-full">
                 {isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</> : 'Guardar Categoría'}
             </Button>
         </form>

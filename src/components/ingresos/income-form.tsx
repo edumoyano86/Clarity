@@ -13,22 +13,16 @@ import { Calendar } from '../ui/calendar';
 import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
 
-function SubmitButton() {
-    const [isPending] = useTransition();
-    return (
-        <Button type="submit" disabled={isPending}>
-            {isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Agregando...</> : 'Agregar Ingreso'}
-        </Button>
-    );
-}
-
 export function IncomeForm({ onFormSuccess }: { onFormSuccess: () => void }) {
     const { toast } = useToast();
     const [date, setDate] = useState<Date | undefined>(new Date());
     const formRef = useRef<HTMLFormElement>(null);
     const [isPending, startTransition] = useTransition();
 
-    const handleSubmit = (formData: FormData) => {
+    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        
         startTransition(async () => {
             const result = await addIngreso(null, formData);
             if (result?.errors) {
@@ -39,7 +33,7 @@ export function IncomeForm({ onFormSuccess }: { onFormSuccess: () => void }) {
                         variant: 'destructive',
                     });
                 });
-            } else if (result?.message) {
+            } else if (result?.message && !result.success) {
                  toast({
                     title: 'Error',
                     description: result.message,
@@ -48,7 +42,7 @@ export function IncomeForm({ onFormSuccess }: { onFormSuccess: () => void }) {
             } else {
                 toast({
                     title: 'Éxito',
-                    description: 'Ingreso agregado exitosamente.',
+                    description: result.message || 'Ingreso agregado exitosamente.',
                 });
                 onFormSuccess();
             }
@@ -56,7 +50,7 @@ export function IncomeForm({ onFormSuccess }: { onFormSuccess: () => void }) {
     };
 
     return (
-        <form ref={formRef} action={handleSubmit} className="space-y-4">
+        <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
             <div>
                 <Label htmlFor="fuente">Fuente del Ingreso</Label>
                 <Input id="fuente" name="fuente" placeholder="Ej: Salario, Venta online" required disabled={isPending} />
@@ -93,7 +87,7 @@ export function IncomeForm({ onFormSuccess }: { onFormSuccess: () => void }) {
                 </Popover>
                 <input type="hidden" name="fecha" value={date?.toISOString()} />
             </div>
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" disabled={isPending} className="w-full">
                 {isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Agregando...</> : 'Agregar Ingreso'}
             </Button>
         </form>

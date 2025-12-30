@@ -27,7 +27,10 @@ export function ExpenseForm({ categorias, onFormSuccess }: ExpenseFormProps) {
     const formRef = useRef<HTMLFormElement>(null);
     const [isPending, startTransition] = useTransition();
 
-    const handleSubmit = (formData: FormData) => {
+    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+
         startTransition(async () => {
             const result = await addGasto(null, formData);
              if (result?.errors) {
@@ -64,7 +67,7 @@ export function ExpenseForm({ categorias, onFormSuccess }: ExpenseFormProps) {
 
 
     return (
-        <form ref={formRef} action={handleSubmit} className="space-y-4">
+        <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
             <div>
                 <Label htmlFor="cantidad">Cantidad</Label>
                 <Input id="cantidad" name="cantidad" type="number" step="0.01" placeholder="Ej: 45.50" required disabled={isPending} />
@@ -116,7 +119,7 @@ export function ExpenseForm({ categorias, onFormSuccess }: ExpenseFormProps) {
                 <Label htmlFor="descripcion">Descripción (Opcional)</Label>
                 <Textarea id="descripcion" name="descripcion" placeholder="Ej: Cena con amigos" disabled={isPending} />
             </div>
-             <Button type="submit" disabled={isPending}>
+             <Button type="submit" disabled={isPending} className="w-full">
                 {isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Agregando...</> : 'Agregar Gasto'}
             </Button>
         </form>
