@@ -70,27 +70,28 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
         let timeout: ReturnType<typeof setTimeout> | null = null;
         
-        return (...args: Parameters<F>): Promise<ReturnType<F>> =>
-            new Promise(resolve => {
-                if (timeout) {
-                    clearTimeout(timeout);
-                }
-                
-                timeout = setTimeout(() => resolve(func(...args)), waitFor);
-            });
+        const debounced = (...args: Parameters<F>) => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(() => func(...args), waitFor);
+        };
+
+        return debounced as (...args: Parameters<F>) => void;
     };
 
-    const searchCoins = async (query: string): Promise<CoinGeckoCoin[]> => {
+    const searchCoins = async (query: string) => {
         if (query.length < 2) {
             setSearchResults([]);
-            return [];
+            setIsSearching(false);
+            return;
         }
         setIsSearching(true);
         try {
             const response = await fetch(`https://api.coingecko.com/api/v3/search?query=${query}`);
             if (!response.ok) throw new Error('Network response was not ok.');
             const data = await response.json();
-            return data.coins || [];
+            setSearchResults(data.coins || []);
         } catch (error) {
             console.error("Failed to search coins:", error);
             toast({
@@ -98,19 +99,14 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 description: 'No se pudieron buscar las criptomonedas.',
                 variant: 'destructive',
             });
-            return [];
+            setSearchResults([]);
         } finally {
             setIsSearching(false);
         }
     };
     
-    const debouncedSearch = useCallback(debounce(searchCoins, 300), []);
+    const debouncedSearch = useCallback(debounce(searchCoins, 300), [toast]);
 
-    const handleSearch = async (query: string) => {
-        setSearchQuery(query);
-        const results = await debouncedSearch(query);
-        setSearchResults(results);
-    };
 
     useEffect(() => {
         if (investment) {
@@ -284,7 +280,10 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                                         <CommandInput 
                                             placeholder="Busca por nombre o símbolo..."
                                             value={searchQuery}
-                                            onValueChange={handleSearch}
+                                            onValueChange={(query) => {
+                                                setSearchQuery(query);
+                                                debouncedSearch(query);
+                                            }}
                                         />
                                         <CommandList>
                                             {isSearching && <CommandEmpty>Buscando...</CommandEmpty>}
