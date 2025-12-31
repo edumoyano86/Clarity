@@ -6,7 +6,7 @@ import { ManagerPage } from '../shared/manager-page';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { AgendaForm } from './agenda-form';
 import { Button } from '../ui/button';
-import { Calendar as CalendarIcon, Edit, Trash2 } from 'lucide-react';
+import { Edit, Trash2 } from 'lucide-react';
 import { Calendar } from '../ui/calendar';
 import { es } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useFirestore } from '@/firebase';
 import { deleteDoc, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { ScrollArea } from '../ui/scroll-area';
 
 export function AgendaManager({ appointments, userId }: { appointments: Appointment[], userId: string }) {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -62,6 +63,8 @@ export function AgendaManager({ appointments, userId }: { appointments: Appointm
         selectedDate && new Date(app.date).toDateString() === selectedDate.toDateString()
     );
 
+    const allUpcomingAppointments = [...appointments].sort((a,b) => a.date - b.date);
+
     return (
         <>
             <ManagerPage
@@ -73,7 +76,7 @@ export function AgendaManager({ appointments, userId }: { appointments: Appointm
                 <div className="grid md:grid-cols-3 gap-8">
                     <div className="md:col-span-1">
                         <Card>
-                             <CardContent className="p-2">
+                             <CardContent className="p-0 flex justify-center">
                                 <Calendar
                                     mode="single"
                                     selected={selectedDate}
@@ -82,6 +85,39 @@ export function AgendaManager({ appointments, userId }: { appointments: Appointm
                                     className="rounded-md"
                                 />
                              </CardContent>
+                        </Card>
+                         <Card className="mt-8">
+                            <CardHeader>
+                                <CardTitle>Todas las Citas</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <ScrollArea className="h-[300px]">
+                                {allUpcomingAppointments.length > 0 ? (
+                                    <ul className="space-y-4">
+                                        {allUpcomingAppointments.map(app => (
+                                            <li key={app.id} className="flex justify-between items-center pr-4">
+                                                <div>
+                                                    <p className="font-semibold">{app.title}</p>
+                                                    <p className="text-sm text-muted-foreground">
+                                                        {format(new Date(app.date), 'PPP p', { locale: es })}
+                                                    </p>
+                                                </div>
+                                                <div className='flex gap-1'>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenDialog(app)}>
+                                                        <Edit className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenAlert(app)}>
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p className="text-muted-foreground text-center py-8">No tienes citas agendadas.</p>
+                                )}
+                                </ScrollArea>
+                            </CardContent>
                         </Card>
                     </div>
                     <div className="md:col-span-2">
