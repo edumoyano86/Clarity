@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from "@/components/ui/table";
 import { Investment, PriceData } from "@/lib/definitions";
 import { ManagerPage } from '../shared/manager-page';
@@ -16,10 +16,9 @@ import { useToast } from '@/hooks/use-toast';
 import { getCryptoPrices } from '@/ai/flows/crypto-prices';
 import { getStockPrices } from '@/ai/flows/stock-prices';
 import { PortfolioChart } from './portfolio-chart';
-
-const formatCurrency = (amount: number, currency = 'USD') => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
-};
+import { Label } from '../ui/label';
+import { Input } from '../ui/input';
+import { Switch } from '../ui/switch';
 
 interface InvestmentsManagerProps {
     investments: Investment[];
@@ -33,9 +32,19 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
     const [investmentToDelete, setInvestmentToDelete] = useState<Investment | null>(null);
     const [prices, setPrices] = useState<PriceData>({});
     const [isLoadingPrices, setIsLoadingPrices] = useState(false);
+    const [usdToArsRate, setUsdToArsRate] = useState<number | undefined>(undefined);
+    const [showInArs, setShowInArs] = useState(false);
+
 
     const firestore = useFirestore();
     const { toast } = useToast();
+
+    const formatCurrency = (amount: number) => {
+        if (showInArs && usdToArsRate) {
+            return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount * usdToArsRate);
+        }
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+    };
 
     useEffect(() => {
         const fetchPrices = async () => {
@@ -149,7 +158,34 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
                 onButtonClick={() => handleOpenForm()}
             >
                 <div className="space-y-8">
-                    <PortfolioChart investments={investments} prices={prices} isLoading={isLoadingPrices} />
+                     <Card>
+                        <CardHeader>
+                            <CardTitle>Configuración de Vista</CardTitle>
+                            <CardDescription>Ajusta la moneda y la cotización para visualizar tu portafolio.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex flex-col sm:flex-row gap-4 items-center">
+                            <div className="grid w-full max-w-sm items-center gap-1.5">
+                                <Label htmlFor="usd-rate">Cotización USD a ARS</Label>
+                                <Input 
+                                    id="usd-rate" 
+                                    type="number" 
+                                    placeholder="Ej: 1050.50" 
+                                    value={usdToArsRate || ''}
+                                    onChange={(e) => setUsdToArsRate(parseFloat(e.target.value))}
+                                />
+                            </div>
+                            <div className="flex items-center space-x-2 pt-6">
+                                <Label htmlFor="currency-switch">Mostrar en {showInArs ? "ARS" : "USD"}</Label>
+                                <Switch
+                                    id="currency-switch"
+                                    checked={showInArs}
+                                    onCheckedChange={setShowInArs}
+                                    disabled={!usdToArsRate || usdToArsRate <= 0}
+                                />
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <PortfolioChart investments={investments} prices={prices} isLoading={isLoadingPrices} displayCurrency={showInArs ? 'ARS' : 'USD'} usdToArsRate={usdToArsRate} />
                     <Card>
                         <CardContent className='pt-6'>
                             <Table>

@@ -12,6 +12,8 @@ type PortfolioChartProps = {
   investments: Investment[];
   prices: PriceData;
   isLoading: boolean;
+  displayCurrency: 'USD' | 'ARS';
+  usdToArsRate?: number;
 };
 
 const chartConfig = {
@@ -25,11 +27,16 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-};
 
-export function PortfolioChart({ investments, prices, isLoading }: PortfolioChartProps) {
+export function PortfolioChart({ investments, prices, isLoading, displayCurrency, usdToArsRate }: PortfolioChartProps) {
+  
+  const formatCurrency = (amount: number) => {
+    if (displayCurrency === 'ARS' && usdToArsRate) {
+        return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount * usdToArsRate);
+    }
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+  };
+
   const chartData = useMemo(() => {
     if (!investments || investments.length === 0) return [];
     
@@ -79,7 +86,7 @@ export function PortfolioChart({ investments, prices, isLoading }: PortfolioChar
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Evolución del Portafolio</CardTitle>
+        <CardTitle>Evolución del Portafolio ({displayCurrency})</CardTitle>
         <CardDescription>Crecimiento del valor de tus inversiones a lo largo del tiempo.</CardDescription>
       </CardHeader>
       <CardContent>
