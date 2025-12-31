@@ -91,7 +91,8 @@ export async function getDashboardData(userId: string, periodo: Periodo = 'mes_a
     totalGastos,
     balance: totalIngresos - totalGastos,
     gastosPorCategoria,
-    transaccionesRecientes
+    transaccionesRecientes,
+    categorias,
   };
 }
 

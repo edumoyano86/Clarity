@@ -7,23 +7,14 @@ import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 import { SavingsSuggestions } from "@/components/dashboard/savings-suggestions";
 import { Categoria } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
-import { useCollection, useFirestore, useUser } from "@/firebase";
-import { collection, query } from "firebase/firestore";
+import { useUser } from "@/firebase";
 
 type DashboardData = Awaited<ReturnType<typeof getDashboardData>>;
 
 export default function DashboardPage() {
-  const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const [data, setData] = useState<DashboardData | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
-
-  const categoriasQuery = useMemo(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, "users", user.uid, "expenseCategories"));
-  }, [firestore, user]);
-  const { data: categorias, isLoading: loadingCategorias } = useCollection<Categoria>(categoriasQuery);
-
 
   const [periodo, setPeriodo] = useState<Periodo>('mes_actual');
   const [isActionLoading, setIsActionLoading] = useState(true);
@@ -53,7 +44,7 @@ export default function DashboardPage() {
     { key: 'ano_actual', label: 'Este Año' },
   ];
 
-  if (loadingCategorias || isActionLoading || isUserLoading || !user) {
+  if (isActionLoading || isUserLoading || !user) {
     return <p>Cargando...</p>
   }
   
@@ -90,7 +81,7 @@ export default function DashboardPage() {
               <ExpensesChart data={data.gastosPorCategoria} />
             </div>
             <div className="lg:col-span-1">
-              <RecentTransactions transactions={data.transaccionesRecientes} categorias={categorias || []} />
+              <RecentTransactions transactions={data.transaccionesRecientes} categorias={data.categorias || []} />
             </div>
           </div>
           <SavingsSuggestions userId={user.uid} />
