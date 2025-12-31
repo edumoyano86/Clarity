@@ -4,7 +4,6 @@ export type Categoria = {
   name: string;
   icono: string; 
   budget?: number;
-  userId: string;
 };
 
 export type Ingreso = {
@@ -12,7 +11,6 @@ export type Ingreso = {
   source: string;
   amount: number;
   date: number; // timestamp
-  userId: string;
 };
 
 export type Gasto = {
@@ -21,5 +19,4 @@ export type Gasto = {
   categoryId: string;
   date: number; // timestamp
   notes?: string;
-  userId: string;
 };

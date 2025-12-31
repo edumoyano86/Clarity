@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
-import { useForm, SubmitHandler } from 'react-hook-form';
+import { useForm, SubmitHandler, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -56,14 +56,15 @@ export function CategoryForm({ userId, category, onFormSuccess }: { userId: stri
             const { id, ...categoriaData } = data;
             const dataToSave = { 
                 ...categoriaData, 
-                userId, 
                 budget: categoriaData.budget || 0 
             };
 
+            const collectionRef = collection(firestore, 'users', userId, 'expenseCategories');
+
             if (id) {
-                await setDoc(doc(firestore, "expenseCategories", id), dataToSave, { merge: true });
+                await setDoc(doc(collectionRef, id), dataToSave, { merge: true });
             } else {
-                await addDoc(collection(firestore, "expenseCategories"), dataToSave);
+                await addDoc(collectionRef, dataToSave);
             }
 
             toast({

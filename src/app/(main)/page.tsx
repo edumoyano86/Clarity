@@ -8,7 +8,7 @@ import { SavingsSuggestions } from "@/components/dashboard/savings-suggestions";
 import { Categoria } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
 import { useCollection, useFirestore, useUser } from "@/firebase";
-import { collection, query, where } from "firebase/firestore";
+import { collection, query } from "firebase/firestore";
 
 type DashboardData = Awaited<ReturnType<typeof getDashboardData>>;
 
@@ -20,7 +20,7 @@ export default function DashboardPage() {
 
   const categoriasQuery = useMemo(() => {
     if (!firestore || !user) return null;
-    return query(collection(firestore, "expenseCategories"), where("userId", "==", user.uid));
+    return query(collection(firestore, "users", user.uid, "expenseCategories"));
   }, [firestore, user]);
   const { data: categorias, isLoading: loadingCategorias } = useCollection<Categoria>(categoriasQuery);
 

@@ -43,10 +43,9 @@ export function IncomeForm({ userId, onFormSuccess }: { userId: string, onFormSu
         try {
             const ingresoData = {
                 ...data,
-                userId,
                 date: data.date.getTime(),
             };
-            await addDoc(collection(firestore, "incomes"), ingresoData);
+            await addDoc(collection(firestore, "users", userId, "incomes"), ingresoData);
             toast({
                 title: 'Éxito',
                 description: 'Ingreso agregado exitosamente.',

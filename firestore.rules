@@ -5,36 +5,16 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    match /incomes/{incomeId} {
-      // Allow single document reads if owner
-      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
-      // Allow list queries but ONLY if filtering by the user's own ID
-      allow list: if isSignedIn() && request.query.where.size == 1 && request.query.where[0].field == 'userId' && request.query.where[0].op == '==' && request.query.where[0].value == request.auth.uid;
-      
-      allow write: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-    }
-
-    match /expenses/{expenseId} {
-      // Allow single document reads if owner
-      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
-      // Allow list queries but ONLY if filtering by the user's own ID
-      allow list: if isSignedIn() && request.query.where.size == 1 && request.query.where[0].field == 'userId' && request.query.where[0].op == '==' && request.query.where[0].value == request.auth.uid;
-
-      allow write: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-    }
-
-    match /expenseCategories/{categoryId} {
-      // Allow single document reads if owner
-      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
-      // Allow list queries but ONLY if filtering by the user's own ID
-      allow list: if isSignedIn() && request.query.where.size == 1 && request.query.where[0].field == 'userId' && request.query.where[0].op == '==' && request.query.where[0].value == request.auth.uid;
-      
-      allow write: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-    }
-
     match /users/{userId} {
+      // Users can read and update their own profile.
+      // Users can create their own profile upon registration.
+      allow read, update, create: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Rules for subcollections
+    match /users/{userId}/{collection}/{docId} {
+      // Any user can read/write to their own subcollections.
       allow read, write: if isSignedIn() && request.auth.uid == userId;
-      allow create: if isSignedIn();
     }
   }
 }

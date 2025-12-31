@@ -16,37 +16,34 @@
       "type": "object",
       "description": "Represents a single income entry for a user.",
       "properties": {
-        "userId": { "type": "string", "description": "ID of the user who owns this income." },
         "source": { "type": "string", "description": "The source of the income (e.g., Salary)." },
         "amount": { "type": "number", "description": "The amount of income received." },
         "date": { "type": "number", "description": "Timestamp of when the income was received." }
       },
-      "required": ["userId", "source", "amount", "date"]
+      "required": ["source", "amount", "date"]
     },
     "Expense": {
       "title": "Expense",
       "type": "object",
       "description": "Represents a single expense entry for a user.",
       "properties": {
-        "userId": { "type": "string", "description": "ID of the user who owns this expense." },
         "categoryId": { "type": "string", "description": "ID of the expense category." },
         "amount": { "type": "number", "description": "The amount of the expense." },
         "date": { "type": "number", "description": "Timestamp of when the expense was incurred." },
         "notes": { "type": "string", "description": "Optional notes for the expense." }
       },
-      "required": ["userId", "categoryId", "amount", "date"]
+      "required": ["categoryId", "amount", "date"]
     },
     "ExpenseCategory": {
       "title": "ExpenseCategory",
       "type": "object",
       "description": "Represents a category for expenses.",
       "properties": {
-        "userId": { "type": "string", "description": "ID of the user who owns this category." },
         "name": { "type": "string", "description": "The name of the expense category." },
         "budget": { "type": "number", "description": "The budget for this category." },
         "icono": { "type": "string", "description": "The icon for this category." }
       },
-      "required": ["userId", "name", "icono"]
+      "required": ["name", "icono"]
     }
   },
   "auth": {
@@ -57,17 +54,17 @@
       "schema": { "$ref": "#/entities/User" },
       "description": "Stores user profile data."
     },
-    "/incomes/{incomeId}": {
+    "/users/{userId}/incomes/{incomeId}": {
       "schema": { "$ref": "#/entities/Income" },
-      "description": "Stores all income entries for all users."
+      "description": "Stores income entries for a specific user."
     },
-    "/expenses/{expenseId}": {
+    "/users/{userId}/expenses/{expenseId}": {
       "schema": { "$ref": "#/entities/Expense" },
-      "description": "Stores all expense entries for all users."
+      "description": "Stores expense entries for a specific user."
     },
-    "/expenseCategories/{categoryId}": {
+    "/users/{userId}/expenseCategories/{categoryId}": {
       "schema": { "$ref": "#/entities/ExpenseCategory" },
-      "description": "Stores all expense categories defined by all users."
+      "description": "Stores expense categories defined by a specific user."
     }
   }
 }

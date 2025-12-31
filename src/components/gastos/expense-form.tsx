@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useForm, SubmitHandler, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -35,7 +35,7 @@ export function ExpenseForm({ categorias, userId, onFormSuccess }: { categorias:
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = useState(false);
     
-    const { register, handleSubmit, formState: { errors }, control, reset } = useForm<FormValues>({
+    const { register, handleSubmit, formState: { errors }, control } = useForm<FormValues>({
         resolver: zodResolver(GastoSchema),
         defaultValues: {
             date: new Date(),
@@ -44,13 +44,19 @@ export function ExpenseForm({ categorias, userId, onFormSuccess }: { categorias:
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         setIsLoading(true);
+        if (!firestore) {
+            toast({ title: 'Error', description: 'Firestore no está disponible', variant: 'destructive'});
+            setIsLoading(false);
+            return;
+        }
+
         try {
             const gastoData = {
                 ...data,
-                userId,
                 date: data.date.getTime(),
             };
-            await addDoc(collection(firestore, "expenses"), gastoData);
+            const expensesColRef = collection(firestore, "users", userId, "expenses");
+            await addDoc(expensesColRef, gastoData);
 
             toast({
                 title: 'Éxito',
@@ -58,7 +64,9 @@ export function ExpenseForm({ categorias, userId, onFormSuccess }: { categorias:
             });
 
             // Check budget
-            const categoriaDoc = await getDoc(doc(firestore, "expenseCategories", data.categoryId));
+            const catDocRef = doc(firestore, "users", userId, "expenseCategories", data.categoryId);
+            const categoriaDoc = await getDoc(catDocRef);
+            
             if (!categoriaDoc.exists()) {
                 onFormSuccess();
                 return;
@@ -67,7 +75,7 @@ export function ExpenseForm({ categorias, userId, onFormSuccess }: { categorias:
             const categoria = categoriaDoc.data() as Categoria;
             
             if (categoria && categoria.budget && categoria.budget > 0) {
-                const q = query(collection(firestore, "expenses"), where("userId", "==", userId), where("categoryId", "==", data.categoryId));
+                const q = query(expensesColRef, where("categoryId", "==", data.categoryId));
                 const gastosSnap = await getDocs(q);
                 const totalGastado = gastosSnap.docs.reduce((sum, doc) => sum + doc.data().amount, 0);
 

@@ -3,23 +3,23 @@
 import { generateSavingsSuggestions } from '@/ai/flows/savings-suggestions';
 import { Categoria, Gasto, Ingreso } from './definitions';
 import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
-import { getDocs, collection, query, where, getDoc, doc } from 'firebase/firestore';
+import { getDocs, collection, query } from 'firebase/firestore';
 import { db } from '@/firebase/server';
 
 async function getCategorias(userId: string): Promise<Categoria[]> {
-    const q = query(collection(db, "expenseCategories"), where("userId", "==", userId));
+    const q = query(collection(db, "users", userId, "expenseCategories"));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Categoria));
 }
 
 async function getIngresos(userId: string): Promise<Ingreso[]> {
-    const q = query(collection(db, "incomes"), where("userId", "==", userId));
+    const q = query(collection(db, "users", userId, "incomes"));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Ingreso));
 }
 
 async function getGastos(userId: string): Promise<Gasto[]> {
-    const q = query(collection(db, "expenses"), where("userId", "==", userId));
+    const q = query(collection(db, "users", userId, "expenses"));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Gasto));
 }
