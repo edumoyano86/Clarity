@@ -6,18 +6,30 @@ service cloud.firestore {
     }
 
     match /incomes/{incomeId} {
-      allow read, write: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      // Allow single document reads if owner
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // Allow list reads if filtering by the user's own ID
+      allow list: if isSignedIn() && request.query.get('userId') == request.auth.uid;
+      
+      allow write: if isSignedIn() && request.resource.data.userId == request.auth.uid;
     }
 
     match /expenses/{expenseId} {
-      allow read, write: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      // Allow single document reads if owner
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // Allow list reads if filtering by the user's own ID
+      allow list: if isSignedIn() && request.query.get('userId') == request.auth.uid;
+
+      allow write: if isSignedIn() && request.resource.data.userId == request.auth.uid;
     }
 
     match /expenseCategories/{categoryId} {
-      allow read, write: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      // Allow single document reads if owner
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // Allow list reads if filtering by the user's own ID
+      allow list: if isSignedIn() && request.query.get('userId') == request.auth.uid;
+      
+      allow write: if isSignedIn() && request.resource.data.userId == request.auth.uid;
     }
 
     match /users/{userId} {
