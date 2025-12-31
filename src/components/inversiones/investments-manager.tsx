@@ -66,7 +66,6 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
                 const cryptoPrices = results[0];
                 const stockPrices = results[1];
 
-                // Combine prices using the correct key
                 const combinedPrices: PriceData = { ...cryptoPrices, ...stockPrices };
 
                 setPrices(combinedPrices);
@@ -117,7 +116,7 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
             await deleteDoc(doc(firestore, 'users', userId, 'investments', investmentToDelete.id));
             toast({ title: 'Éxito', description: 'Inversión eliminada correctamente.' });
         } catch (error) {
-            toast({ title: 'Error', description: 'No se pudo eliminar la inversión.', variant = 'destructive' });
+            toast({ title: 'Error', description: 'No se pudo eliminar la inversión.', variant: 'destructive' });
         } finally {
             handleCloseAlert();
         }
@@ -125,7 +124,14 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
 
     const renderPortfolioRow = (investment: Investment) => {
         const purchaseValue = investment.amount * investment.purchasePrice;
-        const currentPriceKey = investment.assetType === 'crypto' ? investment.assetId : investment.symbol;
+        
+        let currentPriceKey: string;
+        if (investment.assetType === 'crypto') {
+            currentPriceKey = investment.assetId;
+        } else { // stock
+            currentPriceKey = investment.symbol;
+        }
+
         const currentPrice = prices[currentPriceKey]?.price;
         const currentValue = currentPrice ? investment.amount * currentPrice : null;
         const pnl = currentValue !== null ? currentValue - purchaseValue : null;
