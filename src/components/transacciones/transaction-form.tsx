@@ -98,7 +98,7 @@ export function TransactionForm({ categorias, accounts, userId, transaction, onF
             if (id) { // Editing existing transaction - logic for editing assignments is complex, so we simplify and don't allow re-assigning on edit.
                 await setDoc(doc(transactionsColRef, id), dataToSave, { merge: true });
             } else { // Creating new transaction
-                const newDocRef = await addDoc(transactionsColRef, dataToSave);
+                await addDoc(transactionsColRef, dataToSave);
 
                 // If it's an income and an account is selected to be paid
                 if (activeTab === 'ingreso' && accountId) {
@@ -197,6 +197,7 @@ export function TransactionForm({ categorias, accounts, userId, transaction, onF
                 <Input id="amount" type="number" step="0.01" placeholder="Ej: 45.50" {...register('amount')} />
                 {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
             </div>
+            
             {activeTab === 'gasto' && (
                 <div>
                     <Label htmlFor="categoryId">Categoría</Label>
@@ -222,6 +223,7 @@ export function TransactionForm({ categorias, accounts, userId, transaction, onF
                     {errors.categoryId && <p className="text-sm text-destructive">{errors.categoryId.message}</p>}
                 </div>
             )}
+            
             <div>
                 <Label htmlFor="date">Fecha</Label>
                 <Controller
@@ -255,7 +257,8 @@ export function TransactionForm({ categorias, accounts, userId, transaction, onF
                 />
                 {errors.date && <p className="text-sm text-destructive">{errors.date.message}</p>}
             </div>
-             {activeTab === 'ingreso' && pendingAccounts.length > 0 && (
+            
+            {activeTab === 'ingreso' && pendingAccounts.length > 0 && (
                 <div>
                     <Label htmlFor="accountId">Asignar a cuenta (Opcional)</Label>
                     <Controller
@@ -279,7 +282,8 @@ export function TransactionForm({ categorias, accounts, userId, transaction, onF
                      {!!transaction && <p className="text-xs text-muted-foreground mt-1">No se puede cambiar la asignación al editar un ingreso.</p>}
                 </div>
             )}
-             <Button type="submit" disabled={isLoading} className="w-full">
+
+            <Button type="submit" disabled={isLoading} className="w-full">
                 {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</> : `Guardar ${activeTab === 'gasto' ? 'Gasto' : 'Ingreso'}`}
             </Button>
         </form>

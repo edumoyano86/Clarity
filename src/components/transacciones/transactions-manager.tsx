@@ -149,6 +149,7 @@ export function TransactionsManager({ transactions, categorias, accounts, userId
                             <TabsTrigger value='ingreso' disabled={!!selectedTransaction && selectedTransaction.type !== 'ingreso'}>Ingreso</TabsTrigger>
                             <TabsTrigger value='gasto' disabled={!!selectedTransaction && selectedTransaction.type !== 'gasto'}>Gasto</TabsTrigger>
                         </TabsList>
+                        <TabsContent value="ingreso">
                             <TransactionForm
                                 categorias={categorias}
                                 accounts={accounts}
@@ -157,6 +158,17 @@ export function TransactionsManager({ transactions, categorias, accounts, userId
                                 onFormSuccess={handleCloseDialog}
                                 activeTab={activeTab}
                             />
+                        </TabsContent>
+                        <TabsContent value="gasto">
+                             <TransactionForm
+                                categorias={categorias}
+                                accounts={accounts}
+                                userId={userId}
+                                transaction={selectedTransaction}
+                                onFormSuccess={handleCloseDialog}
+                                activeTab={activeTab}
+                            />
+                        </TabsContent>
                     </Tabs>
                 </DialogContent>
             </Dialog>
