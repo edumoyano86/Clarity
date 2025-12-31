@@ -52,9 +52,10 @@
       "properties": {
         "title": { "type": "string", "description": "The title of the appointment." },
         "date": { "type": "number", "description": "Timestamp of the appointment." },
-        "notes": { "type": "string", "description": "Optional notes for the appointment." }
+        "notes": { "type": "string", "description": "Optional notes for the appointment." },
+        "userId": { "type": "string", "description": "The ID of the user who owns this appointment." }
       },
-      "required": ["title", "date"]
+      "required": ["title", "date", "userId"]
     },
     "Note": {
       "title": "Note",

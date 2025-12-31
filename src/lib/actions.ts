@@ -3,7 +3,7 @@
 import { generateSavingsSuggestions } from '@/ai/flows/savings-suggestions';
 import { Categoria, Gasto, Ingreso } from './definitions';
 import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
-import { getDocs, collection, query } from 'firebase/firestore';
+import { getDocs, collection, query, where } from 'firebase/firestore';
 import { db } from '@/firebase/server';
 
 async function getCategorias(userId: string): Promise<Categoria[]> {

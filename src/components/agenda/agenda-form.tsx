@@ -68,6 +68,7 @@ export function AgendaForm({ userId, appointment, onFormSuccess }: AgendaFormPro
             const dataToSave = {
                 ...appointmentData,
                 date: appointmentData.date.getTime(),
+                userId: userId,
             };
 
             const collectionRef = collection(firestore, 'users', userId, 'appointments');
