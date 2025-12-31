@@ -63,8 +63,20 @@ export const FirebaseProvider: React.FC<{ children: ReactNode }> = ({ children }
     return () => unsubscribe(); // Cleanup on unmount
   }, [services]);
 
+  // Memoize context value once everything is loaded
+  const contextValue = useMemo((): FirebaseContextState | null => {
+    if (!services || !user) return null;
+    return {
+        firebaseApp: services.firebaseApp,
+        firestore: services.firestore,
+        auth: services.auth,
+        user,
+        isUserLoading,
+    };
+  }, [services, user, isUserLoading]);
+
   // The isLoading state is true if services are not ready OR the user is still loading.
-  const isLoading = !services || isUserLoading;
+  const isLoading = !contextValue;
 
   if (isLoading) {
     return (
@@ -74,15 +86,6 @@ export const FirebaseProvider: React.FC<{ children: ReactNode }> = ({ children }
     );
   }
   
-  // Memoize context value once everything is loaded
-  const contextValue = useMemo((): FirebaseContextState => ({
-    firebaseApp: services.firebaseApp,
-    firestore: services.firestore,
-    auth: services.auth,
-    user,
-    isUserLoading,
-  }), [services, user, isUserLoading]);
-
   return (
     <FirebaseContext.Provider value={contextValue}>
       <FirebaseErrorListener />
@@ -104,6 +107,11 @@ function useFirebaseContext() {
 
 export const useFirebase = () => {
   const context = useFirebaseContext();
+  if (!context) {
+    // This case should be handled by the loading screen in the provider,
+    // but it's a safeguard.
+    throw new Error('Firebase services are not available yet. This should not happen if used inside FirebaseProvider.');
+  }
   return {
     firebaseApp: context.firebaseApp,
     firestore: context.firestore,
@@ -124,6 +132,9 @@ export const useFirebaseApp = (): FirebaseApp => {
 };
 
 export const useUser = () => {
-    const { user, isUserLoading } = useFirebaseContext();
-    return { user, isUserLoading };
+    const context = useFirebaseContext();
+     if (!context) {
+        return { user: null, isUserLoading: true };
+    }
+    return { user: context.user, isUserLoading: context.isUserLoading };
 };
