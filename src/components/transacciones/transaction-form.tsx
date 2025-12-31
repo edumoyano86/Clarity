@@ -40,6 +40,10 @@ interface TransactionFormProps {
     onFormSuccess: () => void;
 }
 
+const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
+};
+
 export function TransactionForm({ type, categorias, accounts, userId, transaction, onFormSuccess }: TransactionFormProps) {
     const { toast } = useToast();
     const firestore = useFirestore();
@@ -59,6 +63,7 @@ export function TransactionForm({ type, categorias, accounts, userId, transactio
                 amount: transaction.amount,
                 categoryId: transaction.categoryId,
                 date: new Date(transaction.date),
+                accountId: transaction.accountId,
             });
         } else {
             reset({
@@ -92,10 +97,10 @@ export function TransactionForm({ type, categorias, accounts, userId, transactio
 
             const transactionsColRef = collection(firestore, "users", userId, "transactions");
             
-            if (id) { // Editing existing transaction
+            if (id) { // Editing existing transaction - logic for editing assignments is complex, so we simplify and don't allow re-assigning on edit.
                 await setDoc(doc(transactionsColRef, id), dataToSave, { merge: true });
             } else { // Creating new transaction
-                await addDoc(transactionsColRef, dataToSave);
+                const newDocRef = await addDoc(transactionsColRef, dataToSave);
 
                 // If it's an income and an account is selected to be paid
                 if (type === 'ingreso' && accountId) {
@@ -114,7 +119,7 @@ export function TransactionForm({ type, categorias, accounts, userId, transactio
 
                         // Create payment transaction
                         const paymentTx = {
-                            type: 'pago',
+                            type: 'pago' as const,
                             amount: amountToPay,
                             date: data.date.getTime(),
                             description: `Pago de ${accountData.name} con ${data.description}`,
@@ -140,7 +145,7 @@ export function TransactionForm({ type, categorias, accounts, userId, transactio
                 const categoriaDoc = await getDoc(catDocRef);
                 
                 if (categoriaDoc.exists()) {
-                    const categoria = categoriaDoc.data() as Categoria;
+                    const categoria = { id: categoriaDoc.id, ...categoriaDoc.data() } as Categoria;
                     if (categoria && categoria.budget && categoria.budget > 0) {
                         // This logic should be improved to query expenses in the same period
                         if (data.amount > categoria.budget) {
@@ -252,14 +257,14 @@ export function TransactionForm({ type, categorias, accounts, userId, transactio
                 />
                 {errors.date && <p className="text-sm text-destructive">{errors.date.message}</p>}
             </div>
-             {!isGasto && !transaction && pendingAccounts.length > 0 && (
+             {!isGasto && pendingAccounts.length > 0 && (
                 <div>
                     <Label htmlFor="accountId">Asignar a cuenta (Opcional)</Label>
                     <Controller
                         name="accountId"
                         control={control}
                         render={({ field }) => (
-                            <Select onValueChange={field.onChange} value={field.value}>
+                            <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!!transaction}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Saldar una cuenta pendiente" />
                                 </SelectTrigger>
@@ -273,6 +278,7 @@ export function TransactionForm({ type, categorias, accounts, userId, transactio
                             </Select>
                         )}
                     />
+                     {!!transaction && <p className="text-xs text-muted-foreground mt-1">No se puede cambiar la asignación al editar un ingreso.</p>}
                 </div>
             )}
              <Button type="submit" disabled={isLoading} className="w-full">
