@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import 'react-day-picker/dist/style.css'; // Importa los estilos del calendario
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {

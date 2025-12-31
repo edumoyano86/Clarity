@@ -5,14 +5,17 @@ import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { ExpensesChart } from "@/components/dashboard/expenses-chart";
 import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 import { SavingsSuggestions } from "@/components/dashboard/savings-suggestions";
-import { Categoria } from "@/lib/definitions";
+import { Categoria, Appointment } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
-import { useUser } from "@/firebase";
+import { useCollection, useFirestore, useUser } from "@/firebase";
+import { UpcomingAppointments } from "@/components/dashboard/upcoming-appointments";
+import { collection, query, where, orderBy, limit } from "firebase/firestore";
 
 type DashboardData = Awaited<ReturnType<typeof getDashboardData>>;
 
 export default function DashboardPage() {
   const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
   const [data, setData] = useState<DashboardData | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -37,6 +40,19 @@ export default function DashboardPage() {
     fetchData();
   }, [periodo, user]);
 
+   const upcomingAppointmentsQuery = useMemo(() => {
+    if (!firestore || !user) return null;
+    return query(
+      collection(firestore, 'users', user.uid, 'appointments'),
+      where('date', '>=', new Date().getTime()),
+      orderBy('date', 'asc'),
+      limit(3)
+    );
+  }, [firestore, user]);
+
+  const { data: upcomingAppointments, isLoading: loadingAppointments } = useCollection<Appointment>(upcomingAppointmentsQuery);
+
+
   const periodos: { key: Periodo, label: string }[] = [
     { key: 'mes_actual', label: 'Este Mes' },
     { key: 'mes_pasado', label: 'Mes Pasado' },
@@ -45,7 +61,7 @@ export default function DashboardPage() {
   ];
 
   if (isActionLoading || isUserLoading || !user) {
-    return <p>Cargando...</p>
+    return <div className="flex h-full items-center justify-center"><p>Cargando...</p></div>
   }
   
   return (
@@ -80,8 +96,9 @@ export default function DashboardPage() {
             <div className="lg:col-span-2">
               <ExpensesChart data={data.gastosPorCategoria} />
             </div>
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 space-y-8">
               <RecentTransactions transactions={data.transaccionesRecientes} categorias={data.categorias || []} />
+              <UpcomingAppointments appointments={upcomingAppointments || []} isLoading={loadingAppointments}/>
             </div>
           </div>
           <SavingsSuggestions userId={user.uid} />
