@@ -1,6 +1,6 @@
 "use client";
 
-import { Pie, PieChart, Tooltip, Legend, Cell } from "recharts";
+import { Pie, PieChart, Tooltip, Legend, Cell, ResponsiveContainer } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMemo } from "react";
 import { type ChartConfig, ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
@@ -39,7 +39,8 @@ export function ExpensesChart({ data }: ExpensesChartProps) {
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
           {data.length > 0 ? (
-            <PieChart width={399} height={300}>
+            <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
               <Tooltip
                 cursor={{ fill: 'hsl(var(--muted))' }}
                 content={<ChartTooltipContent nameKey="name" hideLabel />}
@@ -99,6 +100,7 @@ export function ExpensesChart({ data }: ExpensesChartProps) {
                 }}
               />
             </PieChart>
+            </ResponsiveContainer>
           ) : (
             <div className="flex h-full items-center justify-center">
               <p className="text-muted-foreground">No hay gastos para mostrar en este período.</p>

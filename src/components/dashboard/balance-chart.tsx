@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Bar, BarChart, XAxis, YAxis, Tooltip, Cell } from "recharts";
+import { Bar, BarChart, XAxis, YAxis, Tooltip, Cell, ResponsiveContainer } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { type ChartConfig, ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 
@@ -39,7 +39,8 @@ export function BalanceChart({ ingresos, gastos }: BalanceChartProps) {
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 20 }} width={399} height={300}>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 20 }}>
                   <YAxis 
                       dataKey="name" 
                       type="category" 
@@ -67,6 +68,7 @@ export function BalanceChart({ ingresos, gastos }: BalanceChartProps) {
                     ))}
                   </Bar>
               </BarChart>
+            </ResponsiveContainer>
         </ChartContainer>
       </CardContent>
     </Card>
