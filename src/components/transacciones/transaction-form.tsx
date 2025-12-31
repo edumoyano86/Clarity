@@ -102,12 +102,17 @@ export function TransactionForm({ categorias, userId, transaction, onFormSuccess
             } else {
                  // Regular transaction (income or expense)
                 const { id, isPending, ...txData } = data;
-                const dataToSave = {
+                
+                const dataToSave: any = {
                     ...txData,
                     type: activeTab,
                     date: txData.date.getTime(),
-                    categoryId: activeTab === 'gasto' ? txData.categoryId : undefined,
                 };
+
+                if (activeTab === 'gasto') {
+                    dataToSave.categoryId = txData.categoryId;
+                }
+
 
                 const collectionRef = collection(firestore, "users", userId, "transactions");
                 if (id) {
