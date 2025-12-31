@@ -45,6 +45,20 @@ interface InvestmentFormProps {
     onFormSuccess: () => void;
 }
 
+// Helper function
+function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+
+  const debounced = (...args: Parameters<F>) => {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    timeout = setTimeout(() => func(...args), waitFor);
+  };
+
+  return debounced as (...args: Parameters<F>) => void;
+}
+
 
 export function InvestmentForm({ userId, investment, onFormSuccess }: InvestmentFormProps) {
     const { toast } = useToast();
@@ -66,8 +80,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
 
     const assetType = watch('assetType');
     
-    // Debounce search function
-    const debouncedSearch = useCallback(
+     const debouncedSearch = useCallback(
         debounce(async (query: string) => {
             if (query.length < 2) {
                 setSearchResults([]);
@@ -248,7 +261,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                         name="assetId"
                         control={control}
                         render={({ field }) => (
-                            <Popover open={open} onOpenChange={setOpen}>
+                            <Popover open={open} onOpenChange={setOpen} modal={true}>
                                 <PopoverTrigger asChild>
                                 <Button
                                     variant="outline"
@@ -359,18 +372,4 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             </Button>
         </form>
     );
-}
-
-// Helper function
-function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
-  let timeout: ReturnType<typeof setTimeout> | null = null;
-
-  const debounced = (...args: Parameters<F>) => {
-    if (timeout) {
-      clearTimeout(timeout);
-    }
-    timeout = setTimeout(() => func(...args), waitFor);
-  };
-
-  return debounced as (...args: Parameters<F>) => void;
 }
