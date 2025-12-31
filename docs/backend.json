@@ -57,17 +57,17 @@
       "schema": { "$ref": "#/entities/User" },
       "description": "Stores user profile data."
     },
-    "/users/{userId}/incomes/{incomeId}": {
+    "/incomes/{incomeId}": {
       "schema": { "$ref": "#/entities/Income" },
-      "description": "Stores income entries for a specific user."
+      "description": "Stores all income entries for all users."
     },
-    "/users/{userId}/expenses/{expenseId}": {
+    "/expenses/{expenseId}": {
       "schema": { "$ref": "#/entities/Expense" },
-      "description": "Stores expense entries for a specific user."
+      "description": "Stores all expense entries for all users."
     },
-    "/users/{userId}/expenseCategories/{categoryId}": {
+    "/expenseCategories/{categoryId}": {
       "schema": { "$ref": "#/entities/ExpenseCategory" },
-      "description": "Stores expense categories defined by a specific user."
+      "description": "Stores all expense categories defined by all users."
     }
   }
 }

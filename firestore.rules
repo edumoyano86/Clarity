@@ -1,20 +1,35 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
     function isSignedIn() {
       return request.auth != null;
     }
 
+    // Check if the user is the owner of the document
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return request.auth.uid == userId;
     }
 
-    match /users/{userId} {
-      allow read, write: if isOwner(userId);
+    // Allow read/write access to incomes for the owner
+    match /incomes/{incomeId} {
+      allow read, write: if isSignedIn() && isOwner(request.resource.data.userId);
+      allow create: if isSignedIn() && isOwner(request.resource.data.userId);
     }
-    
-    match /users/{userId}/{collection}/{docId} {
+
+    // Allow read/write access to expenses for the owner
+    match /expenses/{expenseId} {
+      allow read, write: if isSignedIn() && isOwner(request.resource.data.userId);
+      allow create: if isSignedIn() && isOwner(request.resource.data.userId);
+    }
+
+    // Allow read/write access to expense categories for the owner
+    match /expenseCategories/{categoryId} {
+      allow read, write: if isSignedIn() && isOwner(request.resource.data.userId);
+      allow create: if isSignedIn() && isOwner(request.resource.data.userId);
+    }
+
+    // Allow read/write access to user profile for the owner
+    match /users/{userId} {
       allow read, write: if isOwner(userId);
     }
   }

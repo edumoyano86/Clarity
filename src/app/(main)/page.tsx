@@ -8,30 +8,30 @@ import { SavingsSuggestions } from "@/components/dashboard/savings-suggestions";
 import { Categoria } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
 import { useCollection, useFirestore, useUser } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { collection, query, where } from "firebase/firestore";
 
 type DashboardData = Awaited<ReturnType<typeof getDashboardData>>;
 
 export default function DashboardPage() {
   const firestore = useFirestore();
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
   const [data, setData] = useState<DashboardData | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   const categoriasQuery = useMemo(() => {
     if (!firestore || !user) return null;
-    return collection(firestore, `users/${user.uid}/expenseCategories`);
+    return query(collection(firestore, "expenseCategories"), where("userId", "==", user.uid));
   }, [firestore, user]);
   const { data: categorias, isLoading: loadingCategorias } = useCollection<Categoria>(categoriasQuery);
 
 
   const [periodo, setPeriodo] = useState<Periodo>('mes_actual');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isActionLoading, setIsActionLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
     const fetchData = async () => {
-      setIsLoading(true);
+      setIsActionLoading(true);
       setFetchError(null);
       try {
         const dashboardData = await getDashboardData(user.uid, periodo)
@@ -40,7 +40,7 @@ export default function DashboardPage() {
         console.error("Failed to fetch dashboard data:", error);
         setFetchError("No se pudieron cargar los datos del resumen.");
       } finally {
-        setIsLoading(false);
+        setIsActionLoading(false);
       }
     };
     fetchData();
@@ -53,7 +53,7 @@ export default function DashboardPage() {
     { key: 'ano_actual', label: 'Este Año' },
   ];
 
-  if (loadingCategorias || isLoading) {
+  if (loadingCategorias || isActionLoading || isUserLoading) {
     return <p>Cargando...</p>
   }
   
@@ -96,7 +96,7 @@ export default function DashboardPage() {
           <SavingsSuggestions userId={user!.uid} />
         </>
       ) : (
-        !isLoading && !fetchError && <p>No hay datos para mostrar en este período.</p>
+        !isActionLoading && !fetchError && <p>No hay datos para mostrar en este período.</p>
       )}
     </div>
   );

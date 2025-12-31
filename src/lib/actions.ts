@@ -5,7 +5,7 @@ import { generateSavingsSuggestions } from '@/ai/flows/savings-suggestions';
 import { Categoria, Gasto, Ingreso } from './definitions';
 import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import { z } from 'zod';
-import { getDocs, collection, query, where, getDoc, doc, addDoc, updateDoc } from 'firebase/firestore';
+import { getDocs, collection, query, where, getDoc, doc, addDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/firebase/server';
 import { parseISO } from 'date-fns';
 import { generateBudgetAlert } from '@/ai/flows/budget-alerts';
@@ -115,7 +115,7 @@ export async function addIngreso(userId: string, prevState: ActionState, formDat
             userId,
             date: parseISO(validatedFields.data.date).getTime(),
         };
-        await addDoc(collection(db, `incomes`), ingresoData);
+        await addDoc(collection(db, "incomes"), ingresoData);
         revalidatePath('/ingresos');
         revalidatePath('/');
         return { success: true, message: 'Ingreso agregado exitosamente.' };
@@ -143,7 +143,7 @@ export async function addGasto(userId: string, prevState: ActionState, formData:
             userId,
             date: parseISO(validatedFields.data.date).getTime(),
         };
-        await addDoc(collection(db, `expenses`), gastoData);
+        await addDoc(collection(db, "expenses"), gastoData);
 
         const categoria = await getCategoria(userId, validatedFields.data.categoryId);
         let alertMessage: string | undefined = undefined;
