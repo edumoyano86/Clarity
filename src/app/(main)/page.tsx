@@ -45,8 +45,8 @@ export default function DashboardPage() {
     { key: 'ano_actual', label: 'Este Año' },
   ];
 
-  if (!user) {
-    return <p>Inicia sesión para ver tu resumen.</p>
+  if (!user || !firestore) {
+    return <p>Cargando...</p>
   }
 
   return (
