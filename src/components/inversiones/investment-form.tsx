@@ -53,6 +53,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     const [searchResults, setSearchResults] = useState<CoinGeckoCoin[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [selectedCoin, setSelectedCoin] = useState<CoinGeckoCoin | null>(null);
+    const [open, setOpen] = useState(false);
 
     const { register, handleSubmit, formState: { errors }, control, reset, watch, setValue } = useForm<FormValues>({
         resolver: zodResolver(InvestmentSchema),
@@ -260,11 +261,12 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                         name="assetId"
                         control={control}
                         render={({ field }) => (
-                            <Popover>
+                            <Popover open={open} onOpenChange={setOpen}>
                                 <PopoverTrigger asChild>
                                 <Button
                                     variant="outline"
                                     role="combobox"
+                                    aria-expanded={open}
                                     className="w-full justify-between"
                                 >
                                     {selectedCoin
@@ -293,6 +295,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                                                             setSelectedCoin(selected);
                                                             field.onChange(selected.id);
                                                         }
+                                                        setOpen(false)
                                                     }}
                                                 >
                                                     <Check
