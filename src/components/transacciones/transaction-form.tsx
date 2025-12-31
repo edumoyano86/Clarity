@@ -190,12 +190,12 @@ export function TransactionForm({ categorias, accounts, userId, transaction, onF
                         name="accountId"
                         control={control}
                         render={({ field }) => (
-                            <Select onValueChange={field.onChange} value={field.value || ''}>
+                            <Select onValueChange={(value) => field.onChange(value === 'none' ? '' : value)} value={field.value || 'none'}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Selecciona una cuenta para pagar..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">No asignar</SelectItem>
+                                    <SelectItem value="none">No asignar</SelectItem>
                                     {pendingAccounts.map(acc => (
                                         <SelectItem key={acc.id} value={acc.id}>
                                             {acc.name} (Saldo: ${acc.amount - acc.paidAmount})
