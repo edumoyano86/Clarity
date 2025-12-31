@@ -28,7 +28,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!firestore || !user) return;
+    if (!user) return;
     const fetchData = async () => {
       setIsLoading(true);
       const dashboardData = await getDashboardData(user.uid, periodo)
@@ -36,7 +36,7 @@ export default function DashboardPage() {
       setIsLoading(false);
     };
     fetchData();
-  }, [periodo, firestore, user]);
+  }, [periodo, user]);
 
   const periodos: { key: Periodo, label: string }[] = [
     { key: 'mes_actual', label: 'Este Mes' },
@@ -45,7 +45,7 @@ export default function DashboardPage() {
     { key: 'ano_actual', label: 'Este Año' },
   ];
 
-  if (!user || !firestore || loadingCategorias || isLoading) {
+  if (!user || loadingCategorias || isLoading) {
     return <p>Cargando...</p>
   }
 

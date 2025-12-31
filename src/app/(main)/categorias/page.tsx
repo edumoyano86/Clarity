@@ -15,7 +15,7 @@ export default function CategoriasPage() {
 
     const { data: categorias, isLoading } = useCollection<Categoria>(categoriasQuery);
 
-    if (isLoading || !firestore || !user) {
+    if (isLoading || !user) {
         return <p>Cargando categorías...</p>
     }
 

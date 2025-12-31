@@ -23,7 +23,7 @@ function AuthHandler({ children }: { children: React.ReactNode }) {
   }, [auth, user, isUserLoading]);
 
   // While the initial user state is loading, you might want to show a loader.
-  if (isUserLoading) {
+  if (isUserLoading || !user) {
     return <div className="flex h-screen w-full items-center justify-center"><p>Conectando...</p></div>;
   }
 

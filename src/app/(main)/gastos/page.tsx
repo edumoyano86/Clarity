@@ -21,7 +21,7 @@ export default function GastosPage() {
     }, [firestore, user]);
     const { data: categorias, isLoading: loadingCategorias } = useCollection<Categoria>(categoriasQuery);
     
-    if (loadingGastos || loadingCategorias || !firestore || !user) {
+    if (loadingGastos || loadingCategorias || !user) {
         return <p>Cargando datos...</p>
     }
 

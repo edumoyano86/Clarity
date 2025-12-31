@@ -15,7 +15,7 @@ export default function IngresosPage() {
 
     const { data: ingresos, isLoading } = useCollection<Ingreso>(ingresosQuery);
 
-    if (isLoading || !firestore || !user) {
+    if (isLoading || !user) {
         return <p>Cargando ingresos...</p>;
     }
 

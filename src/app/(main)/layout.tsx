@@ -1,33 +1,11 @@
 'use client';
-import { useEffect } from 'react';
 import Header from "@/components/layout/header";
 import { MainSidebar } from "@/components/layout/main-sidebar";
 import {
   Sidebar,
   SidebarProvider,
 } from "@/components/ui/sidebar";
-import FirebaseProvider from "@/firebase/client-provider";
-import { useAuth, useUser, useFirebase } from "@/firebase";
-import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
-
-function AuthHandler({ children }: { children: React.ReactNode }) {
-  const { auth, firestore } = useFirebase();
-  const { user, isUserLoading } = useUser();
-
-  useEffect(() => {
-    if (auth && !isUserLoading && !user) {
-      initiateAnonymousSignIn(auth);
-    }
-  }, [user, isUserLoading, auth]);
-
-  // Wait until Firebase services are available, auth state is resolved, and we have a user.
-  if (isUserLoading || !auth || !firestore || !user) {
-    return <div className="flex h-screen w-full items-center justify-center"><p>Conectando...</p></div>;
-  }
-
-  return <>{children}</>;
-}
-
+import FirebaseClientProvider from "@/firebase/client-provider";
 
 export default function MainLayout({
   children,
@@ -35,8 +13,7 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <FirebaseProvider>
-      <AuthHandler>
+    <FirebaseClientProvider>
         <SidebarProvider>
           <div className="flex min-h-screen">
             <Sidebar>
@@ -50,7 +27,6 @@ export default function MainLayout({
             </div>
           </div>
         </SidebarProvider>
-      </AuthHandler>
-    </FirebaseProvider>
+    </FirebaseClientProvider>
   );
 }
