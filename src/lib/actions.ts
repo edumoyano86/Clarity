@@ -4,8 +4,12 @@ import { revalidatePath } from 'next/cache';
 import { generateSavingsSuggestions } from '@/ai/flows/savings-suggestions';
 import { Categoria, Gasto, Ingreso } from './definitions';
 import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
-import { getCategorias, getIngresos, getGastos, addGasto as addGastoToDb, addIngreso as addIngresoToDb, saveCategoria as saveCategoriaToDb } from './firebase-actions';
 import { z } from 'zod';
+import { getDocs, collection, query, where, getDoc, doc, addDoc, updateDoc } from 'firebase/firestore';
+import { db } from '@/firebase/server';
+import { parseISO } from 'date-fns';
+import { generateBudgetAlert } from '@/ai/flows/budget-alerts';
+
 
 export type ActionState = {
     success: boolean;
@@ -18,7 +22,7 @@ const CategoriaSchema = z.object({
   id: z.string().optional().or(z.literal('')),
   name: z.string({ required_error: 'El nombre es requerido.'}).min(1, 'El nombre es requerido'),
   icono: z.string({ required_error: 'El icono es requerido.'}).min(1, 'El icono es requerido'),
-  budget: z.coerce.number().min(0, 'El presupuesto debe ser un número positivo').optional(),
+  budget: z.coerce.number().min(0, 'El presupuesto debe ser un número positivo').optional().or(z.literal('')),
 });
 
 const IngresoSchema = z.object({
@@ -34,6 +38,34 @@ const GastoSchema = z.object({
   date: z.string({ required_error: 'La fecha es requerida.'}).min(1, 'La fecha es requerida'),
 });
 
+async function getCategorias(userId: string): Promise<Categoria[]> {
+    const q = query(collection(db, "expenseCategories"), where("userId", "==", userId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Categoria));
+}
+
+async function getCategoria(userId: string, categoryId: string): Promise<Categoria | null> {
+    const docRef = doc(db, "expenseCategories", categoryId);
+    const docSnap = await getDoc(docRef);
+     if (docSnap.exists() && docSnap.data().userId === userId) {
+        return { id: docSnap.id, ...docSnap.data() } as Categoria;
+    }
+    return null;
+}
+
+
+async function getIngresos(userId: string): Promise<Ingreso[]> {
+    const q = query(collection(db, "incomes"), where("userId", "==", userId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Ingreso));
+}
+
+async function getGastos(userId: string): Promise<Gasto[]> {
+    const q = query(collection(db, "expenses"), where("userId", "==", userId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Gasto));
+}
+
 
 export async function saveCategoria(userId: string, prevState: ActionState, formData: FormData): Promise<ActionState> {
     const data = Object.fromEntries(formData.entries());
@@ -48,7 +80,14 @@ export async function saveCategoria(userId: string, prevState: ActionState, form
     }
 
     try {
-        await saveCategoriaToDb(userId, validatedFields.data);
+        const { id, ...categoriaData } = validatedFields.data;
+        const dataToSave = { ...categoriaData, userId, budget: categoriaData.budget || 0 };
+
+        if (id) {
+            await updateDoc(doc(db, "expenseCategories", id), dataToSave);
+        } else {
+            await addDoc(collection(db, "expenseCategories"), dataToSave);
+        }
         revalidatePath('/categorias');
         revalidatePath('/');
         return { success: true, message: 'Categoría guardada exitosamente.' };
@@ -71,7 +110,12 @@ export async function addIngreso(userId: string, prevState: ActionState, formDat
     }
     
     try {
-        await addIngresoToDb(userId, validatedFields.data);
+        const ingresoData = {
+            ...validatedFields.data,
+            userId,
+            date: parseISO(validatedFields.data.date).getTime(),
+        };
+        await addDoc(collection(db, `incomes`), ingresoData);
         revalidatePath('/ingresos');
         revalidatePath('/');
         return { success: true, message: 'Ingreso agregado exitosamente.' };
@@ -94,7 +138,36 @@ export async function addGasto(userId: string, prevState: ActionState, formData:
     }
     
     try {
-        const alertMessage = await addGastoToDb(userId, validatedFields.data);
+        const gastoData = {
+            ...validatedFields.data,
+            userId,
+            date: parseISO(validatedFields.data.date).getTime(),
+        };
+        await addDoc(collection(db, `expenses`), gastoData);
+
+        const categoria = await getCategoria(userId, validatedFields.data.categoryId);
+        let alertMessage: string | undefined = undefined;
+
+        if (categoria && categoria.budget && categoria.budget > 0) {
+            const q = query(collection(db, "expenses"), where("userId", "==", userId), where("categoryId", "==", validatedFields.data.categoryId));
+            const gastosSnap = await getDocs(q);
+            const totalGastado = gastosSnap.docs.reduce((sum, doc) => sum + doc.data().amount, 0);
+
+            if (totalGastado > categoria.budget) {
+                try {
+                    const alertResult = await generateBudgetAlert({
+                        category: categoria.name,
+                        spentAmount: totalGastado,
+                        budgetLimit: categoria.budget,
+                        userName: 'Usuario',
+                    });
+                    alertMessage = alertResult.alertMessage;
+                } catch (error) {
+                    console.error("Error generating budget alert:", error);
+                }
+            }
+        }
+
         revalidatePath('/gastos');
         revalidatePath('/');
         return { success: true, message: 'Gasto agregado exitosamente.', alertMessage };
