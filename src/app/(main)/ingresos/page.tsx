@@ -16,9 +16,9 @@ export default function IngresosPage() {
 
     const { data: ingresos, isLoading: loadingIngresos } = useCollection<Ingreso>(ingresosQuery);
 
-    if (isUserLoading || loadingIngresos) {
+    if (isUserLoading || loadingIngresos || !user) {
         return <p>Cargando ingresos...</p>;
     }
 
-    return <IncomeManager ingresos={ingresos || []} userId={user!.uid} />;
+    return <IncomeManager ingresos={ingresos || []} userId={user.uid} />;
 }

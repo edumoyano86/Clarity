@@ -53,7 +53,7 @@ export default function DashboardPage() {
     { key: 'ano_actual', label: 'Este Año' },
   ];
 
-  if (loadingCategorias || isActionLoading || isUserLoading) {
+  if (loadingCategorias || isActionLoading || isUserLoading || !user) {
     return <p>Cargando...</p>
   }
   
@@ -93,7 +93,7 @@ export default function DashboardPage() {
               <RecentTransactions transactions={data.transaccionesRecientes} categorias={categorias || []} />
             </div>
           </div>
-          <SavingsSuggestions userId={user!.uid} />
+          <SavingsSuggestions userId={user.uid} />
         </>
       ) : (
         !isActionLoading && !fetchError && <p>No hay datos para mostrar en este período.</p>

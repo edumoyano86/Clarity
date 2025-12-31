@@ -16,9 +16,9 @@ export default function CategoriasPage() {
 
     const { data: categorias, isLoading: loadingCategorias } = useCollection<Categoria>(categoriasQuery);
 
-    if (isUserLoading || loadingCategorias) {
+    if (isUserLoading || loadingCategorias || !user) {
         return <p>Cargando categorías...</p>
     }
 
-    return <CategoryManager categorias={categorias || []} userId={user!.uid} />;
+    return <CategoryManager categorias={categorias || []} userId={user.uid} />;
 }

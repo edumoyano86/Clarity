@@ -22,9 +22,9 @@ export default function GastosPage() {
     }, [firestore, user]);
     const { data: categorias, isLoading: loadingCategorias } = useCollection<Categoria>(categoriasQuery);
     
-    if (loadingGastos || loadingCategorias || isUserLoading) {
+    if (loadingGastos || loadingCategorias || isUserLoading || !user) {
         return <p>Cargando datos...</p>
     }
 
-    return <ExpenseManager gastos={gastos || []} categorias={categorias || []} userId={user!.uid} />;
+    return <ExpenseManager gastos={gastos || []} categorias={categorias || []} userId={user.uid} />;
 }
