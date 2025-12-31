@@ -80,7 +80,12 @@ export function InvestmentsChart({ data }: InvestmentsChartProps) {
                     <Tooltip 
                         content={<ChartTooltipContent 
                             formatter={(value) => formatCurrency(value as number)}
-                            labelFormatter={(label) => format(new Date(label), "PPP")}
+                            labelFormatter={(label) => {
+                                const date = new Date(label);
+                                return date instanceof Date && !isNaN(date.getTime())
+                                  ? format(date, "PPP")
+                                  : label;
+                              }}
                             indicator="dot"
                             />} 
                     />
