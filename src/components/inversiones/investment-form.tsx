@@ -54,6 +54,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     const [isSearching, setIsSearching] = useState(false);
     const [selectedCoin, setSelectedCoin] = useState<CoinGeckoCoin | null>(null);
     const [open, setOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const { register, handleSubmit, formState: { errors }, control, reset, watch, setValue } = useForm<FormValues>({
         resolver: zodResolver(InvestmentSchema),
@@ -103,9 +104,10 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         }
     };
     
-    const debouncedSearch = useCallback(debounce(searchCoins, 500), []);
+    const debouncedSearch = useCallback(debounce(searchCoins, 300), []);
 
     const handleSearch = async (query: string) => {
+        setSearchQuery(query);
         const results = await debouncedSearch(query);
         setSearchResults(results);
     };
@@ -139,6 +141,8 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     useEffect(() => {
         setValue('assetId', '');
         setSelectedCoin(null);
+        setSearchQuery('');
+        setSearchResults([]);
     }, [assetType, setValue]);
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
@@ -279,11 +283,12 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                                     <Command>
                                         <CommandInput 
                                             placeholder="Busca por nombre o símbolo..."
+                                            value={searchQuery}
                                             onValueChange={handleSearch}
                                         />
                                         <CommandList>
                                             {isSearching && <CommandEmpty>Buscando...</CommandEmpty>}
-                                            {!isSearching && searchResults.length === 0 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}
+                                            {!isSearching && searchQuery.length > 1 && searchResults.length === 0 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}
                                             <CommandGroup>
                                                 {searchResults.map((coin) => (
                                                 <CommandItem
