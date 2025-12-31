@@ -18,7 +18,8 @@ import {
   Notebook,
   ArrowRightLeft,
   Wallet,
-  Shapes
+  Shapes,
+  AreaChart,
 } from "lucide-react";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
@@ -28,6 +29,7 @@ const menuItems = [
   { href: "/transacciones", label: "Transacciones", icon: ArrowRightLeft },
   { href: "/cuentas", label: "Cuentas", icon: Wallet },
   { href: "/categorias", label: "Categorías", icon: Shapes },
+  { href: "/inversiones", label: "Inversiones", icon: AreaChart },
   { href: "/agenda", label: "Agenda", icon: Calendar },
   { href: "/notas", label: "Notas", icon: Notebook },
 ];

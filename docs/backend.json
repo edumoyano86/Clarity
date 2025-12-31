@@ -72,6 +72,20 @@
         "updatedAt": { "type": "number", "description": "Timestamp when the note was last updated." }
       },
       "required": ["title", "content", "createdAt", "updatedAt"]
+    },
+    "Investment": {
+      "title": "Investment",
+      "type": "object",
+      "description": "Represents a user's investment in an asset, like a cryptocurrency.",
+      "properties": {
+        "coinId": { "type": "string", "description": "The ID of the coin (e.g., 'bitcoin')." },
+        "name": { "type": "string", "description": "The name of the asset (e.g., 'Bitcoin')." },
+        "symbol": { "type": "string", "description": "The ticker symbol of the asset (e.g., 'BTC')." },
+        "amount": { "type": "number", "description": "The quantity of the asset owned." },
+        "purchasePrice": { "type": "number", "description": "The price per unit at the time of purchase." },
+        "purchaseDate": { "type": "number", "description": "Timestamp of when the investment was made." }
+      },
+      "required": ["coinId", "name", "symbol", "amount", "purchasePrice", "purchaseDate"]
     }
   },
   "auth": {
@@ -101,6 +115,10 @@
     "/users/{userId}/notes/{noteId}": {
       "schema": { "$ref": "#/entities/Note" },
       "description": "Stores notes for a specific user."
+    },
+    "/users/{userId}/investments/{investmentId}": {
+      "schema": { "$ref": "#/entities/Investment" },
+      "description": "Stores the user's investments."
     }
   }
 }

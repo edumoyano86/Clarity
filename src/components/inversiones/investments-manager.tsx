@@ -1,0 +1,197 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from "@/components/ui/table";
+import { Investment, CoinPrice } from "@/lib/definitions";
+import { ManagerPage } from '../shared/manager-page';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
+import { InvestmentForm } from './investment-form';
+import { Button } from '../ui/button';
+import { Edit, Trash2, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { useFirestore } from '@/firebase';
+import { deleteDoc, doc } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
+import { getCryptoPrices } from '@/ai/flows/crypto-prices';
+
+const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+};
+
+interface InvestmentsManagerProps {
+    investments: Investment[];
+    userId: string;
+}
+
+export function InvestmentsManager({ investments, userId }: InvestmentsManagerProps) {
+    const [isFormOpen, setIsFormOpen] = useState(false);
+    const [isAlertOpen, setIsAlertOpen] = useState(false);
+    const [selectedInvestment, setSelectedInvestment] = useState<Investment | undefined>(undefined);
+    const [investmentToDelete, setInvestmentToDelete] = useState<Investment | null>(null);
+    const [prices, setPrices] = useState<CoinPrice>({});
+    const [isLoadingPrices, setIsLoadingPrices] = useState(false);
+
+    const firestore = useFirestore();
+    const { toast } = useToast();
+
+    useEffect(() => {
+        const fetchPrices = async () => {
+            if (investments.length === 0) return;
+            setIsLoadingPrices(true);
+            const coinIds = [...new Set(investments.map(inv => inv.coinId))];
+            try {
+                const fetchedPrices = await getCryptoPrices({ coinIds });
+                setPrices(fetchedPrices);
+            } catch (error) {
+                console.error("Failed to fetch crypto prices:", error);
+                toast({
+                    title: 'Error de Precios',
+                    description: 'No se pudieron obtener los precios de las criptomonedas.',
+                    variant: 'destructive'
+                });
+            } finally {
+                setIsLoadingPrices(false);
+            }
+        };
+
+        fetchPrices();
+    }, [investments, toast]);
+
+    const handleOpenForm = (investment?: Investment) => {
+        setSelectedInvestment(investment);
+        setIsFormOpen(true);
+    };
+
+    const handleCloseForm = () => {
+        setIsFormOpen(false);
+        setSelectedInvestment(undefined);
+    };
+
+    const handleOpenAlert = (investment: Investment) => {
+        setInvestmentToDelete(investment);
+        setIsAlertOpen(true);
+    };
+
+    const handleCloseAlert = () => {
+        setInvestmentToDelete(null);
+        setIsAlertOpen(false);
+    };
+
+    const handleDelete = async () => {
+        if (!investmentToDelete) return;
+        try {
+            await deleteDoc(doc(firestore, 'users', userId, 'investments', investmentToDelete.id));
+            toast({ title: 'Éxito', description: 'Inversión eliminada correctamente.' });
+        } catch (error) {
+            toast({ title: 'Error', description: 'No se pudo eliminar la inversión.', variant: 'destructive' });
+        } finally {
+            handleCloseAlert();
+        }
+    };
+
+    const renderPortfolioRow = (investment: Investment) => {
+        const purchaseValue = investment.amount * investment.purchasePrice;
+        const currentValue = prices[investment.coinId] ? investment.amount * prices[investment.coinId].usd : null;
+        const pnl = currentValue !== null ? currentValue - purchaseValue : null;
+        const pnlPercent = pnl !== null && purchaseValue > 0 ? (pnl / purchaseValue) * 100 : null;
+
+        return (
+            <TableRow key={investment.id}>
+                <TableCell>
+                    <div className='font-medium'>{investment.name}</div>
+                    <div className='text-sm text-muted-foreground'>{investment.symbol.toUpperCase()}</div>
+                </TableCell>
+                <TableCell>{investment.amount}</TableCell>
+                <TableCell>{formatCurrency(investment.purchasePrice)}</TableCell>
+                <TableCell>{formatCurrency(purchaseValue)}</TableCell>
+                <TableCell>
+                    {currentValue !== null ? formatCurrency(currentValue) : <Loader2 className="h-4 w-4 animate-spin" />}
+                </TableCell>
+                <TableCell>
+                    {pnl !== null && pnlPercent !== null ? (
+                        <div className={`flex items-center gap-1 font-medium ${pnl >= 0 ? 'text-green-600' : 'text-destructive'}`}>
+                            {pnl >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                            <span>{formatCurrency(pnl)} ({pnlPercent.toFixed(2)}%)</span>
+                        </div>
+                    ) : <Loader2 className="h-4 w-4 animate-spin" />}
+                </TableCell>
+                <TableCell className='text-right'>
+                    <Button variant="ghost" size="icon" onClick={() => handleOpenForm(investment)}>
+                        <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleOpenAlert(investment)}>
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                </TableCell>
+            </TableRow>
+        )
+    }
+
+    return (
+        <>
+            <ManagerPage
+                title="Portafolio de Inversiones"
+                description="Realiza un seguimiento de tus activos de criptomonedas."
+                buttonLabel="Añadir Inversión"
+                onButtonClick={() => handleOpenForm()}
+            >
+                <Card>
+                    <CardContent className='pt-6'>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Activo</TableHead>
+                                    <TableHead>Cantidad</TableHead>
+                                    <TableHead>Precio de Compra</TableHead>
+                                    <TableHead>Valor de Compra</TableHead>
+                                    <TableHead>Valor Actual</TableHead>
+                                    <TableHead>G/P</TableHead>
+                                    <TableHead className='text-right'>Acciones</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {investments.length > 0 ? (
+                                    investments.map(renderPortfolioRow)
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={7} className="text-center h-24">
+                                            No tienes inversiones registradas.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            </ManagerPage>
+
+            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{selectedInvestment ? 'Editar' : 'Nueva'} Inversión</DialogTitle>
+                        <DialogDescription>
+                            Añade un nuevo activo a tu portafolio.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <InvestmentForm userId={userId} investment={selectedInvestment} onFormSuccess={handleCloseForm} />
+                </DialogContent>
+            </Dialog>
+
+            <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta acción no se puede deshacer. Se eliminará permanentemente la inversión.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={handleCloseAlert}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete}>Eliminar</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
+    );
+}

@@ -1,4 +1,5 @@
 
+
 export type Categoria = {
   id: string;
   name: string;
@@ -39,4 +40,21 @@ export type Note = {
     content: string;
     createdAt: number; // timestamp
     updatedAt: number; // timestamp
+};
+
+export type Investment = {
+    id: string;
+    coinId: string;
+    name: string;
+    symbol: string;
+    amount: number;
+    purchasePrice: number;
+    purchaseDate: number; // timestamp
+};
+
+// For CoinGecko API
+export type CoinPrice = {
+  [coinId: string]: {
+    usd: number;
+  };
 };
