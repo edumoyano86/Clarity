@@ -1,7 +1,7 @@
 "use client";
 
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Pie, PieChart, ResponsiveContainer, Tooltip, Legend } from "recharts";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { type ChartConfig, ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 
 type ExpensesChartProps = {
@@ -9,13 +9,13 @@ type ExpensesChartProps = {
     name: string;
     total: number;
     icono: string;
+    fill: string;
   }[];
 };
 
 const chartConfig = {
   total: {
     label: "Total",
-    color: "hsl(var(--primary))",
   },
 } satisfies ChartConfig;
 
@@ -24,23 +24,52 @@ export function ExpensesChart({ data }: ExpensesChartProps) {
     <Card>
       <CardHeader>
         <CardTitle>Gastos por Categoría</CardTitle>
+        <CardDescription>Distribución de tus gastos por categoría para el período seleccionado.</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-            <BarChart data={data} layout="vertical" margin={{ left: 20 }}>
-            <XAxis type="number" hide />
-            <YAxis
-                dataKey="name"
-                type="category"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={10}
-                width={100}
-                tick={{ fill: "hsl(var(--foreground))" }}
-            />
-            <Tooltip cursor={{ fill: 'hsl(var(--muted))' }} content={<ChartTooltipContent />} />
-            <Bar dataKey="total" fill="hsl(var(--primary))" radius={4} />
-            </BarChart>
+            <PieChart>
+                <Tooltip
+                    cursor={{ fill: 'hsl(var(--muted))' }}
+                    content={<ChartTooltipContent nameKey="name" hideLabel />}
+                />
+                <Pie
+                    data={data}
+                    dataKey="total"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={110}
+                    labelLine={false}
+                    label={({
+                        cx,
+                        cy,
+                        midAngle,
+                        innerRadius,
+                        outerRadius,
+                        percent,
+                        index,
+                    }) => {
+                        const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                        const x = cx + radius * Math.cos(-midAngle * (Math.PI / 180));
+                        const y = cy + radius * Math.sin(-midAngle * (Math.PI / 180));
+
+                        return (
+                        <text
+                            x={x}
+                            y={y}
+                            fill="white"
+                            textAnchor={x > cx ? "start" : "end"}
+                            dominantBaseline="central"
+                            className="text-xs font-bold"
+                        >
+                            {`${(percent * 100).toFixed(0)}%`}
+                        </text>
+                        );
+                    }}
+                />
+                 <Legend />
+            </PieChart>
         </ChartContainer>
       </CardContent>
     </Card>

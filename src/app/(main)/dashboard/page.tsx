@@ -15,6 +15,14 @@ import { BalanceChart } from "@/components/dashboard/balance-chart";
 
 type Periodo = 'mes_actual' | 'mes_pasado' | 'ultimos_3_meses' | 'ano_actual';
 
+const CHART_COLORS = [
+    "hsl(var(--chart-1))",
+    "hsl(var(--chart-2))",
+    "hsl(var(--chart-3))",
+    "hsl(var(--chart-4))",
+    "hsl(var(--chart-5))",
+];
+
 export default function DashboardPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
@@ -91,8 +99,8 @@ export default function DashboardPage() {
     const totalIngresos = ingresos.reduce((sum, i) => sum + i.amount, 0);
     const totalGastos = gastosYPagos.reduce((sum, g) => sum + g.amount, 0);
 
+    let colorIndex = 0;
     const gastosPorCategoria = categorias.map(cat => {
-      // We only consider 'gasto' type for the category chart, not 'pago'
       const gastosEnCategoria = transactionsFiltradas.filter(g => g.type === 'gasto' && g.categoryId === cat.id);
       const total = gastosEnCategoria.reduce((sum, g) => sum + g.amount, 0);
       return {
@@ -100,7 +108,15 @@ export default function DashboardPage() {
         total,
         icono: cat.icono,
       };
-    }).filter(c => c.total > 0);
+    }).filter(c => c.total > 0)
+      .map(c => {
+        const result = {
+          ...c,
+          fill: CHART_COLORS[colorIndex % CHART_COLORS.length]
+        };
+        colorIndex++;
+        return result;
+      });
 
     const transaccionesRecientes = [...transactions]
       .sort((a, b) => b.date - a.date)
