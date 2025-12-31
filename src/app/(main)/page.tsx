@@ -60,10 +60,14 @@ export default function DashboardPage() {
     { key: 'ano_actual', label: 'Este Año' },
   ];
 
-  if (isActionLoading || isUserLoading || !user) {
+  if (isActionLoading || isUserLoading) {
     return <div className="flex h-full items-center justify-center"><p>Cargando...</p></div>
   }
   
+  if (!user) {
+     return <div className="flex h-full items-center justify-center"><p>Usuario no encontrado.</p></div>
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
