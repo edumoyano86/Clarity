@@ -144,33 +144,19 @@ export function TransactionsManager({ transactions, categorias, accounts, userId
                             Completa los detalles de tu movimiento.
                         </DialogDescription>
                     </DialogHeader>
-                    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'ingreso' | 'gasto')}>
+                    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'ingreso' | 'gasto')} className="w-full">
                         <TabsList className='grid w-full grid-cols-2'>
                             <TabsTrigger value='ingreso' disabled={!!selectedTransaction && selectedTransaction.type !== 'ingreso'}>Ingreso</TabsTrigger>
                             <TabsTrigger value='gasto' disabled={!!selectedTransaction && selectedTransaction.type !== 'gasto'}>Gasto</TabsTrigger>
                         </TabsList>
-                        <TabsContent value='ingreso'>
-                            <TransactionForm 
-                                type="ingreso"
-                                categorias={categorias}
-                                accounts={accounts} 
-                                userId={userId} 
-                                transaction={selectedTransaction} 
-                                onFormSuccess={handleCloseDialog}
-                                activeTab={activeTab}
-                            />
-                        </TabsContent>
-                        <TabsContent value='gasto'>
-                             <TransactionForm 
-                                type="gasto"
-                                categorias={categorias}
-                                accounts={accounts} 
-                                userId={userId} 
-                                transaction={selectedTransaction} 
-                                onFormSuccess={handleCloseDialog}
-                                activeTab={activeTab}
-                             />
-                        </TabsContent>
+                        <TransactionForm
+                            categorias={categorias}
+                            accounts={accounts}
+                            userId={userId}
+                            transaction={selectedTransaction}
+                            onFormSuccess={handleCloseDialog}
+                            activeTab={activeTab}
+                        />
                     </Tabs>
                 </DialogContent>
             </Dialog>

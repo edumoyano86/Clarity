@@ -32,7 +32,6 @@ const TransactionSchema = z.object({
 type FormValues = z.infer<typeof TransactionSchema>;
 
 interface TransactionFormProps {
-    type: 'ingreso' | 'gasto';
     categorias: Categoria[];
     accounts: Account[];
     userId: string;
@@ -45,7 +44,7 @@ const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
 };
 
-export function TransactionForm({ type, categorias, accounts, userId, transaction, onFormSuccess, activeTab }: TransactionFormProps) {
+export function TransactionForm({ categorias, accounts, userId, transaction, onFormSuccess, activeTab }: TransactionFormProps) {
     const { toast } = useToast();
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = useState(false);
