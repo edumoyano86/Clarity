@@ -8,7 +8,7 @@ import { ManagerPage } from '../shared/manager-page';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { InvestmentForm } from './investment-form';
 import { Button } from '../ui/button';
-import { Edit, Trash2, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
+import { Edit, Trash2, TrendingUp, TrendingDown, Loader2, MinusCircle, DollarSign } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useFirestore } from '@/firebase';
 import { deleteDoc, doc } from 'firebase/firestore';
@@ -18,6 +18,7 @@ import { getStockPrices } from '@/ai/flows/stock-prices';
 import { PortfolioChart } from './portfolio-chart';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
+import { SellInvestmentDialog } from './sell-investment-dialog';
 
 interface InvestmentsManagerProps {
     investments: Investment[];
@@ -30,7 +31,9 @@ const USD_TO_ARS_RATE = 1050;
 export function InvestmentsManager({ investments, userId }: InvestmentsManagerProps) {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
+    const [isSellDialogOpen, setIsSellDialogOpen] = useState(false);
     const [selectedInvestment, setSelectedInvestment] = useState<Investment | undefined>(undefined);
+    const [investmentToSell, setInvestmentToSell] = useState<Investment | undefined>(undefined);
     const [investmentToDelete, setInvestmentToDelete] = useState<Investment | null>(null);
     const [prices, setPrices] = useState<PriceData>({});
     const [isLoadingPrices, setIsLoadingPrices] = useState(false);
@@ -88,6 +91,11 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
         setSelectedInvestment(undefined);
     };
 
+    const handleOpenSellDialog = (investment: Investment) => {
+        setInvestmentToSell(investment);
+        setIsSellDialogOpen(true);
+    };
+
     const handleOpenAlert = (investment: Investment) => {
         setInvestmentToDelete(investment);
         setIsAlertOpen(true);
@@ -138,11 +146,14 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
                         </div>
                     ) : <Loader2 className="h-4 w-4 animate-spin" />}
                 </TableCell>
-                <TableCell className='text-right'>
-                    <Button variant="ghost" size="icon" onClick={() => handleOpenForm(investment)}>
+                <TableCell className='text-right space-x-0'>
+                     <Button variant="ghost" size="icon" onClick={() => handleOpenSellDialog(investment)} title="Vender">
+                        <DollarSign className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleOpenForm(investment)} title="Editar">
                         <Edit className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleOpenAlert(investment)}>
+                    <Button variant="ghost" size="icon" onClick={() => handleOpenAlert(investment)} title="Eliminar">
                         <Trash2 className="h-4 w-4" />
                     </Button>
                 </TableCell>
@@ -215,6 +226,19 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
                     <InvestmentForm userId={userId} investment={selectedInvestment} onFormSuccess={handleCloseForm} />
                 </DialogContent>
             </Dialog>
+
+            {investmentToSell && (
+                 <SellInvestmentDialog
+                    isOpen={isSellDialogOpen}
+                    onOpenChange={setIsSellDialogOpen}
+                    investment={investmentToSell}
+                    userId={userId}
+                    onSuccess={() => {
+                        setIsSellDialogOpen(false);
+                        setInvestmentToSell(undefined);
+                    }}
+                />
+            )}
 
             <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
                 <AlertDialogContent>
