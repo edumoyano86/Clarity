@@ -27,7 +27,8 @@ const formatCurrency = (amount: number) => {
 
 export function BalanceChart({ ingresos, gastos }: BalanceChartProps) {
     const chartData = [
-        { name: "Total", ingresos, gastos }
+        { name: "Ingresos", value: ingresos, fill: "var(--color-ingresos)" },
+        { name: "Gastos", value: gastos, fill: "var(--color-gastos)" },
     ];
 
   return (
@@ -38,9 +39,19 @@ export function BalanceChart({ ingresos, gastos }: BalanceChartProps) {
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-            <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 30 }}>
-                <XAxis type="number" hide />
-                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} hide/>
+            <BarChart data={chartData} layout="horizontal" margin={{ left: 10, right: 30 }}>
+                <YAxis 
+                    dataKey="name" 
+                    type="category" 
+                    tickLine={false} 
+                    axisLine={false}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                />
+                <XAxis 
+                    dataKey="value" 
+                    type="number" 
+                    hide 
+                />
                 <Tooltip 
                     cursor={{ fill: 'hsl(var(--muted))' }} 
                     content={<ChartTooltipContent 
@@ -48,8 +59,7 @@ export function BalanceChart({ ingresos, gastos }: BalanceChartProps) {
                         hideLabel
                     />} 
                 />
-                 <Bar dataKey="ingresos" name="Ingresos" fill="var(--color-ingresos)" radius={4} />
-                 <Bar dataKey="gastos" name="Gastos" fill="var(--color-gastos)" radius={4} />
+                 <Bar dataKey="value" name="Valor" radius={4} />
             </BarChart>
         </ChartContainer>
       </CardContent>
