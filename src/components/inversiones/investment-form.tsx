@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useForm, SubmitHandler, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,18 +9,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { CalendarIcon, Loader2 } from 'lucide-react';
+import { CalendarIcon, Loader2, Check, ChevronsUpDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { Calendar } from '../ui/calendar';
 import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { useFirestore } from '@/firebase';
 import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import { Investment } from '@/lib/definitions';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { getCryptoPrices } from '@/ai/flows/crypto-prices';
 import { getStockPrices } from '@/ai/flows/stock-prices';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 
 interface CoinGeckoCoin {
     id: string;
@@ -45,21 +45,15 @@ interface InvestmentFormProps {
     onFormSuccess: () => void;
 }
 
-// Monedas específicas que el usuario necesita y que podrían no estar en el top 100
-const requiredCoins: CoinGeckoCoin[] = [
-    { id: 'terra-luna-v2', symbol: 'luna', name: 'Terra 2.0' },
-    { id: 'terra-luna-classic', symbol: 'lunc', name: 'Terra Classic' },
-    { id: 'terra-classic-usd', symbol: 'ustc', name: 'TerraClassicUSD' },
-];
-
 
 export function InvestmentForm({ userId, investment, onFormSuccess }: InvestmentFormProps) {
     const { toast } = useToast();
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = useState(false);
-    const [coinList, setCoinList] = useState<CoinGeckoCoin[]>([]);
-    const [isLoadingCoins, setIsLoadingCoins] = useState(false);
-    
+    const [searchResults, setSearchResults] = useState<CoinGeckoCoin[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [selectedCoin, setSelectedCoin] = useState<CoinGeckoCoin | null>(null);
+
     const { register, handleSubmit, formState: { errors }, control, reset, watch, setValue } = useForm<FormValues>({
         resolver: zodResolver(InvestmentSchema),
         defaultValues: {
@@ -69,51 +63,51 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     });
 
     const assetType = watch('assetType');
-
-     useEffect(() => {
-        const fetchCoins = async () => {
-            setIsLoadingCoins(true);
-            try {
-                const response = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch coin list from CoinGecko');
+    
+    // Debounce search function
+    const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
+        let timeout: ReturnType<typeof setTimeout> | null = null;
+        
+        return (...args: Parameters<F>): Promise<ReturnType<F>> =>
+            new Promise(resolve => {
+                if (timeout) {
+                    clearTimeout(timeout);
                 }
-                const top100Coins: CoinGeckoCoin[] = await response.json();
-
-                // Combinar la lista del top 100 con las monedas requeridas, eliminando duplicados
-                const combinedMap = new Map<string, CoinGeckoCoin>();
                 
-                // Añadir primero las requeridas para que, en caso de duplicado, se mantengan
-                requiredCoins.forEach(coin => combinedMap.set(coin.id, coin));
-                
-                // Luego añadir las del top 100, que no sobreescribirán las ya existentes
-                top100Coins.forEach(coin => {
-                    if (!combinedMap.has(coin.id)) {
-                        combinedMap.set(coin.id, coin);
-                    }
-                });
+                timeout = setTimeout(() => resolve(func(...args)), waitFor);
+            });
+    };
 
-                setCoinList(Array.from(combinedMap.values()));
-
-            } catch (error) {
-                console.error(error);
-                // Si la API falla, al menos cargar las monedas requeridas
-                setCoinList(requiredCoins);
-                toast({
-                    title: 'Error de Red',
-                    description: 'No se pudo cargar la lista completa de criptomonedas. Mostrando opciones básicas.',
-                    variant: 'destructive',
-                });
-            } finally {
-                setIsLoadingCoins(false);
-            }
-        };
-
-        if (assetType === 'crypto') {
-            fetchCoins();
+    const searchCoins = async (query: string): Promise<CoinGeckoCoin[]> => {
+        if (query.length < 2) {
+            setSearchResults([]);
+            return [];
         }
-    }, [assetType, toast]);
+        setIsSearching(true);
+        try {
+            const response = await fetch(`https://api.coingecko.com/api/v3/search?query=${query}`);
+            if (!response.ok) throw new Error('Network response was not ok.');
+            const data = await response.json();
+            return data.coins || [];
+        } catch (error) {
+            console.error("Failed to search coins:", error);
+            toast({
+                title: 'Error de Búsqueda',
+                description: 'No se pudieron buscar las criptomonedas.',
+                variant: 'destructive',
+            });
+            return [];
+        } finally {
+            setIsSearching(false);
+        }
+    };
+    
+    const debouncedSearch = useCallback(debounce(searchCoins, 500), []);
 
+    const handleSearch = async (query: string) => {
+        const results = await debouncedSearch(query);
+        setSearchResults(results);
+    };
 
     useEffect(() => {
         if (investment) {
@@ -125,6 +119,9 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 purchasePrice: investment.purchasePrice,
                 purchaseDate: new Date(investment.purchaseDate),
             });
+            if(investment.assetType === 'crypto') {
+                setSelectedCoin({ id: investment.assetId, name: investment.name, symbol: investment.symbol });
+            }
         } else {
              reset({
                 id: '',
@@ -134,11 +131,13 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 purchasePrice: '',
                 purchaseDate: new Date(),
             });
+            setSelectedCoin(null);
         }
     }, [investment, reset]);
 
     useEffect(() => {
         setValue('assetId', '');
+        setSelectedCoin(null);
     }, [assetType, setValue]);
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
@@ -182,8 +181,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             let symbol = '';
 
             if (assetType === 'crypto') {
-                const selectedCoin = coinList.find(c => c.id === assetId);
-                if (!selectedCoin) throw new Error('Criptomoneda no válida');
+                if (!selectedCoin || selectedCoin.id !== assetId) throw new Error('Por favor selecciona una criptomoneda de la lista.');
                 name = selectedCoin.name;
                 symbol = selectedCoin.symbol;
             } else {
@@ -262,19 +260,55 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                         name="assetId"
                         control={control}
                         render={({ field }) => (
-                            <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoadingCoins}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder={isLoadingCoins ? "Cargando monedas..." : "Selecciona una criptomoneda"} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {coinList.map(coin => (
-                                        <SelectItem key={coin.id} value={coin.id}>
-                                            {coin.name} ({coin.symbol.toUpperCase()})
-                                        </SelectItem>
-
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    className="w-full justify-between"
+                                >
+                                    {selectedCoin
+                                    ? selectedCoin.name
+                                    : "Busca una criptomoneda..."}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                    <Command>
+                                        <CommandInput 
+                                            placeholder="Busca por nombre o símbolo..."
+                                            onValueChange={handleSearch}
+                                        />
+                                        <CommandList>
+                                            {isSearching && <CommandEmpty>Buscando...</CommandEmpty>}
+                                            {!isSearching && searchResults.length === 0 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}
+                                            <CommandGroup>
+                                                {searchResults.map((coin) => (
+                                                <CommandItem
+                                                    key={coin.id}
+                                                    value={coin.id}
+                                                    onSelect={(currentValue) => {
+                                                        const selected = searchResults.find(c => c.id === currentValue);
+                                                        if (selected) {
+                                                            setSelectedCoin(selected);
+                                                            field.onChange(selected.id);
+                                                        }
+                                                    }}
+                                                >
+                                                    <Check
+                                                    className={cn(
+                                                        "mr-2 h-4 w-4",
+                                                        field.value === coin.id ? "opacity-100" : "opacity-0"
+                                                    )}
+                                                    />
+                                                    {coin.name} ({coin.symbol.toUpperCase()})
+                                                </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
                         )}
                     />
                 ) : (
@@ -326,7 +360,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 />
                 {errors.purchaseDate && <p className="text-sm text-destructive">{errors.purchaseDate.message}</p>}
             </div>
-             <Button type="submit" disabled={isLoading || isLoadingCoins} className="w-full">
+             <Button type="submit" disabled={isLoading} className="w-full">
                 {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</> : 'Guardar Inversión'}
             </Button>
         </form>

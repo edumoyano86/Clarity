@@ -202,7 +202,7 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
                                         <TableHead>Tenencia</TableHead>
                                         <TableHead>Precio de Compra</TableHead>
                                         <TableHead>Valor de Compra</TableHead>
-                                        <TableHead>Valor Actual</TableHead>
+                                        <TableHead>Tenencia (USD)</TableHead>
                                         <TableHead>G/P</TableHead>
                                         <TableHead className='text-right'>Acciones</TableHead>
                                     </TableRow>
