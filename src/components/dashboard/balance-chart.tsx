@@ -39,13 +39,14 @@ export function BalanceChart({ ingresos, gastos }: BalanceChartProps) {
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-            <BarChart data={chartData} layout="horizontal" margin={{ left: 10, right: 30 }}>
+            <BarChart data={chartData} layout="horizontal" margin={{ left: 10 }}>
                 <YAxis 
                     dataKey="name" 
                     type="category" 
                     tickLine={false} 
                     axisLine={false}
                     tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                    width={80}
                 />
                 <XAxis 
                     dataKey="value" 
