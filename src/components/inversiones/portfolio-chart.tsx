@@ -120,7 +120,12 @@ export function PortfolioChart({ investments, prices, isLoading }: PortfolioChar
                     <Tooltip 
                         content={<ChartTooltipContent 
                             formatter={(value) => formatCurrency(value as number)}
-                            labelFormatter={(label) => format(new Date(Number(label)), "PPP")}
+                            labelFormatter={(label) => {
+                                const date = new Date(Number(label));
+                                return date instanceof Date && !isNaN(date.getTime())
+                                  ? format(date, "PPP")
+                                  : label;
+                              }}
                             indicator="dot"
                             />} 
                     />
