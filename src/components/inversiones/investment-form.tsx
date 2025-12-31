@@ -67,45 +67,32 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     const assetType = watch('assetType');
     
     // Debounce search function
-    const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
-        let timeout: ReturnType<typeof setTimeout> | null = null;
-        
-        const debounced = (...args: Parameters<F>) => {
-            if (timeout) {
-                clearTimeout(timeout);
+    const debouncedSearch = useCallback(
+        debounce(async (query: string) => {
+            if (query.length < 2) {
+                setSearchResults([]);
+                setIsSearching(false);
+                return;
             }
-            timeout = setTimeout(() => func(...args), waitFor);
-        };
-
-        return debounced as (...args: Parameters<F>) => void;
-    };
-
-    const searchCoins = async (query: string) => {
-        if (query.length < 2) {
-            setSearchResults([]);
-            setIsSearching(false);
-            return;
-        }
-        setIsSearching(true);
-        try {
-            const response = await fetch(`https://api.coingecko.com/api/v3/search?query=${query}`);
-            if (!response.ok) throw new Error('Network response was not ok.');
-            const data = await response.json();
-            setSearchResults(data.coins || []);
-        } catch (error) {
-            console.error("Failed to search coins:", error);
-            toast({
-                title: 'Error de Búsqueda',
-                description: 'No se pudieron buscar las criptomonedas.',
-                variant: 'destructive',
-            });
-            setSearchResults([]);
-        } finally {
-            setIsSearching(false);
-        }
-    };
-    
-    const debouncedSearch = useCallback(debounce(searchCoins, 300), [toast]);
+            setIsSearching(true);
+            try {
+                const response = await fetch(`https://api.coingecko.com/api/v3/search?query=${query}`);
+                if (!response.ok) throw new Error('Network response was not ok.');
+                const data = await response.json();
+                setSearchResults(data.coins || []);
+            } catch (error) {
+                console.error("Failed to search coins:", error);
+                toast({
+                    title: 'Error de Búsqueda',
+                    description: 'No se pudieron buscar las criptomonedas.',
+                    variant: 'destructive',
+                });
+                setSearchResults([]);
+            } finally {
+                setIsSearching(false);
+            }
+        }, 300), 
+    [toast]);
 
 
     useEffect(() => {
@@ -217,7 +204,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
              console.error("Error saving investment:", error);
             toast({
                 title: 'Error',
-                description: 'No se pudo guardar la inversión.',
+                description: (error as Error).message || 'No se pudo guardar la inversión.',
                 variant: 'destructive',
             });
         } finally {
@@ -372,4 +359,18 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             </Button>
         </form>
     );
+}
+
+// Helper function
+function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+
+  const debounced = (...args: Parameters<F>) => {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    timeout = setTimeout(() => func(...args), waitFor);
+  };
+
+  return debounced as (...args: Parameters<F>) => void;
 }
