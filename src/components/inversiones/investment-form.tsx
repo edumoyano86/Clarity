@@ -22,29 +22,11 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { getCryptoPrices } from '@/ai/flows/crypto-prices';
 import { getStockPrices } from '@/ai/flows/stock-prices';
 
-const popularCoins = [
-    { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
-    { id: 'ethereum', symbol: 'ETH', name: 'Ethereum' },
-    { id: 'tether', symbol: 'USDT', name: 'Tether' },
-    { id: 'binancecoin', symbol: 'BNB', name: 'Binance Coin' },
-    { id: 'solana', symbol: 'SOL', name: 'Solana' },
-    { id: 'usd-coin', symbol: 'USDC', name: 'USD Coin' },
-    { id: 'ripple', symbol: 'XRP', name: 'XRP' },
-    { id: 'dogecoin', symbol: 'DOGE', name: 'Dogecoin' },
-    { id: 'cardano', symbol: 'ADA', name: 'Cardano' },
-    { id: 'shiba-inu', symbol: 'SHIB', name: 'Shiba Inu' },
-    { id: 'avalanche-2', symbol: 'AVAX', name: 'Avalanche' },
-    { id: 'polkadot', symbol: 'DOT', name: 'Polkadot' },
-    { id: 'chainlink', symbol: 'LINK', name: 'Chainlink' },
-    { id: 'tron', symbol: 'TRX', name: 'TRON' },
-    { id: 'matic-network', symbol: 'MATIC', name: 'Polygon' },
-    { id: 'litecoin', symbol: 'LTC', name: 'Litecoin' },
-    { id: 'uniswap', symbol: 'UNI', name: 'Uniswap' },
-    { id: 'cosmos', symbol: 'ATOM', name: 'Cosmos Hub' },
-    { id: 'terra-luna-v2', symbol: 'LUNA', name: 'Terra 2.0'},
-    { id: 'terra-classic-usd', symbol: 'USTC', name: 'TerraClassicUSD' }
-];
-
+interface CoinGeckoCoin {
+    id: string;
+    symbol: string;
+    name: string;
+}
 
 const InvestmentSchema = z.object({
     id: z.string().optional(),
@@ -67,6 +49,8 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     const { toast } = useToast();
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = useState(false);
+    const [coinList, setCoinList] = useState<CoinGeckoCoin[]>([]);
+    const [isLoadingCoins, setIsLoadingCoins] = useState(false);
     
     const { register, handleSubmit, formState: { errors }, control, reset, watch, setValue } = useForm<FormValues>({
         resolver: zodResolver(InvestmentSchema),
@@ -77,6 +61,34 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     });
 
     const assetType = watch('assetType');
+
+     useEffect(() => {
+        const fetchCoins = async () => {
+            setIsLoadingCoins(true);
+            try {
+                const response = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch coin list from CoinGecko');
+                }
+                const data: CoinGeckoCoin[] = await response.json();
+                setCoinList(data);
+            } catch (error) {
+                console.error(error);
+                toast({
+                    title: 'Error',
+                    description: 'No se pudo cargar la lista de criptomonedas. Intenta de nuevo.',
+                    variant: 'destructive',
+                });
+            } finally {
+                setIsLoadingCoins(false);
+            }
+        };
+
+        if (assetType === 'crypto') {
+            fetchCoins();
+        }
+    }, [assetType, toast]);
+
 
     useEffect(() => {
         if (investment) {
@@ -111,7 +123,6 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             
             let finalPurchasePrice = investmentData.purchasePrice ? Number(investmentData.purchasePrice) : 0;
 
-            // If purchase price is not provided, fetch it
             if (!finalPurchasePrice) {
                 try {
                     let priceData;
@@ -146,12 +157,11 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             let symbol = '';
 
             if (assetType === 'crypto') {
-                const selectedCoin = popularCoins.find(c => c.id === assetId);
+                const selectedCoin = coinList.find(c => c.id === assetId);
                 if (!selectedCoin) throw new Error('Criptomoneda no válida');
                 name = selectedCoin.name;
                 symbol = selectedCoin.symbol;
-            } else { // stock
-                // For stocks, we use the ticker symbol as name/symbol and assetId
+            } else {
                 name = assetId.toUpperCase();
                 symbol = assetId.toUpperCase();
             }
@@ -227,12 +237,12 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                         name="assetId"
                         control={control}
                         render={({ field }) => (
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoadingCoins}>
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Selecciona una criptomoneda" />
+                                    <SelectValue placeholder={isLoadingCoins ? "Cargando monedas..." : "Selecciona una criptomoneda"} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {popularCoins.map(coin => (
+                                    {coinList.map(coin => (
                                         <SelectItem key={coin.id} value={coin.id}>
                                             {coin.name} ({coin.symbol.toUpperCase()})
                                         </SelectItem>
@@ -290,7 +300,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 />
                 {errors.purchaseDate && <p className="text-sm text-destructive">{errors.purchaseDate.message}</p>}
             </div>
-             <Button type="submit" disabled={isLoading} className="w-full">
+             <Button type="submit" disabled={isLoading || isLoadingCoins} className="w-full">
                 {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</> : 'Guardar Inversión'}
             </Button>
         </form>
