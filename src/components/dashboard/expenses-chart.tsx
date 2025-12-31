@@ -27,22 +27,20 @@ export function ExpensesChart({ data }: ExpensesChartProps) {
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-            <ResponsiveContainer>
-                <BarChart data={data} layout="vertical" margin={{ left: 20 }}>
-                <XAxis type="number" hide />
-                <YAxis
-                    dataKey="name"
-                    type="category"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={10}
-                    width={100}
-                    tick={{ fill: "hsl(var(--foreground))" }}
-                />
-                <Tooltip cursor={{ fill: 'hsl(var(--muted))' }} content={<ChartTooltipContent />} />
-                <Bar dataKey="total" fill="hsl(var(--primary))" radius={4} />
-                </BarChart>
-            </ResponsiveContainer>
+            <BarChart data={data} layout="vertical" margin={{ left: 20 }}>
+            <XAxis type="number" hide />
+            <YAxis
+                dataKey="name"
+                type="category"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={10}
+                width={100}
+                tick={{ fill: "hsl(var(--foreground))" }}
+            />
+            <Tooltip cursor={{ fill: 'hsl(var(--muted))' }} content={<ChartTooltipContent />} />
+            <Bar dataKey="total" fill="hsl(var(--primary))" radius={4} />
+            </BarChart>
         </ChartContainer>
       </CardContent>
     </Card>
