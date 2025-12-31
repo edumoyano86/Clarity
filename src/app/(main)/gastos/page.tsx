@@ -3,7 +3,7 @@
 import { useCollection, useFirestore, useUser } from "@/firebase";
 import { Gasto, Categoria } from "@/lib/definitions";
 import { ExpenseManager } from "@/components/gastos/expense-manager";
-import { collection } from "firebase/firestore";
+import { collection, query, orderBy } from "firebase/firestore";
 import { useMemo } from "react";
 
 export default function GastosPage() {
@@ -12,7 +12,7 @@ export default function GastosPage() {
     
     const gastosQuery = useMemo(() => {
         if (!firestore || !user) return null;
-        return collection(firestore, 'users', user.uid, 'expenses');
+        return query(collection(firestore, 'users', user.uid, 'expenses'), orderBy('date', 'desc'));
     }, [firestore, user]);
     const { data: gastos, isLoading: loadingGastos } = useCollection<Gasto>(gastosQuery);
 
