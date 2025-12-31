@@ -45,6 +45,14 @@ interface InvestmentFormProps {
     onFormSuccess: () => void;
 }
 
+// Monedas específicas que el usuario necesita y que podrían no estar en el top 100
+const requiredCoins: CoinGeckoCoin[] = [
+    { id: 'terra-luna-v2', symbol: 'luna', name: 'Terra 2.0' },
+    { id: 'terra-luna-classic', symbol: 'lunc', name: 'Terra Classic' },
+    { id: 'terra-classic-usd', symbol: 'ustc', name: 'TerraClassicUSD' },
+];
+
+
 export function InvestmentForm({ userId, investment, onFormSuccess }: InvestmentFormProps) {
     const { toast } = useToast();
     const firestore = useFirestore();
@@ -70,13 +78,30 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 if (!response.ok) {
                     throw new Error('Failed to fetch coin list from CoinGecko');
                 }
-                const data: CoinGeckoCoin[] = await response.json();
-                setCoinList(data);
+                const top100Coins: CoinGeckoCoin[] = await response.json();
+
+                // Combinar la lista del top 100 con las monedas requeridas, eliminando duplicados
+                const combinedMap = new Map<string, CoinGeckoCoin>();
+                
+                // Añadir primero las requeridas para que, en caso de duplicado, se mantengan
+                requiredCoins.forEach(coin => combinedMap.set(coin.id, coin));
+                
+                // Luego añadir las del top 100, que no sobreescribirán las ya existentes
+                top100Coins.forEach(coin => {
+                    if (!combinedMap.has(coin.id)) {
+                        combinedMap.set(coin.id, coin);
+                    }
+                });
+
+                setCoinList(Array.from(combinedMap.values()));
+
             } catch (error) {
                 console.error(error);
+                // Si la API falla, al menos cargar las monedas requeridas
+                setCoinList(requiredCoins);
                 toast({
-                    title: 'Error',
-                    description: 'No se pudo cargar la lista de criptomonedas. Intenta de nuevo.',
+                    title: 'Error de Red',
+                    description: 'No se pudo cargar la lista completa de criptomonedas. Mostrando opciones básicas.',
                     variant: 'destructive',
                 });
             } finally {
@@ -246,6 +271,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                                         <SelectItem key={coin.id} value={coin.id}>
                                             {coin.name} ({coin.symbol.toUpperCase()})
                                         </SelectItem>
+
                                     ))}
                                 </SelectContent>
                             </Select>

@@ -8,7 +8,7 @@ import { ManagerPage } from '../shared/manager-page';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { InvestmentForm } from './investment-form';
 import { Button } from '../ui/button';
-import { Edit, Trash2, TrendingUp, TrendingDown, Loader2, MinusCircle, DollarSign } from 'lucide-react';
+import { Edit, Trash2, TrendingUp, TrendingDown, Loader2, DollarSign } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useFirestore } from '@/firebase';
 import { deleteDoc, doc } from 'firebase/firestore';
@@ -59,13 +59,11 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
             const stockSymbols = [...new Set(investments.filter(i => i.assetType === 'stock').map(inv => inv.symbol))];
 
             try {
-                const results = await Promise.all([
+                const [cryptoPrices, stockPrices] = await Promise.all([
                     cryptoIds.length > 0 ? getCryptoPrices({ assetIds: cryptoIds }) : Promise.resolve({}),
                     stockSymbols.length > 0 ? getStockPrices({ symbols: stockSymbols }) : Promise.resolve({}),
                 ]);
-                const cryptoPrices = results[0];
-                const stockPrices = results[1];
-
+                
                 const combinedPrices: PriceData = { ...cryptoPrices, ...stockPrices };
 
                 setPrices(combinedPrices);
@@ -201,7 +199,7 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Activo</TableHead>
-                                        <TableHead>Cantidad</TableHead>
+                                        <TableHead>Tenencia</TableHead>
                                         <TableHead>Precio de Compra</TableHead>
                                         <TableHead>Valor de Compra</TableHead>
                                         <TableHead>Valor Actual</TableHead>
