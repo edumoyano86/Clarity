@@ -17,13 +17,15 @@ import { getCryptoPrices } from '@/ai/flows/crypto-prices';
 import { getStockPrices } from '@/ai/flows/stock-prices';
 import { PortfolioChart } from './portfolio-chart';
 import { Label } from '../ui/label';
-import { Input } from '../ui/input';
 import { Switch } from '../ui/switch';
 
 interface InvestmentsManagerProps {
     investments: Investment[];
     userId: string;
 }
+
+// For simplicity, using a fixed rate. This could be fetched from an API in a future iteration.
+const USD_TO_ARS_RATE = 1050; 
 
 export function InvestmentsManager({ investments, userId }: InvestmentsManagerProps) {
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -32,7 +34,6 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
     const [investmentToDelete, setInvestmentToDelete] = useState<Investment | null>(null);
     const [prices, setPrices] = useState<PriceData>({});
     const [isLoadingPrices, setIsLoadingPrices] = useState(false);
-    const [usdToArsRate, setUsdToArsRate] = useState<number | undefined>(undefined);
     const [showInArs, setShowInArs] = useState(false);
 
 
@@ -40,8 +41,8 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
     const { toast } = useToast();
 
     const formatCurrency = (amount: number) => {
-        if (showInArs && usdToArsRate) {
-            return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount * usdToArsRate);
+        if (showInArs) {
+            return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount * USD_TO_ARS_RATE);
         }
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
     };
@@ -158,36 +159,22 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
                 onButtonClick={() => handleOpenForm()}
             >
                 <div className="space-y-8">
-                     <Card>
-                        <CardHeader>
-                            <CardTitle>Configuración de Vista</CardTitle>
-                            <CardDescription>Ajusta la moneda y la cotización para visualizar tu portafolio.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex flex-col sm:flex-row gap-4 items-center">
-                            <div className="grid w-full max-w-sm items-center gap-1.5">
-                                <Label htmlFor="usd-rate">Cotización USD a ARS</Label>
-                                <Input 
-                                    id="usd-rate" 
-                                    type="number" 
-                                    placeholder="Ej: 1050.50" 
-                                    value={usdToArsRate || ''}
-                                    onChange={(e) => setUsdToArsRate(parseFloat(e.target.value))}
-                                />
-                            </div>
-                            <div className="flex items-center space-x-2 pt-6">
-                                <Label htmlFor="currency-switch">Mostrar en {showInArs ? "ARS" : "USD"}</Label>
-                                <Switch
-                                    id="currency-switch"
-                                    checked={showInArs}
-                                    onCheckedChange={setShowInArs}
-                                    disabled={!usdToArsRate || usdToArsRate <= 0}
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <PortfolioChart investments={investments} prices={prices} isLoading={isLoadingPrices} displayCurrency={showInArs ? 'ARS' : 'USD'} usdToArsRate={usdToArsRate} />
+                    <PortfolioChart investments={investments} prices={prices} isLoading={isLoadingPrices} displayCurrency={showInArs ? 'ARS' : 'USD'} usdToArsRate={USD_TO_ARS_RATE} />
                     <Card>
-                        <CardContent className='pt-6'>
+                        <CardHeader>
+                            <div className='flex justify-between items-center'>
+                                <CardTitle>Detalle de Activos</CardTitle>
+                                <div className="flex items-center space-x-2">
+                                    <Switch
+                                        id="currency-switch"
+                                        checked={showInArs}
+                                        onCheckedChange={setShowInArs}
+                                    />
+                                    <Label htmlFor="currency-switch">Mostrar en {showInArs ? "ARS" : "USD"}</Label>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className='pt-0'>
                             <Table>
                                 <TableHeader>
                                     <TableRow>
