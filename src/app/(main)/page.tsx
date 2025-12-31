@@ -21,7 +21,7 @@ export default function DashboardPage() {
     if (!firestore || !user) return null;
     return collection(firestore, `users/${user.uid}/expenseCategories`);
   }, [firestore, user]);
-  const { data: categorias, loading: loadingCategorias } = useCollection<Categoria>(categoriasQuery);
+  const { data: categorias, isLoading: loadingCategorias } = useCollection<Categoria>(categoriasQuery);
 
 
   const [periodo, setPeriodo] = useState<Periodo>('mes_actual');
@@ -45,7 +45,7 @@ export default function DashboardPage() {
     { key: 'ano_actual', label: 'Este Año' },
   ];
 
-  if (!user || !firestore) {
+  if (!user || !firestore || loadingCategorias || isLoading) {
     return <p>Cargando...</p>
   }
 
@@ -67,9 +67,7 @@ export default function DashboardPage() {
         </div>
       </div>
       
-      {isLoading || loadingCategorias ? (
-        <p>Cargando datos...</p>
-      ) : data ? (
+      {data ? (
         <>
           <SummaryCards
             totalIngresos={data.totalIngresos}
