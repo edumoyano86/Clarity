@@ -66,3 +66,4 @@ export function BalanceChart({ ingresos, gastos }: BalanceChartProps) {
     </Card>
   );
 }
+

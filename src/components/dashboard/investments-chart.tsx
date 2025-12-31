@@ -107,3 +107,4 @@ export function InvestmentsChart({ data }: InvestmentsChartProps) {
     </Card>
   );
 }
+
