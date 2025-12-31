@@ -39,9 +39,12 @@ export function TransactionsManager({ transactions, categorias, accounts, userId
     const { toast } = useToast();
     
     const getCategory = (id: string) => categorias.find(c => c.id === id);
+    const getAccount = (id: string) => accounts.find(a => a.id === id);
 
     const handleOpenDialog = (transaction?: Transaction) => {
         if(transaction) {
+            // Cannot edit payments, they are records of an action.
+            if (transaction.type === 'pago') return; 
             setActiveTab(transaction.type === 'ingreso' ? 'ingreso' : 'gasto');
         } else {
             // Reset to default tab when adding a new transaction
@@ -68,6 +71,9 @@ export function TransactionsManager({ transactions, categorias, accounts, userId
 
     const handleDelete = async () => {
         if (!transactionToDelete) return;
+        // Deleting a payment transaction should probably revert the account status,
+        // but for simplicity, we'll just delete the record.
+        // A more robust solution would use a cloud function transaction.
         try {
             await deleteDoc(doc(firestore, 'users', userId, 'transactions', transactionToDelete.id));
             toast({ title: 'Éxito', description: 'Transacción eliminada correctamente.' });
@@ -81,14 +87,20 @@ export function TransactionsManager({ transactions, categorias, accounts, userId
 
     const renderRow = (transaction: Transaction) => {
         const categoria = transaction.categoryId ? getCategory(transaction.categoryId) : null;
+        const account = transaction.accountId ? getAccount(transaction.accountId) : null;
+        
+        const description = transaction.type === 'pago' 
+            ? `Pago de ${account?.name || 'cuenta'}`
+            : transaction.description;
+
         return (
             <TableRow key={transaction.id}>
                 <TableCell className="font-medium">
                      <div className="flex items-center gap-2">
                         {categoria && <Icon name={categoria.icono} className='h-5 w-5 text-muted-foreground'/>}
                         <div>
-                            <div>{transaction.description}</div>
-                            {transaction.type === 'pago' && <div className='text-xs text-muted-foreground'>Pago de cuenta</div>}
+                            <div>{description}</div>
+                            {transaction.type === 'pago' && <div className='text-xs text-muted-foreground'>Transacción de Pago</div>}
                         </div>
                     </div>
                 </TableCell>
@@ -102,7 +114,7 @@ export function TransactionsManager({ transactions, categorias, accounts, userId
                     <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(transaction)} disabled={transaction.type === 'pago'}>
                         <Edit className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleOpenAlert(transaction)} disabled={transaction.type === 'pago'}>
+                    <Button variant="ghost" size="icon" onClick={() => handleOpenAlert(transaction)}>
                         <Trash2 className="h-4 w-4" />
                     </Button>
                 </TableCell>
@@ -178,7 +190,7 @@ export function TransactionsManager({ transactions, categorias, accounts, userId
                     <AlertDialogHeader>
                         <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Esta acción no se puede deshacer. Se eliminará permanentemente la transacción.
+                            Esta acción no se puede deshacer. Se eliminará permanentemente la transacción. Si es un pago, no se revertirá el cambio en la cuenta por pagar.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

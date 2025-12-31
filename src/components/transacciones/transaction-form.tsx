@@ -17,7 +17,7 @@ import { es } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Categoria, Transaction, Account } from '@/lib/definitions';
 import { useFirestore } from '@/firebase';
-import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc, runTransaction } from 'firebase/firestore';
 import { Switch } from '../ui/switch';
 
 const TransactionSchema = z.object({
@@ -26,7 +26,7 @@ const TransactionSchema = z.object({
   amount: z.coerce.number({ invalid_type_error: 'La cantidad debe ser un número.'}).positive('La cantidad debe ser un número positivo'),
   date: z.date({ required_error: 'La fecha es requerida.'}),
   categoryId: z.string().optional(),
-  isPending: z.boolean().default(false),
+  accountId: z.string().optional(), // For paying an account
 });
 
 type FormValues = z.infer<typeof TransactionSchema>;
@@ -40,19 +40,17 @@ interface TransactionFormProps {
     activeTab: 'ingreso' | 'gasto';
 }
 
-export function TransactionForm({ categorias, userId, transaction, onFormSuccess, activeTab }: TransactionFormProps) {
+export function TransactionForm({ categorias, accounts, userId, transaction, onFormSuccess, activeTab }: TransactionFormProps) {
     const { toast } = useToast();
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = useState(false);
     
     const { register, handleSubmit, formState: { errors }, control, reset, watch } = useForm<FormValues>({
         resolver: zodResolver(TransactionSchema),
-        defaultValues: {
-            isPending: false,
-        }
     });
 
-    const isPending = watch('isPending');
+    const accountId = watch('accountId');
+    const amount = watch('amount');
 
     useEffect(() => {
         if (transaction) {
@@ -62,7 +60,7 @@ export function TransactionForm({ categorias, userId, transaction, onFormSuccess
                 amount: transaction.amount,
                 categoryId: transaction.categoryId,
                 date: new Date(transaction.date),
-                isPending: false, // Cannot edit a transaction to be pending
+                accountId: '',
             });
         } else {
             reset({
@@ -71,7 +69,7 @@ export function TransactionForm({ categorias, userId, transaction, onFormSuccess
                 amount: undefined,
                 categoryId: '',
                 date: new Date(),
-                isPending: false,
+                accountId: '',
             });
         }
     }, [transaction, reset]);
@@ -85,23 +83,44 @@ export function TransactionForm({ categorias, userId, transaction, onFormSuccess
         }
 
         try {
-            // If it's a pending expense, create an Account instead of a transaction
-            if (activeTab === 'gasto' && data.isPending) {
-                const accountData = {
-                    name: data.description,
-                    amount: data.amount,
-                    dueDate: data.date.getTime(),
-                    status: 'pendiente' as const,
-                    paidAmount: 0,
-                };
-                await addDoc(collection(firestore, 'users', userId, 'accounts'), accountData);
+            // Case 1: An income is being used to pay an account
+            if (activeTab === 'ingreso' && data.accountId) {
+                const accountRef = doc(firestore, 'users', userId, 'accounts', data.accountId);
+                
+                await runTransaction(firestore, async (firestoreTransaction) => {
+                    const accountDoc = await firestoreTransaction.get(accountRef);
+                    if (!accountDoc.exists()) {
+                        throw "La cuenta seleccionada ya no existe.";
+                    }
+                    const currentAccountData = accountDoc.data() as Account;
+                    
+                    const paymentAmount = data.amount;
+                    const newPaidAmount = currentAccountData.paidAmount + paymentAmount;
+                    const newStatus = newPaidAmount >= currentAccountData.amount ? 'pagada' : 'pendiente';
+
+                    // 1. Update the account
+                    firestoreTransaction.update(accountRef, { paidAmount: newPaidAmount, status: newStatus });
+
+                    // 2. Create the payment transaction record
+                    const paymentTransactionData = {
+                        type: 'pago' as const,
+                        amount: paymentAmount,
+                        date: data.date.getTime(),
+                        description: data.description || `Pago de ${currentAccountData.name}`,
+                        accountId: data.accountId,
+                    };
+                    const transactionsRef = collection(firestore, 'users', userId, 'transactions');
+                    firestoreTransaction.set(doc(transactionsRef), paymentTransactionData);
+                });
+
                 toast({
                     title: 'Éxito',
-                    description: 'Cuenta por pagar creada exitosamente.',
+                    description: 'Pago registrado y cuenta actualizada.',
                 });
+
             } else {
-                 // Regular transaction (income or expense)
-                const { id, isPending, ...txData } = data;
+                 // Case 2: Regular income or expense transaction
+                const { id, accountId, ...txData } = data;
                 
                 const dataToSave: any = {
                     ...txData,
@@ -109,10 +128,12 @@ export function TransactionForm({ categorias, userId, transaction, onFormSuccess
                     date: txData.date.getTime(),
                 };
 
-                if (activeTab === 'gasto') {
+                // Only add categoryId for expenses
+                if (activeTab === 'gasto' && dataToSave.categoryId) {
                     dataToSave.categoryId = txData.categoryId;
+                } else {
+                    delete dataToSave.categoryId;
                 }
-
 
                 const collectionRef = collection(firestore, "users", userId, "transactions");
                 if (id) {
@@ -129,7 +150,7 @@ export function TransactionForm({ categorias, userId, transaction, onFormSuccess
 
         } catch (error) {
             console.error("Error saving:", error);
-            const errorMessage = typeof error === 'string' ? error : 'No se pudo guardar.';
+            const errorMessage = typeof error === 'string' ? error : (error as Error).message || 'No se pudo guardar.';
             toast({
                 title: 'Error',
                 description: errorMessage,
@@ -140,6 +161,8 @@ export function TransactionForm({ categorias, userId, transaction, onFormSuccess
         }
     };
     
+    const pendingAccounts = accounts.filter(acc => acc.status === 'pendiente');
+
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-4">
             <input type="hidden" {...register('id')} />
@@ -154,52 +177,59 @@ export function TransactionForm({ categorias, userId, transaction, onFormSuccess
                 {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
             </div>
             
+            {activeTab === 'ingreso' && pendingAccounts.length > 0 && (
+                <div>
+                    <Label htmlFor="accountId">Asignar a Cuenta por Pagar (Opcional)</Label>
+                    <Controller
+                        name="accountId"
+                        control={control}
+                        render={({ field }) => (
+                            <Select onValueChange={field.onChange} value={field.value}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Selecciona una cuenta para pagar..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="">Ninguna</SelectItem>
+                                    {pendingAccounts.map(acc => (
+                                        <SelectItem key={acc.id} value={acc.id}>
+                                            {acc.name} (Saldo: ${acc.amount - acc.paidAmount})
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                    />
+                </div>
+            )}
+
             {activeTab === 'gasto' && (
-                <>
-                    <div>
-                        <Label htmlFor="categoryId">Categoría</Label>
-                        <Controller
-                            name="categoryId"
-                            control={control}
-                            rules={{ required: activeTab === 'gasto' ? 'La categoría es requerida' : false }}
-                            render={({ field }) => (
-                                <Select onValueChange={field.onChange} value={field.value} disabled={isPending}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Selecciona una categoría" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {categorias.map(cat => (
-                                            <SelectItem key={cat.id} value={cat.id}>
-                                                {cat.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            )}
-                        />
-                        {errors.categoryId && !isPending && <p className="text-sm text-destructive">{errors.categoryId.message}</p>}
-                    </div>
-                     {!transaction && ( // Only show for new expenses
-                        <div className="flex items-center space-x-2 pt-2">
-                           <Controller
-                                name="isPending"
-                                control={control}
-                                render={({ field }) => (
-                                    <Switch
-                                        id="isPending"
-                                        checked={field.value}
-                                        onCheckedChange={field.onChange}
-                                    />
-                                )}
-                            />
-                            <Label htmlFor="isPending">¿Queda pendiente de pago? (Creará una cuenta por pagar)</Label>
-                        </div>
-                     )}
-                </>
+                <div>
+                    <Label htmlFor="categoryId">Categoría</Label>
+                    <Controller
+                        name="categoryId"
+                        control={control}
+                        rules={{ required: activeTab === 'gasto' ? 'La categoría es requerida' : false }}
+                        render={({ field }) => (
+                            <Select onValueChange={field.onChange} value={field.value}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Selecciona una categoría" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {categorias.map(cat => (
+                                        <SelectItem key={cat.id} value={cat.id}>
+                                            {cat.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                    />
+                    {errors.categoryId && <p className="text-sm text-destructive">{errors.categoryId.message}</p>}
+                </div>
             )}
             
             <div>
-                <Label htmlFor="date">{isPending ? 'Fecha de Vencimiento' : 'Fecha'}</Label>
+                <Label htmlFor="date">Fecha</Label>
                 <Controller
                     name="date"
                     control={control}
@@ -234,7 +264,7 @@ export function TransactionForm({ categorias, userId, transaction, onFormSuccess
 
             <Button type="submit" disabled={isLoading} className="w-full">
                 {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</> : 
-                `Guardar ${isPending ? 'Cuenta por Pagar' : (activeTab === 'gasto' ? 'Gasto' : 'Ingreso')}`
+                `Guardar ${accountId ? 'Pago' : (activeTab === 'gasto' ? 'Gasto' : 'Ingreso')}`
                 }
             </Button>
         </form>
