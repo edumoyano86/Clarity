@@ -4,12 +4,14 @@ import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { ExpensesChart } from "@/components/dashboard/expenses-chart";
 import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 import { SavingsSuggestions } from "@/components/dashboard/savings-suggestions";
-import { Categoria, Appointment, Transaction } from "@/lib/definitions";
+import { Categoria, Appointment, Transaction, Investment } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
 import { useCollection, useFirestore, useUser } from "@/firebase";
 import { UpcomingAppointments } from "@/components/dashboard/upcoming-appointments";
 import { collection, query, where, orderBy, limit } from "firebase/firestore";
 import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { InvestmentsChart } from "@/components/dashboard/investments-chart";
+import { BalanceChart } from "@/components/dashboard/balance-chart";
 
 type Periodo = 'mes_actual' | 'mes_pasado' | 'ultimos_3_meses' | 'ano_actual';
 
@@ -29,6 +31,12 @@ export default function DashboardPage() {
     return collection(firestore, 'users', user.uid, 'expenseCategories');
   }, [firestore, user]);
   const { data: categorias, isLoading: loadingCategorias } = useCollection<Categoria>(categoriesQuery);
+
+   const investmentsQuery = useMemo(() => {
+    if (!firestore || !user) return null;
+    return query(collection(firestore, 'users', user.uid, 'investments'), orderBy('purchaseDate', 'asc'));
+  }, [firestore, user]);
+  const { data: investments, isLoading: loadingInvestments } = useCollection<Investment>(investmentsQuery);
 
   const upcomingAppointmentsQuery = useMemo(() => {
     if (!firestore || !user) return null;
@@ -115,7 +123,7 @@ export default function DashboardPage() {
     { key: 'ano_actual', label: 'Este Año' },
   ];
 
-  const isLoading = isUserLoading || loadingTransactions || loadingCategorias;
+  const isLoading = isUserLoading || loadingTransactions || loadingCategorias || loadingInvestments;
 
   if (isLoading) {
     return <div className="flex h-full items-center justify-center"><p>Cargando...</p></div>
@@ -151,6 +159,10 @@ export default function DashboardPage() {
             balance={dashboardData.balance}
             periodo={periodo}
           />
+          <div className="grid gap-8 md:grid-cols-2">
+            <InvestmentsChart data={investments || []} />
+            <BalanceChart ingresos={dashboardData.totalIngresos} gastos={dashboardData.totalGastos} />
+          </div>
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <ExpensesChart data={dashboardData.gastosPorCategoria} />
