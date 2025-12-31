@@ -108,3 +108,4 @@ export function InvestmentsChart({ data }: InvestmentsChartProps) {
   );
 }
 
+
