@@ -11,10 +11,11 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Edit, Trash2, Wallet } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
-import { useFirestore, useUser } from '@/firebase';
-import { deleteDoc, doc, addDoc, collection, updateDoc } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
+import { deleteDoc, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '../ui/progress';
+import { PaymentDialog } from './payment-dialog';
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
@@ -26,21 +27,23 @@ interface AccountsManagerProps {
 }
 
 export function AccountsManager({ accounts, userId }: AccountsManagerProps) {
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
+    const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
     const [selectedAccount, setSelectedAccount] = useState<Account | undefined>(undefined);
+    const [accountToPay, setAccountToPay] = useState<Account | undefined>(undefined);
     const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
 
     const firestore = useFirestore();
     const { toast } = useToast();
     
-    const handleOpenDialog = (account?: Account) => {
+    const handleOpenForm = (account?: Account) => {
         setSelectedAccount(account);
-        setIsDialogOpen(true);
+        setIsFormOpen(true);
     };
 
-    const handleCloseDialog = () => {
-        setIsDialogOpen(false);
+    const handleCloseForm = () => {
+        setIsFormOpen(false);
         setSelectedAccount(undefined);
     };
 
@@ -54,6 +57,11 @@ export function AccountsManager({ accounts, userId }: AccountsManagerProps) {
         setIsAlertOpen(false);
     };
 
+    const handleOpenPaymentDialog = (account: Account) => {
+        setAccountToPay(account);
+        setIsPaymentDialogOpen(true);
+    }
+
     const handleDelete = async () => {
         if (!accountToDelete) return;
         try {
@@ -66,43 +74,13 @@ export function AccountsManager({ accounts, userId }: AccountsManagerProps) {
         }
     };
     
-    const handleMarkAsPaid = async (account: Account) => {
-        const remainingAmount = account.amount - account.paidAmount;
-        if (remainingAmount <= 0) return;
-
-        try {
-            // 1. Create a payment transaction
-            const paymentTransaction = {
-                type: 'pago' as const,
-                amount: remainingAmount,
-                date: new Date().getTime(),
-                description: `Pago de ${account.name}`,
-                accountId: account.id,
-            };
-            await addDoc(collection(firestore, 'users', userId, 'transactions'), paymentTransaction);
-            
-            // 2. Update the account
-            await updateDoc(doc(firestore, 'users', userId, 'accounts', account.id), {
-                status: 'pagada',
-                paidAmount: account.amount
-            });
-
-            toast({ title: 'Éxito', description: `La cuenta ${account.name} ha sido marcada como pagada.` });
-
-        } catch (error) {
-            console.error("Error marking account as paid:", error);
-            toast({ title: 'Error', description: 'No se pudo marcar la cuenta como pagada.', variant: 'destructive' });
-        }
-    }
-
-
     return (
         <>
             <ManagerPage
                 title="Cuentas por Pagar"
                 description="Gestiona tus deudas y pagos pendientes."
                 buttonLabel="Añadir Cuenta"
-                onButtonClick={() => handleOpenDialog()}
+                onButtonClick={() => handleOpenForm()}
             >
                 <Card>
                     <CardContent className='pt-6'>
@@ -136,11 +114,11 @@ export function AccountsManager({ accounts, userId }: AccountsManagerProps) {
                                             </TableCell>
                                             <TableCell className='text-right space-x-1'>
                                                 {account.status === 'pendiente' && (
-                                                    <Button variant="outline" size="sm" onClick={() => handleMarkAsPaid(account)}>
+                                                    <Button variant="outline" size="sm" onClick={() => handleOpenPaymentDialog(account)}>
                                                         <Wallet className="h-4 w-4 mr-2"/> Pagar
                                                     </Button>
                                                 )}
-                                                <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(account)}>
+                                                <Button variant="ghost" size="icon" onClick={() => handleOpenForm(account)}>
                                                     <Edit className="h-4 w-4" />
                                                 </Button>
                                                 <Button variant="ghost" size="icon" onClick={() => handleOpenAlert(account)}>
@@ -155,7 +133,8 @@ export function AccountsManager({ accounts, userId }: AccountsManagerProps) {
                     </CardContent>
                 </Card>
             </ManagerPage>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+
+            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{selectedAccount ? 'Editar' : 'Nueva'} Cuenta</DialogTitle>
@@ -163,9 +142,22 @@ export function AccountsManager({ accounts, userId }: AccountsManagerProps) {
                             Completa los detalles de tu cuenta por pagar.
                         </DialogDescription>
                     </DialogHeader>
-                    <AccountForm userId={userId} account={selectedAccount} onFormSuccess={handleCloseDialog} />
+                    <AccountForm userId={userId} account={selectedAccount} onFormSuccess={handleCloseForm} />
                 </DialogContent>
             </Dialog>
+
+            {accountToPay && (
+                 <PaymentDialog 
+                    isOpen={isPaymentDialogOpen}
+                    onOpenChange={setIsPaymentDialogOpen}
+                    account={accountToPay}
+                    userId={userId}
+                    onSuccess={() => {
+                        setIsPaymentDialogOpen(false);
+                        setAccountToPay(undefined);
+                    }}
+                />
+            )}
 
             <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
                 <AlertDialogContent>

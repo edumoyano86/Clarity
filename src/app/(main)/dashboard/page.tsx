@@ -78,13 +78,14 @@ export default function DashboardPage() {
     const transactionsFiltradas = transactions.filter(filterByDate);
 
     const ingresos = transactionsFiltradas.filter(t => t.type === 'ingreso');
-    const gastos = transactionsFiltradas.filter(t => t.type === 'gasto');
+    const gastosYPagos = transactionsFiltradas.filter(t => t.type === 'gasto' || t.type === 'pago');
 
     const totalIngresos = ingresos.reduce((sum, i) => sum + i.amount, 0);
-    const totalGastos = gastos.reduce((sum, g) => sum + g.amount, 0);
+    const totalGastos = gastosYPagos.reduce((sum, g) => sum + g.amount, 0);
 
     const gastosPorCategoria = categorias.map(cat => {
-      const gastosEnCategoria = gastos.filter(g => g.categoryId === cat.id);
+      // We only consider 'gasto' type for the category chart, not 'pago'
+      const gastosEnCategoria = transactionsFiltradas.filter(g => g.type === 'gasto' && g.categoryId === cat.id);
       const total = gastosEnCategoria.reduce((sum, g) => sum + g.amount, 0);
       return {
         name: cat.name,
@@ -119,11 +120,11 @@ export default function DashboardPage() {
   if (isLoading) {
     return <div className="flex h-full items-center justify-center"><p>Cargando...</p></div>
   }
-
+  
   if (!user) {
      return <div className="flex h-full items-center justify-center"><p>Usuario no encontrado.</p></div>
   }
-  
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-center justify-between gap-4">

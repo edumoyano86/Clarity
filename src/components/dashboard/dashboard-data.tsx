@@ -84,8 +84,7 @@ export default function DashboardPage() {
     const totalGastos = gastosYPagos.reduce((sum, g) => sum + g.amount, 0);
 
     const gastosPorCategoria = categorias.map(cat => {
-      // We only consider 'gasto' type for the category chart, not 'pago'
-      const gastosEnCategoria = transactionsFiltradas.filter(g => g.type === 'gasto' && g.categoryId === cat.id);
+      const gastosEnCategoria = gastosYPagos.filter(g => g.categoryId === cat.id);
       const total = gastosEnCategoria.reduce((sum, g) => sum + g.amount, 0);
       return {
         name: cat.name,
@@ -120,11 +119,11 @@ export default function DashboardPage() {
   if (isLoading) {
     return <div className="flex h-full items-center justify-center"><p>Cargando...</p></div>
   }
-  
+
   if (!user) {
      return <div className="flex h-full items-center justify-center"><p>Usuario no encontrado.</p></div>
   }
-
+  
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
