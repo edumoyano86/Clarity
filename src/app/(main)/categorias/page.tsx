@@ -11,7 +11,7 @@ export default function CategoriasPage() {
 
     const categoriasQuery = useMemo(() => {
         if (!firestore || !user) return null;
-        return query(collection(firestore, `expenseCategories`), where('userId', '==', user.uid));
+        return query(collection(firestore, 'expenseCategories'), where('userId', '==', user.uid));
     }, [firestore, user]);
 
     const { data: categorias, isLoading: loadingCategorias } = useCollection<Categoria>(categoriasQuery);
