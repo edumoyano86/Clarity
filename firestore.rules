@@ -27,7 +27,7 @@ service cloud.firestore {
       // Allow single document reads if owner
       allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
       // Allow list queries but ONLY if filtering by the user's own ID
-      allow list: if isSignedIn() && request.query.where.size >= 1 && request.query.where[0].field == 'userId' && request.query.where[0].op == '==' && request.query.where[0].value == request.auth.uid;
+      allow list: if isSignedIn() && request.query.where.size == 1 && request.query.where[0].field == 'userId' && request.query.where[0].op == '==' && request.query.where[0].value == request.auth.uid;
       
       allow write: if isSignedIn() && request.resource.data.userId == request.auth.uid;
     }
