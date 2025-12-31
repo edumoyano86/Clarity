@@ -2,7 +2,7 @@
 import { useCollection, useFirestore, useUser } from "@/firebase";
 import { CategoryManager } from "@/components/categorias/category-manager";
 import { Categoria } from "@/lib/definitions";
-import { collection, orderBy, query, where } from "firebase/firestore";
+import { collection, query, where } from "firebase/firestore";
 import { useMemo } from "react";
 
 export default function CategoriasPage() {
@@ -11,7 +11,7 @@ export default function CategoriasPage() {
 
     const categoriasQuery = useMemo(() => {
         if (!firestore || !user) return null;
-        return query(collection(firestore, `expenseCategories`), where('userId', '==', user.uid), orderBy('name'));
+        return query(collection(firestore, `expenseCategories`), where('userId', '==', user.uid));
     }, [firestore, user]);
 
     const { data: categorias, isLoading: loadingCategorias } = useCollection<Categoria>(categoriasQuery);

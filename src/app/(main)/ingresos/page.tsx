@@ -2,7 +2,7 @@
 import { useCollection, useFirestore, useUser } from "@/firebase";
 import { Ingreso } from "@/lib/definitions";
 import { IncomeManager } from "@/components/ingresos/income-manager";
-import { collection, orderBy, query, where } from "firebase/firestore";
+import { collection, query, where } from "firebase/firestore";
 import { useMemo } from "react";
 
 export default function IngresosPage() {
@@ -11,7 +11,7 @@ export default function IngresosPage() {
 
     const ingresosQuery = useMemo(() => {
         if (!firestore || !user) return null;
-        return query(collection(firestore, 'incomes'), where('userId', '==', user.uid), orderBy('date', 'desc'));
+        return query(collection(firestore, 'incomes'), where('userId', '==', user.uid));
     }, [firestore, user]);
 
     const { data: ingresos, isLoading: loadingIngresos } = useCollection<Ingreso>(ingresosQuery);
