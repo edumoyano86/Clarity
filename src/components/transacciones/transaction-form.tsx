@@ -18,7 +18,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Categoria, Transaction, Account } from '@/lib/definitions';
 import { useFirestore } from '@/firebase';
 import { collection, addDoc, doc, setDoc, runTransaction } from 'firebase/firestore';
-import { Switch } from '../ui/switch';
 
 const TransactionSchema = z.object({
   id: z.string().optional(),
@@ -26,7 +25,7 @@ const TransactionSchema = z.object({
   amount: z.coerce.number({ invalid_type_error: 'La cantidad debe ser un número.'}).positive('La cantidad debe ser un número positivo'),
   date: z.date({ required_error: 'La fecha es requerida.'}),
   categoryId: z.string().optional(),
-  accountId: z.string().optional(), // For paying an account
+  accountId: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof TransactionSchema>;
@@ -50,8 +49,7 @@ export function TransactionForm({ categorias, accounts, userId, transaction, onF
     });
 
     const accountId = watch('accountId');
-    const amount = watch('amount');
-
+    
     useEffect(() => {
         if (transaction) {
             reset({
@@ -83,8 +81,10 @@ export function TransactionForm({ categorias, accounts, userId, transaction, onF
         }
 
         try {
-            // Case 1: An income is being used to pay an account
+            const collectionRef = collection(firestore, "users", userId, "transactions");
+
             if (activeTab === 'ingreso' && data.accountId) {
+                // Double-entry: create income, create payment, update account
                 const accountRef = doc(firestore, 'users', userId, 'accounts', data.accountId);
                 
                 await runTransaction(firestore, async (firestoreTransaction) => {
@@ -98,28 +98,35 @@ export function TransactionForm({ categorias, accounts, userId, transaction, onF
                     const newPaidAmount = currentAccountData.paidAmount + paymentAmount;
                     const newStatus = newPaidAmount >= currentAccountData.amount ? 'pagada' : 'pendiente';
 
-                    // 1. Update the account
-                    firestoreTransaction.update(accountRef, { paidAmount: newPaidAmount, status: newStatus });
+                    // 1. Create the income transaction
+                    const incomeData = {
+                        type: 'ingreso' as const,
+                        amount: data.amount,
+                        date: data.date.getTime(),
+                        description: data.description,
+                    };
+                    firestoreTransaction.set(doc(collectionRef), incomeData);
 
-                    // 2. Create the payment transaction record
+                    // 2. Create the payment transaction
                     const paymentTransactionData = {
                         type: 'pago' as const,
                         amount: paymentAmount,
                         date: data.date.getTime(),
-                        description: data.description || `Pago de ${currentAccountData.name}`,
+                        description: `Pago de ${currentAccountData.name} con ${data.description}`,
                         accountId: data.accountId,
                     };
-                    const transactionsRef = collection(firestore, 'users', userId, 'transactions');
-                    firestoreTransaction.set(doc(transactionsRef), paymentTransactionData);
+                    firestoreTransaction.set(doc(collectionRef), paymentTransactionData);
+                    
+                    // 3. Update the account
+                    firestoreTransaction.update(accountRef, { paidAmount: newPaidAmount, status: newStatus });
                 });
 
                 toast({
                     title: 'Éxito',
-                    description: 'Pago registrado y cuenta actualizada.',
+                    description: 'Ingreso y pago registrados. Cuenta actualizada.',
                 });
-
             } else {
-                 // Case 2: Regular income or expense transaction
+                 // Regular income, expense, or edit transaction
                 const { id, accountId, ...txData } = data;
                 
                 const dataToSave: any = {
@@ -135,7 +142,6 @@ export function TransactionForm({ categorias, accounts, userId, transaction, onF
                     delete dataToSave.categoryId;
                 }
 
-                const collectionRef = collection(firestore, "users", userId, "transactions");
                 if (id) {
                     await setDoc(doc(collectionRef, id), dataToSave, { merge: true });
                 } else {
@@ -184,12 +190,12 @@ export function TransactionForm({ categorias, accounts, userId, transaction, onF
                         name="accountId"
                         control={control}
                         render={({ field }) => (
-                            <Select onValueChange={field.onChange} value={field.value}>
+                            <Select onValueChange={field.onChange} value={field.value || ''}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Selecciona una cuenta para pagar..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">Ninguna</SelectItem>
+                                    <SelectItem value="">No asignar</SelectItem>
                                     {pendingAccounts.map(acc => (
                                         <SelectItem key={acc.id} value={acc.id}>
                                             {acc.name} (Saldo: ${acc.amount - acc.paidAmount})
@@ -264,7 +270,7 @@ export function TransactionForm({ categorias, accounts, userId, transaction, onF
 
             <Button type="submit" disabled={isLoading} className="w-full">
                 {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</> : 
-                `Guardar ${accountId ? 'Pago' : (activeTab === 'gasto' ? 'Gasto' : 'Ingreso')}`
+                `Guardar ${accountId ? 'Ingreso y Pago' : (activeTab === 'gasto' ? 'Gasto' : 'Ingreso')}`
                 }
             </Button>
         </form>
