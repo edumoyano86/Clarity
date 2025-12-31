@@ -7,16 +7,16 @@ import { useAuth } from '../provider';
 export function useUser() {
   const auth = useAuth();
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isUserLoading, setIsUserLoading] = useState(true); // Default to true
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
-      setLoading(false);
+      setIsUserLoading(false);
     });
 
     return () => unsubscribe();
   }, [auth]);
 
-  return { user, loading };
+  return { user, isUserLoading };
 }
