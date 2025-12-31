@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useCollection, useFirestore, useUser } from "@/firebase";
 import { UpcomingAppointments } from "@/components/dashboard/upcoming-appointments";
 import { collection, query, where, orderBy, limit } from "firebase/firestore";
-import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear, startOfToday } from 'date-fns';
 import { InvestmentsChart } from "@/components/dashboard/investments-chart";
 import { BalanceChart } from "@/components/dashboard/balance-chart";
 
@@ -48,9 +48,10 @@ export default function DashboardPage() {
 
   const upcomingAppointmentsQuery = useMemo(() => {
     if (!firestore || !user) return null;
+    const todayTimestamp = startOfToday().getTime();
     return query(
       collection(firestore, 'users', user.uid, 'appointments'),
-      where('date', '>=', new Date().getTime()),
+      where('date', '>=', todayTimestamp),
       orderBy('date', 'asc'),
       limit(3)
     );
