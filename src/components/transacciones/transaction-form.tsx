@@ -58,7 +58,7 @@ export function TransactionForm({ categorias, accounts, userId, transaction, onF
                 amount: transaction.amount,
                 categoryId: transaction.categoryId,
                 date: new Date(transaction.date),
-                accountId: '',
+                accountId: transaction.accountId || '',
             });
         } else {
             reset({
@@ -112,7 +112,7 @@ export function TransactionForm({ categorias, accounts, userId, transaction, onF
                         type: 'pago' as const,
                         amount: paymentAmount,
                         date: data.date.getTime(),
-                        description: `Pago de ${currentAccountData.name} con ${data.description}`,
+                        description: `Pago de ${currentAccountData.name}`,
                         accountId: data.accountId,
                     };
                     firestoreTransaction.set(doc(collectionRef), paymentTransactionData);
@@ -125,6 +125,40 @@ export function TransactionForm({ categorias, accounts, userId, transaction, onF
                     title: 'Éxito',
                     description: 'Ingreso y pago registrados. Cuenta actualizada.',
                 });
+            } else if (activeTab === 'gasto' && data.accountId) {
+                // This is a payment from the expense tab
+                const accountRef = doc(firestore, 'users', userId, 'accounts', data.accountId);
+                
+                await runTransaction(firestore, async (firestoreTransaction) => {
+                    const accountDoc = await firestoreTransaction.get(accountRef);
+                    if (!accountDoc.exists()) {
+                        throw "La cuenta a pagar no existe.";
+                    }
+                    const currentAccountData = accountDoc.data() as Account;
+
+                    const paymentAmount = data.amount;
+                    const newPaidAmount = currentAccountData.paidAmount + paymentAmount;
+                    const newStatus = newPaidAmount >= currentAccountData.amount ? 'pagada' : 'pendiente';
+
+                    // 1. Create the payment transaction
+                    const paymentTransaction = {
+                        type: 'pago' as const,
+                        amount: paymentAmount,
+                        date: data.date.getTime(),
+                        description: data.description || `Pago de ${currentAccountData.name}`,
+                        accountId: data.accountId,
+                    };
+                    firestoreTransaction.set(doc(collectionRef), paymentTransaction);
+
+                    // 2. Update the account
+                    firestoreTransaction.update(accountRef, { paidAmount: newPaidAmount, status: newStatus });
+                });
+                
+                toast({
+                    title: 'Éxito',
+                    description: 'Pago registrado y cuenta actualizada.',
+                });
+
             } else {
                  // Regular income, expense, or edit transaction
                 const { id, accountId, ...txData } = data;
@@ -135,8 +169,7 @@ export function TransactionForm({ categorias, accounts, userId, transaction, onF
                     date: txData.date.getTime(),
                 };
 
-                // Only add categoryId for expenses
-                if (activeTab === 'gasto' && dataToSave.categoryId) {
+                if (activeTab === 'gasto') {
                     dataToSave.categoryId = txData.categoryId;
                 } else {
                     delete dataToSave.categoryId;
@@ -168,6 +201,7 @@ export function TransactionForm({ categorias, accounts, userId, transaction, onF
     };
     
     const pendingAccounts = accounts.filter(acc => acc.status === 'pendiente');
+    const isPayingAccount = !!accountId;
 
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-4">
@@ -183,7 +217,7 @@ export function TransactionForm({ categorias, accounts, userId, transaction, onF
                 {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
             </div>
             
-            {activeTab === 'ingreso' && pendingAccounts.length > 0 && (
+            {(activeTab === 'ingreso' || activeTab === 'gasto') && pendingAccounts.length > 0 && (
                 <div>
                     <Label htmlFor="accountId">Asignar a Cuenta por Pagar (Opcional)</Label>
                     <Controller
@@ -208,13 +242,13 @@ export function TransactionForm({ categorias, accounts, userId, transaction, onF
                 </div>
             )}
 
-            {activeTab === 'gasto' && (
+            {activeTab === 'gasto' && !isPayingAccount && (
                 <div>
                     <Label htmlFor="categoryId">Categoría</Label>
                     <Controller
                         name="categoryId"
                         control={control}
-                        rules={{ required: activeTab === 'gasto' ? 'La categoría es requerida' : false }}
+                        rules={{ required: activeTab === 'gasto' && !isPayingAccount ? 'La categoría es requerida' : false }}
                         render={({ field }) => (
                             <Select onValueChange={field.onChange} value={field.value}>
                                 <SelectTrigger>
@@ -270,7 +304,7 @@ export function TransactionForm({ categorias, accounts, userId, transaction, onF
 
             <Button type="submit" disabled={isLoading} className="w-full">
                 {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</> : 
-                `Guardar ${accountId ? 'Ingreso y Pago' : (activeTab === 'gasto' ? 'Gasto' : 'Ingreso')}`
+                `Guardar ${activeTab === 'ingreso' && accountId ? 'Ingreso y Pago' : (activeTab === 'gasto' && accountId ? 'Pago' : (activeTab === 'gasto' ? 'Gasto' : 'Ingreso'))}`
                 }
             </Button>
         </form>
