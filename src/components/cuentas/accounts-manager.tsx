@@ -30,21 +30,18 @@ export function AccountsManager({ accounts, userId }: AccountsManagerProps) {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
-    const [selectedAccount, setSelectedAccount] = useState<Account | undefined>(undefined);
     const [accountToPay, setAccountToPay] = useState<Account | undefined>(undefined);
     const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
 
     const firestore = useFirestore();
     const { toast } = useToast();
     
-    const handleOpenForm = (account?: Account) => {
-        setSelectedAccount(account);
+    const handleOpenForm = () => {
         setIsFormOpen(true);
     };
 
     const handleCloseForm = () => {
         setIsFormOpen(false);
-        setSelectedAccount(undefined);
     };
 
     const handleOpenAlert = (account: Account) => {
@@ -79,7 +76,7 @@ export function AccountsManager({ accounts, userId }: AccountsManagerProps) {
             <ManagerPage
                 title="Cuentas por Pagar"
                 description="Gestiona tus deudas y pagos pendientes."
-                buttonLabel="Añadir Cuenta"
+                buttonLabel="Añadir/Modificar Cuenta"
                 onButtonClick={() => handleOpenForm()}
             >
                 <Card>
@@ -118,9 +115,6 @@ export function AccountsManager({ accounts, userId }: AccountsManagerProps) {
                                                         <Wallet className="h-4 w-4 mr-2"/> Pagar
                                                     </Button>
                                                 )}
-                                                <Button variant="ghost" size="icon" onClick={() => handleOpenForm(account)}>
-                                                    <Edit className="h-4 w-4" />
-                                                </Button>
                                                 <Button variant="ghost" size="icon" onClick={() => handleOpenAlert(account)}>
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
@@ -137,12 +131,12 @@ export function AccountsManager({ accounts, userId }: AccountsManagerProps) {
             <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>{selectedAccount ? 'Editar' : 'Nueva'} Cuenta</DialogTitle>
+                        <DialogTitle>Nueva Cuenta / Añadir Saldo</DialogTitle>
                          <DialogDescription>
-                            Completa los detalles de tu cuenta por pagar.
+                            Crea una nueva cuenta por pagar o añade saldo a una existente.
                         </DialogDescription>
                     </DialogHeader>
-                    <AccountForm userId={userId} account={selectedAccount} onFormSuccess={handleCloseForm} />
+                    <AccountForm userId={userId} accounts={accounts} onFormSuccess={handleCloseForm} />
                 </DialogContent>
             </Dialog>
 
