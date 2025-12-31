@@ -5,11 +5,10 @@ import { generateSavingsSuggestions } from '@/ai/flows/savings-suggestions';
 import { Categoria, Gasto, Ingreso } from './definitions';
 import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import { z } from 'zod';
-import { getDocs, collection, query, where, getDoc, doc, addDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { getDocs, collection, query, where, getDoc, doc, addDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebase/server';
 import { parseISO } from 'date-fns';
 import { generateBudgetAlert } from '@/ai/flows/budget-alerts';
-
 
 export type ActionState = {
     success: boolean;
@@ -53,7 +52,6 @@ async function getCategoria(userId: string, categoryId: string): Promise<Categor
     return null;
 }
 
-
 async function getIngresos(userId: string): Promise<Ingreso[]> {
     const q = query(collection(db, "incomes"), where("userId", "==", userId));
     const snapshot = await getDocs(q);
@@ -65,7 +63,6 @@ async function getGastos(userId: string): Promise<Gasto[]> {
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Gasto));
 }
-
 
 export async function saveCategoria(userId: string, prevState: ActionState, formData: FormData): Promise<ActionState> {
     const data = Object.fromEntries(formData.entries());

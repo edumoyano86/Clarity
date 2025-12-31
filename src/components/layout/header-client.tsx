@@ -11,10 +11,25 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { useAuth, useUser } from '@/firebase';
+import { signOut } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
 
 export default function HeaderClient() {
-  const [avatarSrc, setAvatarSrc] = useState("https://picsum.photos/seed/user/40/40");
+  const { user } = useUser();
+  const auth = useAuth();
+  const router = useRouter();
+  const [avatarSrc, setAvatarSrc] = useState(user?.photoURL || "https://picsum.photos/seed/user/40/40");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.push('/login');
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+    }
+  };
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
@@ -26,6 +41,7 @@ export default function HeaderClient() {
       const reader = new FileReader();
       reader.onload = (e) => {
         setAvatarSrc(e.target?.result as string);
+        // Here you would typically upload the image to Firebase Storage and update the user's profileURL
       };
       reader.readAsDataURL(file);
     }
@@ -42,12 +58,12 @@ export default function HeaderClient() {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Avatar className="cursor-pointer">
-            <AvatarImage src={avatarSrc} alt="Usuario" />
-            <AvatarFallback>U</AvatarFallback>
+            <AvatarImage src={avatarSrc} alt={user?.email || 'Usuario'} />
+            <AvatarFallback>{user?.email?.[0].toUpperCase() || 'U'}</AvatarFallback>
           </Avatar>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
+          <DropdownMenuLabel>{user?.email || 'Mi Cuenta'}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleAvatarClick}>
             Cambiar Imagen
@@ -55,7 +71,7 @@ export default function HeaderClient() {
           <DropdownMenuItem>Configuración</DropdownMenuItem>
           <DropdownMenuItem>Soporte</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>Cerrar Sesión</DropdownMenuItem>
+          <DropdownMenuItem onClick={handleLogout}>Cerrar Sesión</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <input

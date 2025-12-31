@@ -1,4 +1,5 @@
 'use client';
+import { useAuth, useUser } from '@/firebase';
 import Header from "@/components/layout/header";
 import { MainSidebar } from "@/components/layout/main-sidebar";
 import {
@@ -6,6 +7,30 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar";
 import { FirebaseProvider } from "@/firebase/provider";
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { user, isUserLoading } = useUser();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, isUserLoading, router]);
+
+  if (isUserLoading || !user) {
+    return (
+       <div className="flex h-screen w-full items-center justify-center">
+        <p>Verificando sesión...</p>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
 
 export default function MainLayout({
   children,
@@ -14,6 +39,7 @@ export default function MainLayout({
 }) {
   return (
     <FirebaseProvider>
+      <AuthGuard>
         <SidebarProvider>
           <div className="flex min-h-screen">
             <Sidebar>
@@ -27,6 +53,7 @@ export default function MainLayout({
             </div>
           </div>
         </SidebarProvider>
+      </AuthGuard>
     </FirebaseProvider>
   );
 }

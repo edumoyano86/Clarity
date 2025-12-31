@@ -5,27 +5,24 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Allow read/write access to incomes for the owner
     match /incomes/{incomeId} {
       allow read, write: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
     }
 
-    // Allow read/write access to expenses for the owner
     match /expenses/{expenseId} {
       allow read, write: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
     }
 
-    // Allow read/write access to expense categories for the owner
     match /expenseCategories/{categoryId} {
       allow read, write: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
     }
 
-    // Allow read/write access to user profile for the owner
     match /users/{userId} {
-      allow read, write: if request.auth.uid == userId;
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn();
     }
   }
 }

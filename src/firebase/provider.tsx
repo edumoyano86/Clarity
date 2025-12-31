@@ -6,7 +6,6 @@ import { Firestore } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 import { initializeFirebase } from '@/firebase';
-import { initiateAnonymousSignIn } from './non-blocking-login';
 
 interface FirebaseServices {
   firebaseApp: FirebaseApp;
@@ -14,7 +13,6 @@ interface FirebaseServices {
   auth: Auth;
 }
 
-// Combined state for the Firebase context
 export interface FirebaseContextState {
   firebaseApp: FirebaseApp;
   firestore: Firestore;
@@ -23,69 +21,39 @@ export interface FirebaseContextState {
   isUserLoading: boolean;
 }
 
-// React Context
 export const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
 
+const services = initializeFirebase();
 
-/**
- * The main Firebase provider. It initializes Firebase services and handles anonymous authentication.
- * It shows a loading screen until all services and user auth are ready.
- */
 export const FirebaseProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Memoize services so they are initialized only once
-  const services = useMemo(() => {
-    try {
-      return initializeFirebase();
-    } catch (e) {
-      console.error("Failed to initialize Firebase", e);
-      return null;
-    }
-  }, []);
-
   const [user, setUser] = useState<User | null>(null);
   const [isUserLoading, setIsUserLoading] = useState(true);
 
-  // Handle authentication state and anonymous sign-in.
   useEffect(() => {
     if (!services) return;
 
     const unsubscribe = onAuthStateChanged(services.auth, (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        setIsUserLoading(false);
-      } else {
-        // If no user, initiate anonymous sign-in
-        initiateAnonymousSignIn(services.auth);
-        // The listener will pick up the new user state, setting isLoading to false then.
-      }
+      setUser(firebaseUser);
+      setIsUserLoading(false);
     });
 
-    return () => unsubscribe(); // Cleanup on unmount
-  }, [services]);
+    return () => unsubscribe();
+  }, []);
+  
+  const contextValue = useMemo(() => ({
+    ...services,
+    user,
+    isUserLoading,
+  }), [user, isUserLoading]);
 
-  // Memoize context value once everything is loaded
-  const contextValue = useMemo((): FirebaseContextState | null => {
-    if (!services || !user) return null;
-    return {
-        firebaseApp: services.firebaseApp,
-        firestore: services.firestore,
-        auth: services.auth,
-        user,
-        isUserLoading,
-    };
-  }, [services, user, isUserLoading]);
-
-  // The isLoading state is true if services are not ready OR the user is still loading.
-  const isLoading = !contextValue;
-
-  if (isLoading) {
+  if (!contextValue) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
-        <p>Conectando...</p>
+        <p>Conectando con Firebase...</p>
       </div>
     );
   }
-  
+
   return (
     <FirebaseContext.Provider value={contextValue}>
       <FirebaseErrorListener />
@@ -94,8 +62,6 @@ export const FirebaseProvider: React.FC<{ children: ReactNode }> = ({ children }
   );
 };
 
-
-// --- HOOKS ---
 
 function useFirebaseContext() {
     const context = useContext(FirebaseContext);
@@ -107,11 +73,6 @@ function useFirebaseContext() {
 
 export const useFirebase = () => {
   const context = useFirebaseContext();
-  if (!context) {
-    // This case should be handled by the loading screen in the provider,
-    // but it's a safeguard.
-    throw new Error('Firebase services are not available yet. This should not happen if used inside FirebaseProvider.');
-  }
   return {
     firebaseApp: context.firebaseApp,
     firestore: context.firestore,
@@ -133,8 +94,5 @@ export const useFirebaseApp = (): FirebaseApp => {
 
 export const useUser = () => {
     const context = useFirebaseContext();
-     if (!context) {
-        return { user: null, isUserLoading: true };
-    }
     return { user: context.user, isUserLoading: context.isUserLoading };
 };
