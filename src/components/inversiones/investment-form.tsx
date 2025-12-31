@@ -41,7 +41,7 @@ const popularCoins = [
     { id: 'litecoin', symbol: 'LTC', name: 'Litecoin' },
     { id: 'uniswap', symbol: 'UNI', name: 'Uniswap' },
     { id: 'cosmos', symbol: 'ATOM', name: 'Cosmos Hub' },
-    { id: 'terra-luna-2', symbol: 'LUNA', name: 'Terra 2.0'},
+    { id: 'terra-luna-v2', symbol: 'LUNA', name: 'Terra 2.0'},
     { id: 'terra-classic-usd', symbol: 'USTC', name: 'TerraClassicUSD' }
 ];
 

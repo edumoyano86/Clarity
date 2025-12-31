@@ -63,7 +63,15 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
                     cryptoIds.length > 0 ? getCryptoPrices({ assetIds: cryptoIds }) : Promise.resolve({}),
                     stockSymbols.length > 0 ? getStockPrices({ symbols: stockSymbols }) : Promise.resolve({}),
                 ]);
-                const combinedPrices = { ...results[0], ...results[1] };
+                const cryptoPrices = results[0];
+                const stockPrices = results[1];
+
+                // Combine prices using the correct key
+                const combinedPrices: PriceData = { ...cryptoPrices };
+                for (const symbol in stockPrices) {
+                    combinedPrices[symbol] = stockPrices[symbol];
+                }
+
                 setPrices(combinedPrices);
 
             } catch (error) {
