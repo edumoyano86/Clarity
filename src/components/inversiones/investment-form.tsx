@@ -26,9 +26,23 @@ const popularCoins = [
     { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
     { id: 'ethereum', symbol: 'ETH', name: 'Ethereum' },
     { id: 'tether', symbol: 'USDT', name: 'Tether' },
-    { id: 'binancecoin', symbol: 'BNB', name: 'Binance' },
+    { id: 'binancecoin', symbol: 'BNB', name: 'Binance Coin' },
     { id: 'solana', symbol: 'SOL', name: 'Solana' },
+    { id: 'usd-coin', symbol: 'USDC', name: 'USD Coin' },
+    { id: 'ripple', symbol: 'XRP', name: 'XRP' },
+    { id: 'dogecoin', symbol: 'DOGE', name: 'Dogecoin' },
+    { id: 'cardano', symbol: 'ADA', name: 'Cardano' },
+    { id: 'shiba-inu', symbol: 'SHIB', name: 'Shiba Inu' },
+    { id: 'avalanche-2', symbol: 'AVAX', name: 'Avalanche' },
+    { id: 'polkadot', symbol: 'DOT', name: 'Polkadot' },
+    { id: 'chainlink', symbol: 'LINK', name: 'Chainlink' },
+    { id: 'tron', symbol: 'TRX', name: 'TRON' },
+    { id: 'matic-network', symbol: 'MATIC', name: 'Polygon' },
+    { id: 'litecoin', symbol: 'LTC', name: 'Litecoin' },
+    { id: 'uniswap', symbol: 'UNI', name: 'Uniswap' },
+    { id: 'cosmos', symbol: 'ATOM', name: 'Cosmos Hub' },
 ];
+
 
 const InvestmentSchema = z.object({
     id: z.string().optional(),
