@@ -13,6 +13,7 @@ import {
   Landmark,
   Calendar,
   Notebook,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 
@@ -31,6 +32,7 @@ export const iconMap: { [key: string]: LucideIcon } = {
   Landmark,
   Calendar,
   Notebook,
+  Wallet,
 };
 
 export const availableIcons = [

@@ -100,23 +100,41 @@ export default function DashboardPage() {
     const totalGastos = gastosYPagos.reduce((sum, g) => sum + g.amount, 0);
 
     let colorIndex = 0;
-    const gastosPorCategoria = categorias.map(cat => {
-      const gastosEnCategoria = transactionsFiltradas.filter(g => g.type === 'gasto' && g.categoryId === cat.id);
-      const total = gastosEnCategoria.reduce((sum, g) => sum + g.amount, 0);
-      return {
-        name: cat.name,
-        total,
-        icono: cat.icono,
-      };
-    }).filter(c => c.total > 0)
-    .map(c => {
-        const result = {
-          ...c,
-          fill: CHART_COLORS[colorIndex % CHART_COLORS.length]
+    
+    // Gastos categorizados
+    const gastosPorCategoriaData = categorias.map(cat => {
+        const gastosEnCategoria = transactionsFiltradas.filter(g => g.type === 'gasto' && g.categoryId === cat.id);
+        const total = gastosEnCategoria.reduce((sum, g) => sum + g.amount, 0);
+        return {
+          name: cat.name,
+          total: total,
+          icono: cat.icono,
         };
-        colorIndex++;
-        return result;
-      });
+    });
+
+    // Pagos (considerados como una categoría aparte para el gráfico)
+    const totalPagos = transactionsFiltradas
+        .filter(t => t.type === 'pago')
+        .reduce((sum, p) => sum + p.amount, 0);
+
+    if (totalPagos > 0) {
+        gastosPorCategoriaData.push({
+            name: 'Pago de Cuentas',
+            total: totalPagos,
+            icono: 'Wallet' // O un icono genérico que tengas
+        });
+    }
+
+    const gastosPorCategoria = gastosPorCategoriaData
+        .filter(c => c.total > 0)
+        .map(c => {
+          const result = {
+            ...c,
+            fill: CHART_COLORS[colorIndex % CHART_COLORS.length]
+          };
+          colorIndex++;
+          return result;
+        });
 
     const transaccionesRecientes = [...transactions]
       .sort((a, b) => b.date - a.date)
