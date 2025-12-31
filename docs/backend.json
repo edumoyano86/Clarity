@@ -11,28 +11,19 @@
       },
       "required": ["id", "registrationDate"]
     },
-    "Income": {
-      "title": "Income",
+    "Transaction": {
+      "title": "Transaction",
       "type": "object",
-      "description": "Represents a single income entry for a user.",
+      "description": "Represents a single financial transaction (income, expense, or payment).",
       "properties": {
-        "source": { "type": "string", "description": "The source of the income (e.g., Salary)." },
-        "amount": { "type": "number", "description": "The amount of income received." },
-        "date": { "type": "number", "description": "Timestamp of when the income was received." }
+        "type": { "type": "string", "enum": ["ingreso", "gasto", "pago"], "description": "The type of transaction." },
+        "amount": { "type": "number", "description": "The amount of the transaction." },
+        "date": { "type": "number", "description": "Timestamp of when the transaction occurred." },
+        "description": { "type": "string", "description": "A brief description of the transaction." },
+        "categoryId": { "type": "string", "description": "ID of the expense category (only for 'gasto' type)." },
+        "accountId": { "type": "string", "description": "ID of the account this transaction is paying off (only for 'pago' type)." }
       },
-      "required": ["source", "amount", "date"]
-    },
-    "Expense": {
-      "title": "Expense",
-      "type": "object",
-      "description": "Represents a single expense entry for a user.",
-      "properties": {
-        "categoryId": { "type": "string", "description": "ID of the expense category." },
-        "amount": { "type": "number", "description": "The amount of the expense." },
-        "date": { "type": "number", "description": "Timestamp of when the expense was incurred." },
-        "notes": { "type": "string", "description": "Optional notes for the expense." }
-      },
-      "required": ["categoryId", "amount", "date"]
+      "required": ["type", "amount", "date", "description"]
     },
     "ExpenseCategory": {
       "title": "ExpenseCategory",
@@ -44,6 +35,19 @@
         "icono": { "type": "string", "description": "The icon for this category." }
       },
       "required": ["name", "icono"]
+    },
+    "Account": {
+      "title": "Account",
+      "type": "object",
+      "description": "Represents a payable account or debt.",
+      "properties": {
+          "name": { "type": "string", "description": "The name of the account (e.g., 'Credit Card Bill')." },
+          "amount": { "type": "number", "description": "The total amount due." },
+          "dueDate": { "type": "number", "description": "Timestamp of the due date." },
+          "status": { "type": "string", "enum": ["pendiente", "pagada"], "description": "The status of the account." },
+          "paidAmount": { "type": "number", "description": "The amount that has been paid so far." }
+      },
+      "required": ["name", "amount", "dueDate", "status", "paidAmount"]
     },
     "Appointment": {
       "title": "Appointment",
@@ -78,17 +82,17 @@
       "schema": { "$ref": "#/entities/User" },
       "description": "Stores user profile data."
     },
-    "/users/{userId}/incomes/{incomeId}": {
-      "schema": { "$ref": "#/entities/Income" },
-      "description": "Stores income entries for a specific user."
-    },
-    "/users/{userId}/expenses/{expenseId}": {
-      "schema": { "$ref": "#/entities/Expense" },
-      "description": "Stores expense entries for a specific user."
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "Stores all financial transactions for a specific user."
     },
     "/users/{userId}/expenseCategories/{categoryId}": {
       "schema": { "$ref": "#/entities/ExpenseCategory" },
       "description": "Stores expense categories defined by a specific user."
+    },
+    "/users/{userId}/accounts/{accountId}": {
+      "schema": { "$ref": "#/entities/Account" },
+      "description": "Stores payable accounts for a specific user."
     },
     "/users/{userId}/appointments/{appointmentId}": {
       "schema": { "$ref": "#/entities/Appointment" },

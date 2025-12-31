@@ -2,10 +2,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Categoria, Gasto, Ingreso } from "@/lib/definitions";
+import { Categoria, Transaction } from "@/lib/definitions";
 import { ScrollArea } from "../ui/scroll-area";
-
-type Transaction = (Ingreso & { tipo: 'ingreso' }) | (Gasto & { tipo: 'gasto' });
+import { Icon } from "../icons";
 
 type RecentTransactionsProps = {
   transactions: Transaction[];
@@ -17,24 +16,58 @@ const formatCurrency = (amount: number) => {
 };
 
 export function RecentTransactions({ transactions, categorias }: RecentTransactionsProps) {
-  const getCategoryName = (id: string) => {
-    return categorias.find(c => c.id === id)?.name || "Desconocido";
+  const getCategory = (id: string) => {
+    return categorias.find(c => c.id === id);
   }
 
   const renderDescription = (tx: Transaction) => {
-    if (tx.tipo === 'ingreso') {
-      return {
-        title: tx.source,
-        subtitle: 'Ingreso'
-      };
+    let categoryName = '';
+    if (tx.type === 'gasto' && tx.categoryId) {
+        const category = getCategory(tx.categoryId);
+        categoryName = category?.name || 'Gasto';
+    } else if (tx.type === 'pago') {
+        categoryName = 'Pago de Cuenta';
     }
-    // It's a Gasto (expense)
-    const categoryName = getCategoryName(tx.categoryId);
+
     return {
-      title: tx.notes || categoryName,
+      title: tx.description,
       subtitle: categoryName
     };
   };
+
+  const getBadgeVariant = (type: Transaction['type']) => {
+    switch (type) {
+      case 'ingreso':
+        return 'secondary';
+      case 'gasto':
+        return 'outline';
+      case 'pago':
+        return 'destructive';
+      default:
+        return 'default';
+    }
+  }
+
+  const getAmountClass = (type: Transaction['type']) => {
+    switch (type) {
+        case 'ingreso': return 'text-green-600';
+        case 'gasto': return 'text-destructive';
+        case 'pago': return 'text-destructive';
+        default: return '';
+    }
+  }
+
+  const getAmountPrefix = (type: Transaction['type']) => {
+      return type === 'ingreso' ? '+' : '-';
+  }
+
+  const getIcon = (tx: Transaction) => {
+    if (tx.type === 'gasto' && tx.categoryId) {
+        const category = getCategory(tx.categoryId);
+        return category ? <Icon name={category.icono} className="h-5 w-5 text-muted-foreground" /> : null;
+    }
+    return null;
+  }
 
 
   return (
@@ -56,20 +89,24 @@ export function RecentTransactions({ transactions, categorias }: RecentTransacti
                 {transactions.map((tx) => {
                   const { title, subtitle } = renderDescription(tx);
                   return (
-                    <TableRow key={`${tx.tipo}-${tx.id}`}>
+                    <TableRow key={`${tx.type}-${tx.id}`}>
                       <TableCell>
-                        <div className="font-medium">
-                          {title}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {new Date(tx.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                          {' - '}
-                          {subtitle}
+                         <div className="flex items-center gap-2">
+                            {getIcon(tx)}
+                            <div>
+                                <div className="font-medium">
+                                {title}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                {new Date(tx.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                                {subtitle && ` - ${subtitle}`}
+                                </div>
+                            </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Badge variant={tx.tipo === 'ingreso' ? 'secondary' : 'outline'} className={tx.tipo === 'ingreso' ? "text-green-600" : ""}>
-                          {tx.tipo === 'ingreso' ? '+' : '-'} {formatCurrency(tx.amount)}
+                        <Badge variant={getBadgeVariant(tx.type)} className={getAmountClass(tx.type)}>
+                           {getAmountPrefix(tx.type)} {formatCurrency(tx.amount)}
                         </Badge>
                       </TableCell>
                     </TableRow>

@@ -12,21 +12,21 @@ import {
 } from "@/components/ui/sidebar";
 import {
   LayoutDashboard,
-  TrendingUp,
-  TrendingDown,
-  Shapes,
   Settings,
   CircleHelp,
   Calendar,
-  Notebook
+  Notebook,
+  ArrowRightLeft,
+  Wallet,
+  Shapes
 } from "lucide-react";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
 
 const menuItems = [
   { href: "/", label: "Resumen", icon: LayoutDashboard },
-  { href: "/ingresos", label: "Ingresos", icon: TrendingUp },
-  { href: "/gastos", label: "Gastos", icon: TrendingDown },
+  { href: "/transacciones", label: "Transacciones", icon: ArrowRightLeft },
+  { href: "/cuentas", label: "Cuentas", icon: Wallet },
   { href: "/categorias", label: "Categorías", icon: Shapes },
   { href: "/agenda", label: "Agenda", icon: Calendar },
   { href: "/notas", label: "Notas", icon: Notebook },

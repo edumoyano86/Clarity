@@ -16,60 +16,62 @@ import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
 import { useFirestore } from '@/firebase';
 import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
-import { Ingreso } from '@/lib/definitions';
+import { Account } from '@/lib/definitions';
 
-const IngresoSchema = z.object({
+const AccountSchema = z.object({
   id: z.string().optional(),
-  source: z.string({ required_error: 'La fuente es requerida.'}).min(1, 'La fuente es requerida'),
+  name: z.string({ required_error: 'El nombre es requerido.'}).min(1, 'El nombre es requerido'),
   amount: z.coerce.number({ invalid_type_error: 'La cantidad debe ser un número.'}).positive('La cantidad debe ser un número positivo'),
-  date: z.date({ required_error: 'La fecha es requerida.'}),
+  dueDate: z.date({ required_error: 'La fecha es requerida.'}),
 });
 
-type FormValues = z.infer<typeof IngresoSchema>;
+type FormValues = z.infer<typeof AccountSchema>;
 
-interface IncomeFormProps {
+interface AccountFormProps {
     userId: string;
-    income?: Ingreso;
+    account?: Account;
     onFormSuccess: () => void;
 }
 
-export function IncomeForm({ userId, income, onFormSuccess }: IncomeFormProps) {
+export function AccountForm({ userId, account, onFormSuccess }: AccountFormProps) {
     const { toast } = useToast();
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = useState(false);
     
     const { register, handleSubmit, formState: { errors }, control, reset } = useForm<FormValues>({
-        resolver: zodResolver(IngresoSchema),
+        resolver: zodResolver(AccountSchema),
     });
 
     useEffect(() => {
-        if (income) {
+        if (account) {
             reset({
-                id: income.id,
-                source: income.source,
-                amount: income.amount,
-                date: new Date(income.date),
+                id: account.id,
+                name: account.name,
+                amount: account.amount,
+                dueDate: new Date(account.dueDate),
             });
         } else {
              reset({
                 id: '',
-                source: '',
+                name: '',
                 amount: undefined,
-                date: new Date(),
+                dueDate: new Date(),
             });
         }
-    }, [income, reset]);
+    }, [account, reset]);
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         setIsLoading(true);
         try {
-            const { id, ...ingresoData } = data;
+            const { id, ...accountData } = data;
             const dataToSave = {
-                ...ingresoData,
-                date: ingresoData.date.getTime(),
+                ...accountData,
+                dueDate: accountData.dueDate.getTime(),
+                status: account?.status || 'pendiente',
+                paidAmount: account?.paidAmount || 0,
             };
             
-            const collectionRef = collection(firestore, 'users', userId, 'incomes');
+            const collectionRef = collection(firestore, 'users', userId, 'accounts');
 
             if (id) {
                 await setDoc(doc(collectionRef, id), dataToSave, { merge: true });
@@ -79,14 +81,14 @@ export function IncomeForm({ userId, income, onFormSuccess }: IncomeFormProps) {
 
             toast({
                 title: 'Éxito',
-                description: 'Ingreso guardado exitosamente.',
+                description: 'Cuenta guardada exitosamente.',
             });
             onFormSuccess();
         } catch (error) {
-             console.error("Error saving income:", error);
+             console.error("Error saving account:", error);
             toast({
                 title: 'Error',
-                description: 'No se pudo guardar el ingreso.',
+                description: 'No se pudo guardar la cuenta.',
                 variant: 'destructive',
             });
         } finally {
@@ -98,19 +100,19 @@ export function IncomeForm({ userId, income, onFormSuccess }: IncomeFormProps) {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <input type="hidden" {...register('id')} />
             <div>
-                <Label htmlFor="source">Fuente del Ingreso</Label>
-                <Input id="source" placeholder="Ej: Salario, Venta online" {...register('source')} />
-                {errors.source && <p className="text-sm text-destructive">{errors.source.message}</p>}
+                <Label htmlFor="name">Nombre de la cuenta</Label>
+                <Input id="name" placeholder="Ej: Tarjeta de Crédito, Alquiler" {...register('name')} />
+                {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
             </div>
             <div>
-                <Label htmlFor="amount">Cantidad</Label>
-                <Input id="amount" type="number" step="0.01" placeholder="Ej: 1500.00" {...register('amount')} />
+                <Label htmlFor="amount">Monto Total</Label>
+                <Input id="amount" type="number" step="0.01" placeholder="Ej: 50000" {...register('amount')} />
                  {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
             </div>
              <div>
-                <Label htmlFor="date">Fecha</Label>
+                <Label htmlFor="dueDate">Fecha de Vencimiento</Label>
                 <Controller
-                    name="date"
+                    name="dueDate"
                     control={control}
                     render={({ field }) => (
                         <Popover modal={true}>
@@ -138,10 +140,10 @@ export function IncomeForm({ userId, income, onFormSuccess }: IncomeFormProps) {
                         </Popover>
                     )}
                 />
-                {errors.date && <p className="text-sm text-destructive">{errors.date.message}</p>}
+                {errors.dueDate && <p className="text-sm text-destructive">{errors.dueDate.message}</p>}
             </div>
              <Button type="submit" disabled={isLoading} className="w-full">
-                {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</> : 'Guardar Ingreso'}
+                {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</> : 'Guardar Cuenta'}
             </Button>
         </form>
     );

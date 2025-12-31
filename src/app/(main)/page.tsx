@@ -4,7 +4,7 @@ import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { ExpensesChart } from "@/components/dashboard/expenses-chart";
 import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 import { SavingsSuggestions } from "@/components/dashboard/savings-suggestions";
-import { Categoria, Appointment, Gasto, Ingreso } from "@/lib/definitions";
+import { Categoria, Appointment, Transaction } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
 import { useCollection, useFirestore, useUser } from "@/firebase";
 import { UpcomingAppointments } from "@/components/dashboard/upcoming-appointments";
@@ -18,18 +18,11 @@ export default function DashboardPage() {
   const firestore = useFirestore();
   const [periodo, setPeriodo] = useState<Periodo>('mes_actual');
 
-  // --- Data Fetching Hooks ---
-  const incomesQuery = useMemo(() => {
+  const transactionsQuery = useMemo(() => {
     if (!firestore || !user) return null;
-    return collection(firestore, 'users', user.uid, 'incomes');
+    return collection(firestore, 'users', user.uid, 'transactions');
   }, [firestore, user]);
-  const { data: ingresos, isLoading: loadingIngresos } = useCollection<Ingreso>(incomesQuery);
-
-  const expensesQuery = useMemo(() => {
-    if (!firestore || !user) return null;
-    return collection(firestore, 'users', user.uid, 'expenses');
-  }, [firestore, user]);
-  const { data: gastos, isLoading: loadingGastos } = useCollection<Gasto>(expensesQuery);
+  const { data: transactions, isLoading: loadingTransactions } = useCollection<Transaction>(transactionsQuery);
 
   const categoriesQuery = useMemo(() => {
     if (!firestore || !user) return null;
@@ -48,9 +41,8 @@ export default function DashboardPage() {
   }, [firestore, user]);
   const { data: upcomingAppointments, isLoading: loadingAppointments } = useCollection<Appointment>(upcomingAppointmentsQuery);
 
-  // --- Data Processing Logic ---
   const dashboardData = useMemo(() => {
-    if (!ingresos || !gastos || !categorias) return null;
+    if (!transactions || !categorias) return null;
 
     const now = new Date();
     let startDate: Date;
@@ -83,14 +75,16 @@ export default function DashboardPage() {
       return itemDate >= startDate && itemDate <= endDate;
     };
 
-    const ingresosFiltrados = ingresos.filter(filterByDate);
-    const gastosFiltrados = gastos.filter(filterByDate);
+    const transactionsFiltradas = transactions.filter(filterByDate);
 
-    const totalIngresos = ingresosFiltrados.reduce((sum, i) => sum + i.amount, 0);
-    const totalGastos = gastosFiltrados.reduce((sum, g) => sum + g.amount, 0);
+    const ingresos = transactionsFiltradas.filter(t => t.type === 'ingreso');
+    const gastos = transactionsFiltradas.filter(t => t.type === 'gasto');
+
+    const totalIngresos = ingresos.reduce((sum, i) => sum + i.amount, 0);
+    const totalGastos = gastos.reduce((sum, g) => sum + g.amount, 0);
 
     const gastosPorCategoria = categorias.map(cat => {
-      const gastosEnCategoria = gastosFiltrados.filter(g => g.categoryId === cat.id);
+      const gastosEnCategoria = gastos.filter(g => g.categoryId === cat.id);
       const total = gastosEnCategoria.reduce((sum, g) => sum + g.amount, 0);
       return {
         name: cat.name,
@@ -99,10 +93,9 @@ export default function DashboardPage() {
       };
     }).filter(c => c.total > 0);
 
-    const transaccionesRecientes = [
-      ...ingresos.map(i => ({...i, tipo: 'ingreso' as const})),
-      ...gastos.map(g => ({...g, tipo: 'gasto' as const}))
-    ].sort((a, b) => b.date - a.date).slice(0, 5);
+    const transaccionesRecientes = [...transactions]
+      .sort((a, b) => b.date - a.date)
+      .slice(0, 5);
 
     return {
       totalIngresos,
@@ -112,7 +105,7 @@ export default function DashboardPage() {
       transaccionesRecientes,
       categorias,
     };
-  }, [periodo, ingresos, gastos, categorias]);
+  }, [periodo, transactions, categorias]);
 
   const periodos: { key: Periodo, label: string }[] = [
     { key: 'mes_actual', label: 'Este Mes' },
@@ -121,7 +114,7 @@ export default function DashboardPage() {
     { key: 'ano_actual', label: 'Este Año' },
   ];
 
-  const isLoading = isUserLoading || loadingIngresos || loadingGastos || loadingCategorias;
+  const isLoading = isUserLoading || loadingTransactions || loadingCategorias;
 
   if (isLoading) {
     return <div className="flex h-full items-center justify-center"><p>Cargando...</p></div>

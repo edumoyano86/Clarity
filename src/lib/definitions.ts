@@ -6,19 +6,23 @@ export type Categoria = {
   budget?: number;
 };
 
-export type Ingreso = {
+export type Transaction = {
   id: string;
-  source: string;
+  type: 'ingreso' | 'gasto' | 'pago';
   amount: number;
   date: number; // timestamp
+  description: string;
+  categoryId?: string; // Solo para gastos
+  accountId?: string; // Para pagos, el ID de la cuenta que salda
 };
 
-export type Gasto = {
-  id: string;
-  amount: number;
-  categoryId: string;
-  date: number; // timestamp
-  notes?: string;
+export type Account = {
+    id: string;
+    name: string;
+    amount: number;
+    dueDate: number; // timestamp
+    status: 'pendiente' | 'pagada';
+    paidAmount: number;
 };
 
 export type Appointment = {
@@ -26,6 +30,7 @@ export type Appointment = {
   title: string;
   date: number; // timestamp
   notes?: string;
+  userId: string;
 };
 
 export type Note = {

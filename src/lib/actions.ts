@@ -1,21 +1,21 @@
 'use server';
 
-import { getDocs, collection, query } from 'firebase/firestore';
+import { getDocs, collection } from 'firebase/firestore';
 import { generateSavingsSuggestions } from '@/ai/flows/savings-suggestions';
 import { db } from '@/firebase/server';
-import type { Categoria, Gasto } from './definitions';
+import type { Categoria, Transaction } from './definitions';
 
 export async function getSavingsSuggestionsAction(userId: string) {
   try {
-    const expensesRef = collection(db, `users/${userId}/expenses`);
+    const transactionsRef = collection(db, `users/${userId}/transactions`);
     const categoriesRef = collection(db, `users/${userId}/expenseCategories`);
 
-    const [expensesSnap, categoriesSnap] = await Promise.all([
-        getDocs(expensesRef),
+    const [transactionsSnap, categoriesSnap] = await Promise.all([
+        getDocs(transactionsRef),
         getDocs(categoriesRef),
     ]);
 
-    const gastos = expensesSnap.docs.map(doc => doc.data() as Gasto);
+    const gastos = transactionsSnap.docs.map(doc => doc.data() as Transaction).filter(t => t.type === 'gasto');
     const categorias = categoriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Categoria));
 
     if (gastos.length === 0) {
@@ -25,6 +25,7 @@ export async function getSavingsSuggestionsAction(userId: string) {
     const categoryMap = new Map(categorias.map(c => [c.id, c.name]));
 
     const spendingData = gastos.reduce((acc, gasto) => {
+        if (!gasto.categoryId) return acc;
         const categoryName = categoryMap.get(gasto.categoryId) || 'Desconocido';
         if (!acc[categoryName]) {
             acc[categoryName] = 0;
