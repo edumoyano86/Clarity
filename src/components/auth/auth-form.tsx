@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/firebase';
+import { useAuth, useFirestore } from '@/firebase';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -18,7 +18,6 @@ import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
-import { db } from '@/firebase/server';
 
 const formSchema = z.object({
   email: z.string().email('Email inválido.'),
@@ -32,6 +31,7 @@ export function AuthForm() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const auth = useAuth();
+  const firestore = useFirestore();
   const router = useRouter();
 
   const {
@@ -46,13 +46,19 @@ export function AuthForm() {
     setIsLoading(true);
     setError(null);
 
+    if (!firestore) {
+      setError('El servicio de base de datos no está disponible. Intente de nuevo.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, data.email, data.password);
       } else {
         const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
         // Create a user document in Firestore
-        await setDoc(doc(db, "users", userCredential.user.uid), {
+        await setDoc(doc(firestore, "users", userCredential.user.uid), {
             id: userCredential.user.uid,
             email: userCredential.user.email,
             registrationDate: new Date().toISOString(),
