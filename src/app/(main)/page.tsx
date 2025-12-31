@@ -1,46 +1,43 @@
 'use client';
-import { useEffect, useMemo, useState } from "react";
-import { getDashboardData, type Periodo } from "@/lib/actions";
+import { useMemo, useState } from "react";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { ExpensesChart } from "@/components/dashboard/expenses-chart";
 import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 import { SavingsSuggestions } from "@/components/dashboard/savings-suggestions";
-import { Categoria, Appointment } from "@/lib/definitions";
+import { Categoria, Appointment, Gasto, Ingreso } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
 import { useCollection, useFirestore, useUser } from "@/firebase";
 import { UpcomingAppointments } from "@/components/dashboard/upcoming-appointments";
 import { collection, query, where, orderBy, limit } from "firebase/firestore";
+import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 
-type DashboardData = Awaited<ReturnType<typeof getDashboardData>>;
+type Periodo = 'mes_actual' | 'mes_pasado' | 'ultimos_3_meses' | 'ano_actual';
 
 export default function DashboardPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-
   const [periodo, setPeriodo] = useState<Periodo>('mes_actual');
-  const [isActionLoading, setIsActionLoading] = useState(true);
 
-  useEffect(() => {
-    if (!user) return;
-    const fetchData = async () => {
-      setIsActionLoading(true);
-      setFetchError(null);
-      try {
-        const dashboardData = await getDashboardData(user.uid, periodo)
-        setData(dashboardData);
-      } catch (error) {
-        console.error("Failed to fetch dashboard data:", error);
-        setFetchError("No se pudieron cargar los datos del resumen.");
-      } finally {
-        setIsActionLoading(false);
-      }
-    };
-    fetchData();
-  }, [periodo, user]);
+  // --- Data Fetching Hooks ---
+  const incomesQuery = useMemo(() => {
+    if (!firestore || !user) return null;
+    return collection(firestore, 'users', user.uid, 'incomes');
+  }, [firestore, user]);
+  const { data: ingresos, isLoading: loadingIngresos } = useCollection<Ingreso>(incomesQuery);
 
-   const upcomingAppointmentsQuery = useMemo(() => {
+  const expensesQuery = useMemo(() => {
+    if (!firestore || !user) return null;
+    return collection(firestore, 'users', user.uid, 'expenses');
+  }, [firestore, user]);
+  const { data: gastos, isLoading: loadingGastos } = useCollection<Gasto>(expensesQuery);
+
+  const categoriesQuery = useMemo(() => {
+    if (!firestore || !user) return null;
+    return collection(firestore, 'users', user.uid, 'expenseCategories');
+  }, [firestore, user]);
+  const { data: categorias, isLoading: loadingCategorias } = useCollection<Categoria>(categoriesQuery);
+
+  const upcomingAppointmentsQuery = useMemo(() => {
     if (!firestore || !user) return null;
     return query(
       collection(firestore, 'users', user.uid, 'appointments'),
@@ -49,9 +46,73 @@ export default function DashboardPage() {
       limit(3)
     );
   }, [firestore, user]);
-
   const { data: upcomingAppointments, isLoading: loadingAppointments } = useCollection<Appointment>(upcomingAppointmentsQuery);
 
+  // --- Data Processing Logic ---
+  const dashboardData = useMemo(() => {
+    if (!ingresos || !gastos || !categorias) return null;
+
+    const now = new Date();
+    let startDate: Date;
+    let endDate: Date = now;
+
+    switch (periodo) {
+      case 'mes_actual':
+        startDate = startOfMonth(now);
+        endDate = endOfMonth(now);
+        break;
+      case 'mes_pasado':
+        startDate = startOfMonth(subMonths(now, 1));
+        endDate = endOfMonth(subMonths(now, 1));
+        break;
+      case 'ultimos_3_meses':
+        startDate = startOfMonth(subMonths(now, 2));
+        endDate = endOfMonth(now);
+        break;
+      case 'ano_actual':
+        startDate = startOfYear(now);
+        endDate = endOfYear(now);
+        break;
+      default:
+        startDate = startOfMonth(now);
+        endDate = endOfMonth(now);
+    }
+
+    const filterByDate = (item: { date: number }) => {
+      const itemDate = new Date(item.date);
+      return itemDate >= startDate && itemDate <= endDate;
+    };
+
+    const ingresosFiltrados = ingresos.filter(filterByDate);
+    const gastosFiltrados = gastos.filter(filterByDate);
+
+    const totalIngresos = ingresosFiltrados.reduce((sum, i) => sum + i.amount, 0);
+    const totalGastos = gastosFiltrados.reduce((sum, g) => sum + g.amount, 0);
+
+    const gastosPorCategoria = categorias.map(cat => {
+      const gastosEnCategoria = gastosFiltrados.filter(g => g.categoryId === cat.id);
+      const total = gastosEnCategoria.reduce((sum, g) => sum + g.amount, 0);
+      return {
+        name: cat.name,
+        total,
+        icono: cat.icono,
+      };
+    }).filter(c => c.total > 0);
+
+    const transaccionesRecientes = [
+      ...ingresos.map(i => ({...i, tipo: 'ingreso' as const})),
+      ...gastos.map(g => ({...g, tipo: 'gasto' as const}))
+    ].sort((a, b) => b.date - a.date).slice(0, 5);
+
+    return {
+      totalIngresos,
+      totalGastos,
+      balance: totalIngresos - totalGastos,
+      gastosPorCategoria,
+      transaccionesRecientes,
+      categorias,
+    };
+  }, [periodo, ingresos, gastos, categorias]);
 
   const periodos: { key: Periodo, label: string }[] = [
     { key: 'mes_actual', label: 'Este Mes' },
@@ -60,7 +121,9 @@ export default function DashboardPage() {
     { key: 'ano_actual', label: 'Este Año' },
   ];
 
-  if (isActionLoading || isUserLoading) {
+  const isLoading = isUserLoading || loadingIngresos || loadingGastos || loadingCategorias;
+
+  if (isLoading) {
     return <div className="flex h-full items-center justify-center"><p>Cargando...</p></div>
   }
   
@@ -86,29 +149,27 @@ export default function DashboardPage() {
         </div>
       </div>
       
-      {fetchError && <p className="text-destructive">{fetchError}</p>}
-
-      {data ? (
+      {dashboardData ? (
         <>
           <SummaryCards
-            totalIngresos={data.totalIngresos}
-            totalGastos={data.totalGastos}
-            balance={data.balance}
+            totalIngresos={dashboardData.totalIngresos}
+            totalGastos={dashboardData.totalGastos}
+            balance={dashboardData.balance}
             periodo={periodo}
           />
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             <div className="lg:col-span-2">
-              <ExpensesChart data={data.gastosPorCategoria} />
+              <ExpensesChart data={dashboardData.gastosPorCategoria} />
             </div>
             <div className="lg:col-span-1 space-y-8">
-              <RecentTransactions transactions={data.transaccionesRecientes} categorias={data.categorias || []} />
+              <RecentTransactions transactions={dashboardData.transaccionesRecientes} categorias={dashboardData.categorias || []} />
               <UpcomingAppointments appointments={upcomingAppointments || []} isLoading={loadingAppointments}/>
             </div>
           </div>
           <SavingsSuggestions userId={user.uid} />
         </>
       ) : (
-        !isActionLoading && !fetchError && <p>No hay datos para mostrar en este período.</p>
+        !isLoading && <p>No hay datos para mostrar en este período.</p>
       )}
     </div>
   );
