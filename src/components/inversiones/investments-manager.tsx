@@ -15,6 +15,7 @@ import { deleteDoc, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { getCryptoPrices } from '@/ai/flows/crypto-prices';
 import { getStockPrices } from '@/ai/flows/stock-prices';
+import { PortfolioChart } from './portfolio-chart';
 
 const formatCurrency = (amount: number, currency = 'USD') => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
@@ -101,7 +102,8 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
 
     const renderPortfolioRow = (investment: Investment) => {
         const purchaseValue = investment.amount * investment.purchasePrice;
-        const currentPrice = prices[investment.assetId]?.price || prices[investment.symbol]?.price;
+        const currentPriceKey = investment.assetType === 'crypto' ? investment.assetId : investment.symbol;
+        const currentPrice = prices[currentPriceKey]?.price;
         const currentValue = currentPrice ? investment.amount * currentPrice : null;
         const pnl = currentValue !== null ? currentValue - purchaseValue : null;
         const pnlPercent = pnl !== null && purchaseValue > 0 ? (pnl / purchaseValue) * 100 : null;
@@ -146,34 +148,37 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
                 buttonLabel="Añadir Inversión"
                 onButtonClick={() => handleOpenForm()}
             >
-                <Card>
-                    <CardContent className='pt-6'>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Activo</TableHead>
-                                    <TableHead>Cantidad</TableHead>
-                                    <TableHead>Precio de Compra</TableHead>
-                                    <TableHead>Valor de Compra</TableHead>
-                                    <TableHead>Valor Actual</TableHead>
-                                    <TableHead>G/P</TableHead>
-                                    <TableHead className='text-right'>Acciones</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {investments.length > 0 ? (
-                                    investments.map(renderPortfolioRow)
-                                ) : (
+                <div className="space-y-8">
+                    <PortfolioChart investments={investments} prices={prices} isLoading={isLoadingPrices} />
+                    <Card>
+                        <CardContent className='pt-6'>
+                            <Table>
+                                <TableHeader>
                                     <TableRow>
-                                        <TableCell colSpan={7} className="text-center h-24">
-                                            No tienes inversiones registradas.
-                                        </TableCell>
+                                        <TableHead>Activo</TableHead>
+                                        <TableHead>Cantidad</TableHead>
+                                        <TableHead>Precio de Compra</TableHead>
+                                        <TableHead>Valor de Compra</TableHead>
+                                        <TableHead>Valor Actual</TableHead>
+                                        <TableHead>G/P</TableHead>
+                                        <TableHead className='text-right'>Acciones</TableHead>
                                     </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                                </TableHeader>
+                                <TableBody>
+                                    {investments.length > 0 ? (
+                                        investments.map(renderPortfolioRow)
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={7} className="text-center h-24">
+                                                No tienes inversiones registradas.
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </div>
             </ManagerPage>
 
             <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
