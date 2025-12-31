@@ -36,7 +36,6 @@ export function PortfolioChart({ investments, prices, isLoading }: PortfolioChar
     let cumulativePurchase = 0;
     let cumulativeCurrent = 0;
     
-    // Sort investments by date to build the timeline correctly
     const sortedInvestments = [...investments].sort((a, b) => a.purchaseDate - b.purchaseDate);
 
     const dataPoints = new Map<number, { date: number; purchaseValue: number; currentValue: number }>();
@@ -60,12 +59,21 @@ export function PortfolioChart({ investments, prices, isLoading }: PortfolioChar
              });
         }
     });
+    
+    if (dataPoints.size === 1) {
+        const singlePoint = dataPoints.values().next().value;
+        const slightlyEarlierDate = singlePoint.date - (24 * 60 * 60 * 1000); // 1 day before
+        return [
+            { date: slightlyEarlierDate, purchaseValue: 0, currentValue: 0 },
+            singlePoint
+        ]
+    }
 
     return Array.from(dataPoints.values());
 
   }, [investments, prices]);
   
-  const showLoadingState = isLoading || (investments.length > 0 && !chartData.length && !isLoading);
+  const showLoadingState = isLoading || (investments.length > 0 && !Object.keys(prices).length);
 
 
   return (
@@ -81,7 +89,7 @@ export function PortfolioChart({ investments, prices, isLoading }: PortfolioChar
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
             )}
-            {!showLoadingState && chartData.length > 1 ? (
+            {!showLoadingState && chartData.length > 0 ? (
                  <AreaChart data={chartData} margin={{ left: 12, right: 12 }}>
                      <defs>
                         <linearGradient id="fillPurchase" x1="0" y1="0" x2="0" y2="1">
@@ -100,6 +108,8 @@ export function PortfolioChart({ investments, prices, isLoading }: PortfolioChar
                         axisLine={false}
                         tickMargin={8}
                         tickFormatter={(value) => format(new Date(value), "MMM yy")}
+                        type="number"
+                        domain={['dataMin', 'dataMax']}
                     />
                     <YAxis 
                         tickLine={false}
@@ -115,13 +125,17 @@ export function PortfolioChart({ investments, prices, isLoading }: PortfolioChar
                             />} 
                     />
                     <Legend />
-                    <Area type="monotone" dataKey="purchaseValue" stroke="var(--color-purchaseValue)" fill="url(#fillPurchase)" />
-                    <Area type="monotone" dataKey="currentValue" stroke="var(--color-currentValue)" fill="url(#fillCurrent)" />
+                    <Area type="monotone" dataKey="purchaseValue" stroke="var(--color-purchaseValue)" fill="url(#fillPurchase)" name="Valor de Compra" />
+                    <Area type="monotone" dataKey="currentValue" stroke="var(--color-currentValue)" fill="url(#fillCurrent)" name="Valor Actual" />
                 </AreaChart>
             ) : null}
-            {!showLoadingState && chartData.length <= 1 && (
+            {!showLoadingState && chartData.length === 0 && (
                 <div className="flex h-full items-center justify-center">
-                    <p className="text-muted-foreground">Añade más de una inversión para ver la evolución.</p>
+                    <p className="text-muted-foreground text-center">
+                        Añade tu primera inversión para ver la evolución del portafolio.
+                        <br/>
+                        Asegúrate de que los precios de los activos se puedan cargar.
+                    </p>
                 </div>
             )}
         </ChartContainer>
