@@ -4,9 +4,8 @@ import { CategoryManager } from "@/components/categorias/category-manager";
 import { Categoria } from "@/lib/definitions";
 import { collection, orderBy, query, where } from "firebase/firestore";
 import { useMemo } from "react";
-import { FirebaseProvider } from "@/firebase/provider";
 
-function CategoriasPageContent() {
+export default function CategoriasPage() {
     const firestore = useFirestore();
     const { user, isUserLoading } = useUser();
 
@@ -22,12 +21,4 @@ function CategoriasPageContent() {
     }
 
     return <CategoryManager categorias={categorias || []} userId={user!.uid} />;
-}
-
-export default function CategoriasPage() {
-    return (
-        <FirebaseProvider>
-            <CategoriasPageContent />
-        </FirebaseProvider>
-    )
 }

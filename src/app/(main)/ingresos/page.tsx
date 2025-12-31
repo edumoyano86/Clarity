@@ -4,9 +4,8 @@ import { Ingreso } from "@/lib/definitions";
 import { IncomeManager } from "@/components/ingresos/income-manager";
 import { collection, orderBy, query, where } from "firebase/firestore";
 import { useMemo } from "react";
-import { FirebaseProvider } from "@/firebase/provider";
 
-function IngresosPageContent() {
+export default function IngresosPage() {
     const firestore = useFirestore();
     const { user, isUserLoading } = useUser();
 
@@ -22,12 +21,4 @@ function IngresosPageContent() {
     }
 
     return <IncomeManager ingresos={ingresos || []} userId={user!.uid} />;
-}
-
-export default function IngresosPage() {
-    return (
-        <FirebaseProvider>
-            <IngresosPageContent />
-        </FirebaseProvider>
-    )
 }

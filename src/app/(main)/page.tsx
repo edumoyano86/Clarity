@@ -8,12 +8,11 @@ import { SavingsSuggestions } from "@/components/dashboard/savings-suggestions";
 import { Categoria } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
 import { useCollection, useFirestore, useUser } from "@/firebase";
-import { FirebaseProvider } from "@/firebase/provider";
 import { collection, query, where } from "firebase/firestore";
 
 type DashboardData = Awaited<ReturnType<typeof getDashboardData>>;
 
-function DashboardPageContent() {
+export default function DashboardPage() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -101,12 +100,4 @@ function DashboardPageContent() {
       )}
     </div>
   );
-}
-
-export default function DashboardPage() {
-    return (
-        <FirebaseProvider>
-            <DashboardPageContent />
-        </FirebaseProvider>
-    )
 }
