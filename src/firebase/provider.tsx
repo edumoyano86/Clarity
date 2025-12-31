@@ -16,12 +16,11 @@ interface FirebaseServices {
 
 // Combined state for the Firebase context
 export interface FirebaseContextState {
-  firebaseApp: FirebaseApp | null;
-  firestore: Firestore | null;
-  auth: Auth | null;
+  firebaseApp: FirebaseApp;
+  firestore: Firestore;
+  auth: Auth;
   user: User | null;
   isUserLoading: boolean;
-  isServicesLoading: boolean;
 }
 
 // React Context
@@ -33,27 +32,21 @@ export const FirebaseContext = createContext<FirebaseContextState | undefined>(u
  * It shows a loading screen until all services and user auth are ready.
  */
 export const FirebaseProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [services, setServices] = useState<FirebaseServices | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [isUserLoading, setIsUserLoading] = useState(true);
-  const [isServicesLoading, setIsServicesLoading] = useState(true);
-
-  // 1. Initialize Firebase services ONCE.
-  useEffect(() => {
-    // This effect runs only once on mount
+  // Memoize services so they are initialized only once
+  const services = useMemo(() => {
     try {
-      const firebaseServices = initializeFirebase();
-      setServices(firebaseServices);
+      return initializeFirebase();
     } catch (e) {
       console.error("Failed to initialize Firebase", e);
-    } finally {
-      setIsServicesLoading(false);
+      return null;
     }
   }, []);
 
-  // 2. Handle authentication state and anonymous sign-in.
+  const [user, setUser] = useState<User | null>(null);
+  const [isUserLoading, setIsUserLoading] = useState(true);
+
+  // Handle authentication state and anonymous sign-in.
   useEffect(() => {
-    // This effect runs when 'services' are available.
     if (!services) return;
 
     const unsubscribe = onAuthStateChanged(services.auth, (firebaseUser) => {
@@ -63,25 +56,17 @@ export const FirebaseProvider: React.FC<{ children: ReactNode }> = ({ children }
       } else {
         // If no user, initiate anonymous sign-in
         initiateAnonymousSignIn(services.auth);
-        // The listener will pick up the new user state.
+        // The listener will pick up the new user state, setting isLoading to false then.
       }
     });
 
     return () => unsubscribe(); // Cleanup on unmount
   }, [services]);
 
-  // Memoize context value
-  const contextValue = useMemo((): FirebaseContextState => ({
-    firebaseApp: services?.firebaseApp ?? null,
-    firestore: services?.firestore ?? null,
-    auth: services?.auth ?? null,
-    user,
-    isUserLoading,
-    isServicesLoading,
-  }), [services, user, isUserLoading, isServicesLoading]);
+  // The isLoading state is true if services are not ready OR the user is still loading.
+  const isLoading = !services || isUserLoading;
 
-  // Render loading screen or children
-  if (isServicesLoading || isUserLoading) {
+  if (isLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <p>Conectando...</p>
@@ -89,6 +74,15 @@ export const FirebaseProvider: React.FC<{ children: ReactNode }> = ({ children }
     );
   }
   
+  // Memoize context value once everything is loaded
+  const contextValue = useMemo((): FirebaseContextState => ({
+    firebaseApp: services.firebaseApp,
+    firestore: services.firestore,
+    auth: services.auth,
+    user,
+    isUserLoading,
+  }), [services, user, isUserLoading]);
+
   return (
     <FirebaseContext.Provider value={contextValue}>
       <FirebaseErrorListener />
@@ -110,9 +104,6 @@ function useFirebaseContext() {
 
 export const useFirebase = () => {
   const context = useFirebaseContext();
-  if (!context.firebaseApp || !context.firestore || !context.auth) {
-    throw new Error('Firebase services not available. Check FirebaseProvider setup.');
-  }
   return {
     firebaseApp: context.firebaseApp,
     firestore: context.firestore,

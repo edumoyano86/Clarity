@@ -16,6 +16,7 @@ export default function DashboardPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const [data, setData] = useState<DashboardData | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const categoriasQuery = useMemo(() => {
     if (!firestore || !user) return null;
@@ -31,9 +32,16 @@ export default function DashboardPage() {
     if (!user) return;
     const fetchData = async () => {
       setIsLoading(true);
-      const dashboardData = await getDashboardData(user.uid, periodo)
-      setData(dashboardData);
-      setIsLoading(false);
+      setFetchError(null);
+      try {
+        const dashboardData = await getDashboardData(user.uid, periodo)
+        setData(dashboardData);
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+        setFetchError("No se pudieron cargar los datos del resumen.");
+      } finally {
+        setIsLoading(false);
+      }
     };
     fetchData();
   }, [periodo, user]);
@@ -45,10 +53,10 @@ export default function DashboardPage() {
     { key: 'ano_actual', label: 'Este Año' },
   ];
 
-  if (!user || loadingCategorias || isLoading || !data) {
+  if (loadingCategorias || isLoading) {
     return <p>Cargando...</p>
   }
-
+  
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -67,6 +75,8 @@ export default function DashboardPage() {
         </div>
       </div>
       
+      {fetchError && <p className="text-destructive">{fetchError}</p>}
+
       {data ? (
         <>
           <SummaryCards
@@ -83,10 +93,10 @@ export default function DashboardPage() {
               <RecentTransactions transactions={data.transaccionesRecientes} categorias={categorias || []} />
             </div>
           </div>
-          <SavingsSuggestions userId={user.uid} />
+          <SavingsSuggestions userId={user!.uid} />
         </>
       ) : (
-        <p>No se pudieron cargar los datos.</p>
+        !isLoading && !fetchError && <p>No hay datos para mostrar en este período.</p>
       )}
     </div>
   );
