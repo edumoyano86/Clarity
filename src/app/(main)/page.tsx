@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getDashboardData, type Periodo } from "@/lib/actions";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { ExpensesChart } from "@/components/dashboard/expenses-chart";
@@ -7,8 +7,8 @@ import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 import { SavingsSuggestions } from "@/components/dashboard/savings-suggestions";
 import { Categoria } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
-import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase";
-import { collection, query, where, Timestamp } from "firebase/firestore";
+import { useCollection, useFirestore, useUser } from "@/firebase";
+import { collection } from "firebase/firestore";
 
 type DashboardData = Awaited<ReturnType<typeof getDashboardData>>;
 
@@ -17,7 +17,7 @@ export default function DashboardPage() {
   const { user } = useUser();
   const [data, setData] = useState<DashboardData | null>(null);
 
-  const categoriasQuery = useMemoFirebase(() => {
+  const categoriasQuery = useMemo(() => {
     if (!firestore || !user) return null;
     return collection(firestore, `users/${user.uid}/expenseCategories`);
   }, [firestore, user]);
@@ -45,7 +45,7 @@ export default function DashboardPage() {
     { key: 'ano_actual', label: 'Este Año' },
   ];
 
-  if (!user || loadingCategorias || isLoading) {
+  if (!user || loadingCategorias || isLoading || !data) {
     return <p>Cargando...</p>
   }
 

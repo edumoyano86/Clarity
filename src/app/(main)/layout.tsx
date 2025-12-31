@@ -5,7 +5,7 @@ import {
   Sidebar,
   SidebarProvider,
 } from "@/components/ui/sidebar";
-import FirebaseClientProvider from "@/firebase/client-provider";
+import { FirebaseProvider } from "@/firebase/provider";
 
 export default function MainLayout({
   children,
@@ -13,7 +13,7 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <FirebaseClientProvider>
+    <FirebaseProvider>
         <SidebarProvider>
           <div className="flex min-h-screen">
             <Sidebar>
@@ -27,6 +27,6 @@ export default function MainLayout({
             </div>
           </div>
         </SidebarProvider>
-    </FirebaseClientProvider>
+    </FirebaseProvider>
   );
 }
