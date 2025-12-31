@@ -5,8 +5,9 @@ import { Gasto, Categoria } from "@/lib/definitions";
 import { ExpenseManager } from "@/components/gastos/expense-manager";
 import { collection, query, orderBy, where } from "firebase/firestore";
 import { useMemo } from "react";
+import { FirebaseProvider } from "@/firebase/provider";
 
-export default function GastosPage() {
+function GastosPageContent() {
     const firestore = useFirestore();
     const { user, isUserLoading } = useUser();
     
@@ -27,4 +28,12 @@ export default function GastosPage() {
     }
 
     return <ExpenseManager gastos={gastos || []} categorias={categorias || []} userId={user!.uid} />;
+}
+
+export default function GastosPage() {
+    return (
+        <FirebaseProvider>
+            <GastosPageContent />
+        </FirebaseProvider>
+    )
 }

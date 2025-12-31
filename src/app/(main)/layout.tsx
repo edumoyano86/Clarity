@@ -1,5 +1,5 @@
 'use client';
-import { useAuth, useUser } from '@/firebase';
+import { useUser } from '@/firebase';
 import Header from "@/components/layout/header";
 import { MainSidebar } from "@/components/layout/main-sidebar";
 import {
