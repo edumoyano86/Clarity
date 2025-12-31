@@ -20,6 +20,7 @@ import { addGasto, type ActionState } from '@/lib/actions';
 
 interface ExpenseFormProps {
     categorias: Categoria[];
+    userId: string;
     onFormSuccess: () => void;
 }
 
@@ -34,12 +35,12 @@ function SubmitButton() {
 
 const initialState: ActionState = { success: false, message: '' };
 
-export function ExpenseForm({ categorias, onFormSuccess }: ExpenseFormProps) {
+export function ExpenseForm({ categorias, userId, onFormSuccess }: ExpenseFormProps) {
     const { toast } = useToast();
-    const [state, dispatch] = useActionState(addGasto, initialState);
+    const addGastoWithUserId = addGasto.bind(null, userId);
+    const [state, dispatch] = useActionState(addGastoWithUserId, initialState);
     const [date, setDate] = useState<Date | undefined>(new Date());
     const formRef = useRef<HTMLFormElement>(null);
-    const [formKey, setFormKey] = useState(0);
 
     useEffect(() => {
         if (state.success) {
@@ -56,15 +57,15 @@ export function ExpenseForm({ categorias, onFormSuccess }: ExpenseFormProps) {
                 });
             }
             onFormSuccess();
+            formRef.current?.reset();
             setDate(new Date());
-            setFormKey(prevKey => prevKey + 1); // Reset form
-        } else if (state.message && state.errors) { // Validation errors
+        } else if (state.message && state.errors) { 
             toast({
                 title: 'Error de Validación',
                 description: Object.values(state.errors).flat().join('\n'),
                 variant: 'destructive',
             });
-        } else if (state.message) { // Other server errors
+        } else if (state.message) { 
              toast({
                 title: 'Error',
                 description: state.message,
@@ -74,28 +75,28 @@ export function ExpenseForm({ categorias, onFormSuccess }: ExpenseFormProps) {
     }, [state, onFormSuccess, toast]);
 
     return (
-        <form key={formKey} ref={formRef} action={dispatch} className="space-y-4">
+        <form ref={formRef} action={dispatch} className="space-y-4">
             <div>
-                <Label htmlFor="cantidad">Cantidad</Label>
-                <Input id="cantidad" name="cantidad" type="number" step="0.01" placeholder="Ej: 45.50" required />
+                <Label htmlFor="amount">Cantidad</Label>
+                <Input id="amount" name="amount" type="number" step="0.01" placeholder="Ej: 45.50" required />
             </div>
             <div>
-                <Label htmlFor="categoriaId">Categoría</Label>
-                 <Select name="categoriaId" required>
+                <Label htmlFor="categoryId">Categoría</Label>
+                 <Select name="categoryId" required>
                     <SelectTrigger>
                         <SelectValue placeholder="Selecciona una categoría" />
                     </SelectTrigger>
                     <SelectContent>
                         {categorias.map(cat => (
                             <SelectItem key={cat.id} value={cat.id}>
-                                {cat.nombre}
+                                {cat.name}
                             </SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
             </div>
             <div>
-                <Label htmlFor="fecha">Fecha</Label>
+                <Label htmlFor="date">Fecha</Label>
                 <Popover modal={true}>
                     <PopoverTrigger asChild>
                     <Button
@@ -119,11 +120,11 @@ export function ExpenseForm({ categorias, onFormSuccess }: ExpenseFormProps) {
                             />
                     </PopoverContent>
                 </Popover>
-                <input type="hidden" name="fecha" value={date?.toISOString() || ''} />
+                <input type="hidden" name="date" value={date?.toISOString() || ''} />
             </div>
              <div>
-                <Label htmlFor="descripcion">Descripción (Opcional)</Label>
-                <Textarea id="descripcion" name="descripcion" placeholder="Ej: Cena con amigos" />
+                <Label htmlFor="notes">Descripción (Opcional)</Label>
+                <Textarea id="notes" name="notes" placeholder="Ej: Cena con amigos" />
             </div>
              <SubmitButton />
         </form>

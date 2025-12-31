@@ -25,33 +25,27 @@ function SubmitButton() {
 
 const initialState: ActionState = { success: false, message: '' };
 
-export function CategoryForm({ category, onFormSuccess }: { category?: Categoria, onFormSuccess: () => void }) {
+export function CategoryForm({ userId, category, onFormSuccess }: { userId: string, category?: Categoria, onFormSuccess: () => void }) {
     const { toast } = useToast();
-    const [state, dispatch] = useActionState(saveCategoria, initialState);
+    const saveCategoriaWithUserId = saveCategoria.bind(null, userId);
+    const [state, dispatch] = useActionState(saveCategoriaWithUserId, initialState);
     const formRef = useRef<HTMLFormElement>(null);
-    const [formKey, setFormKey] = useState(Date.now()); // Unique key to force re-render
 
      useEffect(() => {
-        // When category prop changes, we want to reset the form.
-        // Changing the key of the form element is the easiest way to do this.
-        setFormKey(Date.now());
-    }, [category]);
-
-
-    useEffect(() => {
         if (state.success) {
             toast({
                 title: 'Éxito',
                 description: state.message,
             });
             onFormSuccess();
-        } else if (state.message && state.errors) { // Validation errors
+            formRef.current?.reset();
+        } else if (state.message && state.errors) { 
             toast({
                 title: 'Error de Validación',
                 description: Object.values(state.errors).flat().join('\n'),
                 variant: 'destructive',
             });
-        } else if (state.message) { // Other server errors
+        } else if (state.message) {
              toast({
                 title: 'Error',
                 description: state.message,
@@ -60,16 +54,22 @@ export function CategoryForm({ category, onFormSuccess }: { category?: Categoria
         }
     }, [state, onFormSuccess, toast]);
 
+    // This effect resets the form when the `category` prop changes (i.e., when switching from 'new' to 'edit' or vice-versa)
+    useEffect(() => {
+        formRef.current?.reset();
+    }, [category]);
+
+
     return (
-        <form key={formKey} ref={formRef} action={dispatch} className="space-y-4">
-            <input type="hidden" name="id" value={category?.id || ''} />
+        <form ref={formRef} action={dispatch} className="space-y-4">
+            <input type="hidden" name="id" defaultValue={category?.id || ''} />
             <div>
-                <Label htmlFor="nombre">Nombre de la Categoría</Label>
-                <Input id="nombre" name="nombre" defaultValue={category?.nombre} required />
+                <Label htmlFor="name">Nombre de la Categoría</Label>
+                <Input id="name" name="name" defaultValue={category?.name} required />
             </div>
             <div>
-                <Label htmlFor="presupuesto">Presupuesto (Opcional)</Label>
-                <Input id="presupuesto" name="presupuesto" type="number" step="0.01" defaultValue={category?.presupuesto} placeholder="Ej: 500" />
+                <Label htmlFor="budget">Presupuesto (Opcional)</Label>
+                <Input id="budget" name="budget" type="number" step="0.01" defaultValue={category?.budget} placeholder="Ej: 500" />
             </div>
             <div>
                 <Label htmlFor="icono">Icono</Label>

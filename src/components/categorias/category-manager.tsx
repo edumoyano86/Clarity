@@ -17,7 +17,7 @@ const formatCurrency = (amount?: number) => {
     return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
 };
 
-export function CategoryManager({ categorias }: { categorias: Categoria[] }) {
+export function CategoryManager({ categorias, userId }: { categorias: Categoria[], userId: string }) {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<Categoria | undefined>(undefined);
 
@@ -54,9 +54,9 @@ export function CategoryManager({ categorias }: { categorias: Categoria[] }) {
                                     <TableRow key={categoria.id}>
                                         <TableCell className="font-medium flex items-center gap-2">
                                             <Icon name={categoria.icono} className='h-5 w-5 text-muted-foreground' />
-                                            {categoria.nombre}
+                                            {categoria.name}
                                         </TableCell>
-                                        <TableCell>{formatCurrency(categoria.presupuesto)}</TableCell>
+                                        <TableCell>{formatCurrency(categoria.budget)}</TableCell>
                                         <TableCell className='text-right'>
                                             <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(categoria)}>
                                                 <Edit className="h-4 w-4" />
@@ -77,7 +77,7 @@ export function CategoryManager({ categorias }: { categorias: Categoria[] }) {
                             Completa los detalles de la categoría.
                         </DialogDescription>
                     </DialogHeader>
-                    <CategoryForm category={selectedCategory} onFormSuccess={handleCloseDialog} />
+                    <CategoryForm userId={userId} category={selectedCategory} onFormSuccess={handleCloseDialog} />
                 </DialogContent>
             </Dialog>
         </>

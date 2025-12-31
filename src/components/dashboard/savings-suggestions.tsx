@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
-export function SavingsSuggestions() {
+export function SavingsSuggestions({ userId }: { userId: string }) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasGenerated, setHasGenerated] = useState(false);
@@ -16,7 +16,7 @@ export function SavingsSuggestions() {
     setIsLoading(true);
     setSuggestions([]);
     try {
-      const result = await getSavingsSuggestionsAction();
+      const result = await getSavingsSuggestionsAction(userId);
       if (result.suggestions) {
         setSuggestions(result.suggestions);
       }

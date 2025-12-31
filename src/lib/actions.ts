@@ -16,26 +16,26 @@ export type ActionState = {
 
 const CategoriaSchema = z.object({
   id: z.string().optional().or(z.literal('')),
-  nombre: z.string({ required_error: 'El nombre es requerido.'}).min(1, 'El nombre es requerido'),
+  name: z.string({ required_error: 'El nombre es requerido.'}).min(1, 'El nombre es requerido'),
   icono: z.string({ required_error: 'El icono es requerido.'}).min(1, 'El icono es requerido'),
-  presupuesto: z.coerce.number().min(0, 'El presupuesto debe ser un número positivo').optional(),
+  budget: z.coerce.number().min(0, 'El presupuesto debe ser un número positivo').optional(),
 });
 
 const IngresoSchema = z.object({
-  fuente: z.string({ required_error: 'La fuente es requerida.'}).min(1, 'La fuente es requerida'),
-  cantidad: z.coerce.number({ invalid_type_error: 'La cantidad debe ser un número.'}).positive('La cantidad debe ser un número positivo'),
-  fecha: z.string({ required_error: 'La fecha es requerida.'}).min(1, 'La fecha es requerida'),
+  source: z.string({ required_error: 'La fuente es requerida.'}).min(1, 'La fuente es requerida'),
+  amount: z.coerce.number({ invalid_type_error: 'La cantidad debe ser un número.'}).positive('La cantidad debe ser un número positivo'),
+  date: z.string({ required_error: 'La fecha es requerida.'}).min(1, 'La fecha es requerida'),
 });
 
 const GastoSchema = z.object({
-  descripcion: z.string().optional(),
-  cantidad: z.coerce.number({ invalid_type_error: 'La cantidad debe ser un número.'}).positive('La cantidad debe ser un número positivo'),
-  categoriaId: z.string({ required_error: 'La categoría es requerida.'}).min(1, 'La categoría es requerida'),
-  fecha: z.string({ required_error: 'La fecha es requerida.'}).min(1, 'La fecha es requerida'),
+  notes: z.string().optional(),
+  amount: z.coerce.number({ invalid_type_error: 'La cantidad debe ser un número.'}).positive('La cantidad debe ser un número positivo'),
+  categoryId: z.string({ required_error: 'La categoría es requerida.'}).min(1, 'La categoría es requerida'),
+  date: z.string({ required_error: 'La fecha es requerida.'}).min(1, 'La fecha es requerida'),
 });
 
 
-export async function saveCategoria(prevState: ActionState, formData: FormData): Promise<ActionState> {
+export async function saveCategoria(userId: string, prevState: ActionState, formData: FormData): Promise<ActionState> {
     const data = Object.fromEntries(formData.entries());
     const validatedFields = CategoriaSchema.safeParse(data);
     
@@ -48,7 +48,7 @@ export async function saveCategoria(prevState: ActionState, formData: FormData):
     }
 
     try {
-        await saveCategoriaToDb(validatedFields.data);
+        await saveCategoriaToDb(userId, validatedFields.data);
         revalidatePath('/categorias');
         revalidatePath('/');
         return { success: true, message: 'Categoría guardada exitosamente.' };
@@ -58,7 +58,7 @@ export async function saveCategoria(prevState: ActionState, formData: FormData):
     }
 }
 
-export async function addIngreso(prevState: ActionState, formData: FormData): Promise<ActionState> {
+export async function addIngreso(userId: string, prevState: ActionState, formData: FormData): Promise<ActionState> {
     const data = Object.fromEntries(formData.entries());
     const validatedFields = IngresoSchema.safeParse(data);
 
@@ -71,7 +71,7 @@ export async function addIngreso(prevState: ActionState, formData: FormData): Pr
     }
     
     try {
-        await addIngresoToDb(validatedFields.data);
+        await addIngresoToDb(userId, validatedFields.data);
         revalidatePath('/ingresos');
         revalidatePath('/');
         return { success: true, message: 'Ingreso agregado exitosamente.' };
@@ -81,7 +81,7 @@ export async function addIngreso(prevState: ActionState, formData: FormData): Pr
     }
 }
 
-export async function addGasto(prevState: ActionState, formData: FormData): Promise<ActionState> {
+export async function addGasto(userId: string, prevState: ActionState, formData: FormData): Promise<ActionState> {
     const data = Object.fromEntries(formData.entries());
     const validatedFields = GastoSchema.safeParse(data);
 
@@ -94,7 +94,7 @@ export async function addGasto(prevState: ActionState, formData: FormData): Prom
     }
     
     try {
-        const alertMessage = await addGastoToDb(validatedFields.data);
+        const alertMessage = await addGastoToDb(userId, validatedFields.data);
         revalidatePath('/gastos');
         revalidatePath('/');
         return { success: true, message: 'Gasto agregado exitosamente.', alertMessage };
@@ -104,8 +104,9 @@ export async function addGasto(prevState: ActionState, formData: FormData): Prom
     }
 }
 
+export type Periodo = 'mes_actual' | 'mes_pasado' | 'ultimos_3_meses' | 'ano_actual';
 
-export async function getDashboardData(periodo: Periodo = 'mes_actual') {
+export async function getDashboardData(userId: string, periodo: Periodo = 'mes_actual') {
   const now = new Date();
   let startDate: Date;
   let endDate: Date = now;
@@ -133,27 +134,27 @@ export async function getDashboardData(periodo: Periodo = 'mes_actual') {
   }
 
   const [ingresos, gastos, categorias] = await Promise.all([
-    getIngresos(),
-    getGastos(),
-    getCategorias(),
+    getIngresos(userId),
+    getGastos(userId),
+    getCategorias(userId),
   ]);
 
-  const filterByDate = (item: { fecha: number }) => {
-    const itemDate = new Date(item.fecha);
+  const filterByDate = (item: { date: number }) => {
+    const itemDate = new Date(item.date);
     return itemDate >= startDate && itemDate <= endDate;
   };
 
   const ingresosFiltrados = ingresos.filter(filterByDate);
   const gastosFiltrados = gastos.filter(filterByDate);
 
-  const totalIngresos = ingresosFiltrados.reduce((sum, i) => sum + i.cantidad, 0);
-  const totalGastos = gastosFiltrados.reduce((sum, g) => sum + g.cantidad, 0);
+  const totalIngresos = ingresosFiltrados.reduce((sum, i) => sum + i.amount, 0);
+  const totalGastos = gastosFiltrados.reduce((sum, g) => sum + g.amount, 0);
 
   const gastosPorCategoria = categorias.map(cat => {
-    const gastosEnCategoria = gastosFiltrados.filter(g => g.categoriaId === cat.id);
-    const total = gastosEnCategoria.reduce((sum, g) => sum + g.cantidad, 0);
+    const gastosEnCategoria = gastosFiltrados.filter(g => g.categoryId === cat.id);
+    const total = gastosEnCategoria.reduce((sum, g) => sum + g.amount, 0);
     return {
-      name: cat.nombre,
+      name: cat.name,
       total,
       icono: cat.icono,
     };
@@ -162,7 +163,7 @@ export async function getDashboardData(periodo: Periodo = 'mes_actual') {
   const transaccionesRecientes = [
     ...ingresos.map(i => ({...i, tipo: 'ingreso' as const})),
     ...gastos.map(g => ({...g, tipo: 'gasto' as const}))
-  ].sort((a, b) => b.fecha - a.fecha).slice(0, 5);
+  ].sort((a, b) => b.date - a.date).slice(0, 5);
 
   return {
     totalIngresos,
@@ -173,17 +174,17 @@ export async function getDashboardData(periodo: Periodo = 'mes_actual') {
   };
 }
 
-export async function getSavingsSuggestionsAction() {
-  const gastos = await getGastos();
-  const categorias = await getCategorias();
+export async function getSavingsSuggestionsAction(userId: string) {
+  const gastos = await getGastos(userId);
+  const categorias = await getCategorias(userId);
 
   if (gastos.length === 0) {
     return { suggestions: ["No hay suficientes datos de gastos para generar sugerencias."] };
   }
   
   const spendingData = gastos.map(gasto => {
-    const categoria = categorias.find(c => c.id === gasto.categoriaId);
-    return `${categoria?.nombre || 'Desconocido'}: $${gasto.cantidad}`;
+    const categoria = categorias.find(c => c.id === gasto.categoryId);
+    return `${categoria?.name || 'Desconocido'}: $${gasto.amount}`;
   }).join(', ');
 
   try {

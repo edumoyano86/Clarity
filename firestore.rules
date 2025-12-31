@@ -1,183 +1,21 @@
-/**
- * Core Philosophy: This ruleset enforces a strict, path-based user-ownership model.
- * Each user has exclusive control over their own data, and there is no concept of
- * shared or public information. All data is isolated within a user-specific path.
- *
- * Data Structure: All application data is hierarchically organized under the top-level
- * `/users` collection. A user's profile and all related financial data (incomes,
- * expenses, categories, alerts, and suggestions) are stored in subcollections
- * under `/users/{userId}`. This structure inherently links data to its owner.
- *
- * Key Security Decisions:
- * - User Enumeration is Forbidden: Listing the top-level `/users` collection is
- *   explicitly disallowed to protect user privacy and prevent data scraping.
- * - Strict Ownership: A user can only access documents located under their own
- *   `userId` path (`/users/{request.auth.uid}/...`).
- * - Default Deny: Access is implicitly denied unless an `allow` rule explicitly
- *   grants it. All write operations require authentication.
- * - Profile Deletion Disabled: To prevent accidental data loss, users are not
-
- *   permitted to delete their own root user profile document.
- *
- * Denormalization for Authorization: The entire security model is built on this
- * principle. By placing all of a user's data under a path containing their UID
- * (e.g., `/users/{userId}/incomes/{incomeId}`), we avoid slow and costly `get()`
- * calls to other documents for authorization. The path itself contains all the
- * information needed to secure the data.
- *
- * Structural Segregation: The design correctly segregates each user's data into
- * their own document tree. This is a highly secure and performant pattern that
- * prevents data from one user from ever being returned in a query for another user.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions to improve readability and maintainability.
-
-    /**
-     * Checks if the user is authenticated.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * Checks if the currently authenticated user's UID matches the userId from the path.
-     * This is the primary function for enforcing data ownership.
-     */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    /**
-     * A stricter check for update/delete operations. Ensures the user is the owner
-     * AND that the document they are trying to modify actually exists.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Governs access to a user's root profile document.
-     * @path /users/{userId}
-     * @allow An authenticated user (uid: 'user123') can (create) their own profile document at '/users/user123'.
-     * @deny An authenticated user (uid: 'user123') cannot (list) all documents in the '/users' collection.
-     * @principle Establishes a user's private data space and prevents user enumeration.
-     */
     match /users/{userId} {
-      // A user can read their own profile. Listing all users is forbidden.
-      allow get: if isOwner(userId);
-      allow list: if false;
-
-      // A user can create their own profile, ensuring the document's 'id' field matches their auth UID.
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-
-      // A user can update their own profile. The 'id' field must remain unchanged.
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-
-      // Deleting user profile documents is disabled for safety.
-      allow delete: if false;
+      allow read, write: if isOwner(userId);
     }
-
-    /**
-     * @description Controls access to a user's income records.
-     * @path /users/{userId}/incomes/{incomeId}
-     * @allow An authenticated user (uid: 'user123') can (create) a new income document in their own path '/users/user123/incomes/inc456'.
-     * @deny An authenticated user (uid: 'user123') cannot (get) an income document from another user's path '/users/userABC/incomes/inc789'.
-     * @principle Enforces a strict ownership model where users can only manage their own data.
-     */
-    match /users/{userId}/incomes/{incomeId} {
-      // A user can read their own income documents.
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-
-      // A user can create an income document if the internal 'userId' field matches their UID.
-      allow create: if isOwner(userId) && request.resource.data.userId == userId;
-
-      // An existing income document's owner can update it. The 'userId' field cannot be changed.
-      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingOwner(userId);
-    }
-
-    /**
-     * @description Controls access to a user's expense records.
-     * @path /users/{userId}/expenses/{expenseId}
-     * @allow An authenticated user (uid: 'user123') can (list) all expense documents in their own path '/users/user123/expenses'.
-     * @deny An authenticated user (uid: 'user123') cannot (delete) an expense document from another user's path '/users/userABC/expenses/exp789'.
-     * @principle Enforces a strict ownership model where users can only manage their own data.
-     */
-    match /users/{userId}/expenses/{expenseId} {
-      // A user can read their own expense documents.
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-
-      // A user can create an expense document if the internal 'userId' field matches their UID.
-      allow create: if isOwner(userId) && request.resource.data.userId == userId;
-
-      // An existing expense document's owner can update it. The 'userId' field cannot be changed.
-      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingOwner(userId);
-    }
-
-    /**
-     * @description Controls access to a user's custom expense categories.
-     * @path /users/{userId}/expenseCategories/{categoryId}
-     * @allow An authenticated user (uid: 'user123') can (update) an expense category in their own path '/users/user123/expenseCategories/cat456'.
-     * @deny An authenticated user (uid: 'user123') cannot (create) an expense category in another user's path '/users/userABC/expenseCategories/cat789'.
-     * @principle Enforces a strict ownership model where users can only manage their own data.
-     */
-    match /users/{userId}/expenseCategories/{categoryId} {
-      // A user can read their own expense categories.
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-
-      // A user can create an expense category if the internal 'userId' field matches their UID.
-      allow create: if isOwner(userId) && request.resource.data.userId == userId;
-
-      // An existing category's owner can update it. The 'userId' field cannot be changed.
-      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingOwner(userId);
-    }
-
-    /**
-     * @description Controls access to a user's budget alerts.
-     * @path /users/{userId}/budgetAlerts/{budgetId}
-     * @allow An authenticated user (uid: 'user123') can (get) a budget alert from their own path '/users/user123/budgetAlerts/alert456'.
-     * @deny An authenticated user (uid: 'user123') cannot (list) budget alerts from another user's path '/users/userABC/budgetAlerts'.
-     * @principle Enforces a strict ownership model where users can only manage their own data.
-     */
-    match /users/{userId}/budgetAlerts/{budgetId} {
-      // A user can read their own budget alerts.
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-
-      // A user can create a budget alert if the internal 'userId' field matches their UID.
-      allow create: if isOwner(userId) && request.resource.data.userId == userId;
-
-      // An existing alert's owner can update it. The 'userId' field cannot be changed.
-      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingOwner(userId);
-    }
-
-    /**
-     * @description Controls access to a user's saving suggestions.
-     * @path /users/{userId}/savingSuggestions/{suggestionId}
-     * @allow An authenticated user (uid: 'user123') can (create) a saving suggestion in their own path '/users/user123/savingSuggestions/sug456'.
-     * @deny An authenticated user (uid: 'user123') cannot (update) a suggestion in another user's path '/users/userABC/savingSuggestions/sug789'.
-     * @principle Enforces a strict ownership model where users can only manage their own data.
-     */
-    match /users/{userId}/savingSuggestions/{suggestionId} {
-      // A user can read their own saving suggestions.
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-
-      // A user can create a suggestion if the internal 'userId' field matches their UID.
-      allow create: if isOwner(userId) && request.resource.data.userId == userId;
-
-      // An existing suggestion's owner can update it. The 'userId' field cannot be changed.
-      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingOwner(userId);
+    
+    match /users/{userId}/{collection}/{docId} {
+      allow read, write: if isOwner(userId);
     }
   }
 }

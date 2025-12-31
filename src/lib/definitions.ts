@@ -1,28 +1,25 @@
-import type { LucideIcon } from "lucide-react";
 
 export type Categoria = {
   id: string;
-  nombre: string;
+  name: string;
   icono: string; 
-  presupuesto?: number;
+  budget?: number;
+  userId: string;
 };
 
 export type Ingreso = {
   id: string;
-  fuente: string;
-  cantidad: number;
-  fecha: number; // timestamp
+  source: string;
+  amount: number;
+  date: number; // timestamp
+  userId: string;
 };
 
 export type Gasto = {
   id: string;
-  cantidad: number;
-  categoriaId: string;
-  fecha: number; // timestamp
-  descripcion?: string;
-};
-
-export type IconoDisponible = {
-  name: string;
-  icon: LucideIcon;
+  amount: number;
+  categoryId: string;
+  date: number; // timestamp
+  notes?: string;
+  userId: string;
 };

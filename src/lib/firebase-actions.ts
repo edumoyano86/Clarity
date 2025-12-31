@@ -1,7 +1,7 @@
 'use server';
 
-import { collection, addDoc, getDocs, doc, updateDoc, query, where, getDoc } from "firebase/firestore";
-import { db } from "@/firebase/server"; // Import the server-side db instance
+import { collection, addDoc, getDocs, doc, updateDoc, query, where, getDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/firebase/server"; 
 import { Categoria, Gasto, Ingreso } from "./definitions";
 import { parseISO } from 'date-fns';
 import { generateBudgetAlert } from "@/ai/flows/budget-alerts";
@@ -21,72 +21,66 @@ const getDocument = async <T>(collectionName: string, id: string): Promise<T | n
     return null;
 }
 
-const addDocument = async (collectionName: string, data: any) => {
-    const docRef = await addDoc(collection(db, collectionName), data);
-    return docRef;
-};
-
-const updateDocument = async (collectionName: string, id: string, data: any) => {
-    await updateDoc(doc(db, collectionName, id), data);
-}
-
 // --- Categorias ---
-export const getCategorias = async () => getCollection<Categoria>('categorias');
-export const getCategoria = async (id: string) => getDocument<Categoria>('categorias', id);
+export const getCategorias = async (userId: string) => getCollection<Categoria>(`users/${userId}/expenseCategories`);
+export const getCategoria = async (userId: string, id: string) => getDocument<Categoria>(`users/${userId}/expenseCategories`, id);
 
-export const saveCategoria = async (data: Omit<Categoria, 'id'> & { id?: string }) => {
+export const saveCategoria = async (userId: string, data: Omit<Categoria, 'id'> & { id?: string }) => {
     const { id, ...rest } = data;
+    const categoriaData = { ...rest, userId };
     if (id) {
-        await updateDocument('categorias', id, rest);
+        await updateDoc(doc(db, `users/${userId}/expenseCategories`, id), categoriaData);
     } else {
-        await addDocument('categorias', rest);
+        await addDoc(collection(db, `users/${userId}/expenseCategories`), categoriaData);
     }
 };
 
 // --- Ingresos ---
-export const getIngresos = async () => getCollection<Ingreso>('ingresos');
+export const getIngresos = async (userId: string) => getCollection<Ingreso>(`users/${userId}/incomes`);
 
-export const addIngreso = async (data: Omit<Ingreso, 'id' | 'fecha'> & { fecha: string }) => {
+export const addIngreso = async (userId: string, data: Omit<Ingreso, 'id' | 'date'> & { date: string }) => {
     const ingresoData = {
         ...data,
-        fecha: parseISO(data.fecha).getTime(),
+        userId,
+        date: parseISO(data.date).getTime(),
     };
-    await addDocument('ingresos', ingresoData);
+    await addDoc(collection(db, `users/${userId}/incomes`), ingresoData);
 };
 
 // --- Gastos ---
-export const getGastos = async () => getCollection<Gasto>('gastos');
+export const getGastos = async (userId: string) => getCollection<Gasto>(`users/${userId}/expenses`);
 
-async function getGastosByCategoria(categoriaId: string): Promise<Gasto[]> {
-    const gastosRef = collection(db, 'gastos');
-    const q = query(gastosRef, where('categoriaId', '==', categoriaId));
+async function getGastosByCategoria(userId: string, categoryId: string): Promise<Gasto[]> {
+    const gastosRef = collection(db, `users/${userId}/expenses`);
+    const q = query(gastosRef, where('categoryId', '==', categoryId));
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map((doc) => doc.data() as Gasto);
 }
 
 export const addGasto = async (
-    data: Omit<Gasto, 'id' | 'fecha'> & { fecha: string }
+    userId: string,
+    data: Omit<Gasto, 'id' | 'date'> & { date: string }
 ): Promise<string | undefined> => {
     const gastoData = {
         ...data,
-        fecha: parseISO(data.fecha).getTime(),
+        userId,
+        date: parseISO(data.date).getTime(),
     };
-    await addDocument('gastos', gastoData);
+    await addDoc(collection(db, `users/${userId}/expenses`), gastoData);
 
-    const categorias = await getCategorias();
-    const categoria = categorias.find((c) => c.id === data.categoriaId);
+    const categoria = await getCategoria(userId, data.categoryId);
 
-    if (categoria && categoria.presupuesto && categoria.presupuesto > 0) {
-        const gastosCategoria = await getGastosByCategoria(categoria.id);
-        const totalGastado = gastosCategoria.reduce((sum, g) => sum + g.cantidad, 0) + gastoData.cantidad;
+    if (categoria && categoria.budget && categoria.budget > 0) {
+        const gastosCategoria = await getGastosByCategoria(userId, categoria.id);
+        const totalGastado = gastosCategoria.reduce((sum, g) => sum + g.amount, 0);
 
-        if (totalGastado > categoria.presupuesto) {
+        if (totalGastado > categoria.budget) {
             try {
                 // Assuming 'Usuario' is a placeholder for the actual user name
                 const alertResult = await generateBudgetAlert({
-                    category: categoria.nombre,
+                    category: categoria.name,
                     spentAmount: totalGastado,
-                    budgetLimit: categoria.presupuesto,
+                    budgetLimit: categoria.budget,
                     userName: 'Usuario',
                 });
                 return alertResult.alertMessage;

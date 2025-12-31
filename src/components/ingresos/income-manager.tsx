@@ -14,7 +14,7 @@ const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
 };
 
-export function IncomeManager({ ingresos }: { ingresos: Ingreso[] }) {
+export function IncomeManager({ ingresos, userId }: { ingresos: Ingreso[], userId: string }) {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     
     return (
@@ -38,11 +38,11 @@ export function IncomeManager({ ingresos }: { ingresos: Ingreso[] }) {
                             <TableBody>
                                 {ingresos.map((ingreso) => (
                                     <TableRow key={ingreso.id}>
-                                        <TableCell className="font-medium">{ingreso.fuente}</TableCell>
-                                        <TableCell>{new Date(ingreso.fecha).toLocaleDateString('es-ES')}</TableCell>
+                                        <TableCell className="font-medium">{ingreso.source}</TableCell>
+                                        <TableCell>{new Date(ingreso.date).toLocaleDateString('es-ES')}</TableCell>
                                         <TableCell className='text-right'>
                                             <Badge variant="secondary" className="text-green-600 font-semibold">
-                                                {formatCurrency(ingreso.cantidad)}
+                                                {formatCurrency(ingreso.amount)}
                                             </Badge>
                                         </TableCell>
                                     </TableRow>
@@ -60,7 +60,7 @@ export function IncomeManager({ ingresos }: { ingresos: Ingreso[] }) {
                             Completa los detalles de tu ingreso.
                         </DialogDescription>
                     </DialogHeader>
-                    <IncomeForm onFormSuccess={() => setIsDialogOpen(false)} />
+                    <IncomeForm userId={userId} onFormSuccess={() => setIsDialogOpen(false)} />
                 </DialogContent>
             </Dialog>
         </>

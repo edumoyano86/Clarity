@@ -7,30 +7,36 @@ import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 import { SavingsSuggestions } from "@/components/dashboard/savings-suggestions";
 import { Categoria } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
-import { useCollection, useFirestore } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase";
+import { collection, query, where, Timestamp } from "firebase/firestore";
 
 type DashboardData = Awaited<ReturnType<typeof getDashboardData>>;
 
 export default function DashboardPage() {
   const firestore = useFirestore();
+  const { user } = useUser();
   const [data, setData] = useState<DashboardData | null>(null);
-  const { data: categorias, loading: loadingCategorias } = useCollection<Categoria>(
-    firestore ? collection(firestore, 'categorias') : null
-  );
+
+  const categoriasQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return collection(firestore, `users/${user.uid}/expenseCategories`);
+  }, [firestore, user]);
+  const { data: categorias, loading: loadingCategorias } = useCollection<Categoria>(categoriasQuery);
+
+
   const [periodo, setPeriodo] = useState<Periodo>('mes_actual');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!firestore) return;
+    if (!firestore || !user) return;
     const fetchData = async () => {
       setIsLoading(true);
-      const dashboardData = await getDashboardData(periodo)
+      const dashboardData = await getDashboardData(user.uid, periodo)
       setData(dashboardData);
       setIsLoading(false);
     };
     fetchData();
-  }, [periodo, firestore]);
+  }, [periodo, firestore, user]);
 
   const periodos: { key: Periodo, label: string }[] = [
     { key: 'mes_actual', label: 'Este Mes' },
@@ -38,6 +44,10 @@ export default function DashboardPage() {
     { key: 'ultimos_3_meses', label: 'Últimos 3 Meses' },
     { key: 'ano_actual', label: 'Este Año' },
   ];
+
+  if (!user) {
+    return <p>Inicia sesión para ver tu resumen.</p>
+  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -75,7 +85,7 @@ export default function DashboardPage() {
               <RecentTransactions transactions={data.transaccionesRecientes} categorias={categorias || []} />
             </div>
           </div>
-          <SavingsSuggestions />
+          <SavingsSuggestions userId={user.uid} />
         </>
       ) : (
         <p>No se pudieron cargar los datos.</p>
