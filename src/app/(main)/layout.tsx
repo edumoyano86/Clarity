@@ -1,5 +1,5 @@
 'use client';
-import { useUser } from '@/firebase';
+import { useUser, useFirebase } from '@/firebase';
 import Header from "@/components/layout/header";
 import { MainSidebar } from "@/components/layout/main-sidebar";
 import {
@@ -15,11 +15,13 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
+    // Only redirect if loading is complete and there's no user.
     if (!isUserLoading && !user) {
       router.push('/login');
     }
   }, [user, isUserLoading, router]);
 
+  // While loading, don't render children to avoid executing hooks with null user.
   if (isUserLoading || !user) {
     return (
        <div className="flex h-screen w-full items-center justify-center">
@@ -28,6 +30,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // Render children only when loading is complete and user exists.
   return <>{children}</>;
 }
 

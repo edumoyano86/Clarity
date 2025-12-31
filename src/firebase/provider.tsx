@@ -7,11 +7,9 @@ import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 import { initializeFirebase } from '@/firebase';
 
-interface FirebaseServices {
-  firebaseApp: FirebaseApp;
-  firestore: Firestore;
-  auth: Auth;
-}
+// Initialize Firebase services immediately.
+// This is safe to do at the module level in a client component.
+const services = initializeFirebase();
 
 export interface FirebaseContextState {
   firebaseApp: FirebaseApp;
@@ -23,30 +21,31 @@ export interface FirebaseContextState {
 
 export const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
 
-const services = initializeFirebase();
-
 export const FirebaseProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isUserLoading, setIsUserLoading] = useState(true);
 
   useEffect(() => {
-    if (!services) return;
-
+    // onAuthStateChanged returns an unsubscribe function
     const unsubscribe = onAuthStateChanged(services.auth, (firebaseUser) => {
       setUser(firebaseUser);
-      setIsUserLoading(false);
+      setIsUserLoading(false); // Set loading to false once user state is determined
     });
 
+    // Cleanup subscription on unmount
     return () => unsubscribe();
-  }, []);
-  
+  }, []); // Empty dependency array ensures this effect runs only once on mount
+
+  // Memoize the context value to prevent unnecessary re-renders
   const contextValue = useMemo(() => ({
     ...services,
     user,
     isUserLoading,
   }), [user, isUserLoading]);
 
-  if (!contextValue) {
+  // While the user's auth state is loading, show a global loader.
+  // This prevents any child components from rendering and trying to access Firebase services.
+  if (isUserLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <p>Conectando con Firebase...</p>
