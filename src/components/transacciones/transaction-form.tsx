@@ -38,13 +38,14 @@ interface TransactionFormProps {
     userId: string;
     transaction?: Transaction;
     onFormSuccess: () => void;
+    activeTab: 'ingreso' | 'gasto';
 }
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
 };
 
-export function TransactionForm({ type, categorias, accounts, userId, transaction, onFormSuccess }: TransactionFormProps) {
+export function TransactionForm({ type, categorias, accounts, userId, transaction, onFormSuccess, activeTab }: TransactionFormProps) {
     const { toast } = useToast();
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = useState(false);
@@ -52,8 +53,6 @@ export function TransactionForm({ type, categorias, accounts, userId, transactio
     const { register, handleSubmit, formState: { errors }, control, reset, watch } = useForm<FormValues>({
         resolver: zodResolver(TransactionSchema),
     });
-
-    const isGasto = type === 'gasto';
 
     useEffect(() => {
         if (transaction) {
@@ -90,9 +89,9 @@ export function TransactionForm({ type, categorias, accounts, userId, transactio
             
             const dataToSave = {
                 ...txData,
-                type: type,
+                type: activeTab,
                 date: txData.date.getTime(),
-                categoryId: isGasto ? txData.categoryId : undefined,
+                categoryId: activeTab === 'gasto' ? txData.categoryId : undefined,
             };
 
             const transactionsColRef = collection(firestore, "users", userId, "transactions");
@@ -103,7 +102,7 @@ export function TransactionForm({ type, categorias, accounts, userId, transactio
                 const newDocRef = await addDoc(transactionsColRef, dataToSave);
 
                 // If it's an income and an account is selected to be paid
-                if (type === 'ingreso' && accountId) {
+                if (activeTab === 'ingreso' && accountId) {
                     const accountRef = doc(firestore, 'users', userId, 'accounts', accountId);
                     
                     await runTransaction(firestore, async (t) => {
@@ -140,7 +139,7 @@ export function TransactionForm({ type, categorias, accounts, userId, transactio
             });
 
             // Check budget for expenses
-            if (isGasto && data.categoryId) {
+            if (activeTab === 'gasto' && data.categoryId) {
                 const catDocRef = doc(firestore, "users", userId, "expenseCategories", data.categoryId);
                 const categoriaDoc = await getDoc(catDocRef);
                 
@@ -191,7 +190,7 @@ export function TransactionForm({ type, categorias, accounts, userId, transactio
             <input type="hidden" {...register('id')} />
             <div>
                 <Label htmlFor="description">Descripción</Label>
-                <Input id="description" placeholder={isGasto ? "Ej: Cena con amigos" : "Ej: Salario Mensual"} {...register('description')} />
+                <Input id="description" placeholder={activeTab === 'gasto' ? "Ej: Cena con amigos" : "Ej: Salario Mensual"} {...register('description')} />
                 {errors.description && <p className="text-sm text-destructive">{errors.description.message}</p>}
             </div>
             <div>
@@ -199,13 +198,13 @@ export function TransactionForm({ type, categorias, accounts, userId, transactio
                 <Input id="amount" type="number" step="0.01" placeholder="Ej: 45.50" {...register('amount')} />
                 {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
             </div>
-            {isGasto && (
+            {activeTab === 'gasto' && (
                 <div>
                     <Label htmlFor="categoryId">Categoría</Label>
                     <Controller
                         name="categoryId"
                         control={control}
-                        rules={{ required: isGasto ? 'La categoría es requerida' : false }}
+                        rules={{ required: activeTab === 'gasto' ? 'La categoría es requerida' : false }}
                         render={({ field }) => (
                             <Select onValueChange={field.onChange} value={field.value}>
                                 <SelectTrigger>
@@ -257,7 +256,7 @@ export function TransactionForm({ type, categorias, accounts, userId, transactio
                 />
                 {errors.date && <p className="text-sm text-destructive">{errors.date.message}</p>}
             </div>
-             {!isGasto && pendingAccounts.length > 0 && (
+             {activeTab === 'ingreso' && pendingAccounts.length > 0 && (
                 <div>
                     <Label htmlFor="accountId">Asignar a cuenta (Opcional)</Label>
                     <Controller
@@ -282,7 +281,7 @@ export function TransactionForm({ type, categorias, accounts, userId, transactio
                 </div>
             )}
              <Button type="submit" disabled={isLoading} className="w-full">
-                {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</> : `Guardar ${isGasto ? 'Gasto' : 'Ingreso'}`}
+                {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</> : `Guardar ${activeTab === 'gasto' ? 'Gasto' : 'Ingreso'}`}
             </Button>
         </form>
     );

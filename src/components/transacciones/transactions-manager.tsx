@@ -43,6 +43,9 @@ export function TransactionsManager({ transactions, categorias, accounts, userId
     const handleOpenDialog = (transaction?: Transaction) => {
         if(transaction) {
             setActiveTab(transaction.type === 'ingreso' ? 'ingreso' : 'gasto');
+        } else {
+            // Reset to default tab when adding a new transaction
+            setActiveTab('ingreso');
         }
         setSelectedTransaction(transaction);
         setIsDialogOpen(true);
@@ -143,8 +146,8 @@ export function TransactionsManager({ transactions, categorias, accounts, userId
                     </DialogHeader>
                     <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'ingreso' | 'gasto')}>
                         <TabsList className='grid w-full grid-cols-2'>
-                            <TabsTrigger value='ingreso' disabled={!!selectedTransaction}>Ingreso</TabsTrigger>
-                            <TabsTrigger value='gasto' disabled={!!selectedTransaction}>Gasto</TabsTrigger>
+                            <TabsTrigger value='ingreso' disabled={!!selectedTransaction && selectedTransaction.type !== 'ingreso'}>Ingreso</TabsTrigger>
+                            <TabsTrigger value='gasto' disabled={!!selectedTransaction && selectedTransaction.type !== 'gasto'}>Gasto</TabsTrigger>
                         </TabsList>
                         <TabsContent value='ingreso'>
                             <TransactionForm 
@@ -153,7 +156,9 @@ export function TransactionsManager({ transactions, categorias, accounts, userId
                                 accounts={accounts} 
                                 userId={userId} 
                                 transaction={selectedTransaction} 
-                                onFormSuccess={handleCloseDialog} />
+                                onFormSuccess={handleCloseDialog}
+                                activeTab={activeTab}
+                            />
                         </TabsContent>
                         <TabsContent value='gasto'>
                              <TransactionForm 
@@ -162,7 +167,9 @@ export function TransactionsManager({ transactions, categorias, accounts, userId
                                 accounts={accounts} 
                                 userId={userId} 
                                 transaction={selectedTransaction} 
-                                onFormSuccess={handleCloseDialog} />
+                                onFormSuccess={handleCloseDialog}
+                                activeTab={activeTab}
+                             />
                         </TabsContent>
                     </Tabs>
                 </DialogContent>
