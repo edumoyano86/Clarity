@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm, SubmitHandler, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,13 +15,14 @@ import { Calendar } from '../ui/calendar';
 import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Categoria } from '@/lib/definitions';
+import { Categoria, Gasto } from '@/lib/definitions';
 import { Textarea } from '../ui/textarea';
 import { useFirestore } from '@/firebase';
-import { collection, addDoc, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, doc, getDoc, setDoc } from 'firebase/firestore';
 import { generateBudgetAlert } from '@/ai/flows/budget-alerts';
 
 const GastoSchema = z.object({
+  id: z.string().optional(),
   notes: z.string().optional(),
   amount: z.coerce.number({ invalid_type_error: 'La cantidad debe ser un número.'}).positive('La cantidad debe ser un número positivo'),
   categoryId: z.string({ required_error: 'La categoría es requerida.'}).min(1, 'La categoría es requerida'),
@@ -30,17 +31,41 @@ const GastoSchema = z.object({
 
 type FormValues = z.infer<typeof GastoSchema>;
 
-export function ExpenseForm({ categorias, userId, onFormSuccess }: { categorias: Categoria[], userId: string, onFormSuccess: () => void }) {
+interface ExpenseFormProps {
+    categorias: Categoria[];
+    userId: string;
+    expense?: Gasto;
+    onFormSuccess: () => void;
+}
+
+export function ExpenseForm({ categorias, userId, expense, onFormSuccess }: ExpenseFormProps) {
     const { toast } = useToast();
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = useState(false);
     
-    const { register, handleSubmit, formState: { errors }, control } = useForm<FormValues>({
+    const { register, handleSubmit, formState: { errors }, control, reset } = useForm<FormValues>({
         resolver: zodResolver(GastoSchema),
-        defaultValues: {
-            date: new Date(),
-        }
     });
+
+    useEffect(() => {
+        if (expense) {
+            reset({
+                id: expense.id,
+                notes: expense.notes || '',
+                amount: expense.amount,
+                categoryId: expense.categoryId,
+                date: new Date(expense.date),
+            });
+        } else {
+            reset({
+                id: '',
+                notes: '',
+                amount: undefined,
+                categoryId: '',
+                date: new Date(),
+            });
+        }
+    }, [expense, reset]);
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         setIsLoading(true);
@@ -51,16 +76,22 @@ export function ExpenseForm({ categorias, userId, onFormSuccess }: { categorias:
         }
 
         try {
-            const gastoData = {
-                ...data,
-                date: data.date.getTime(),
+            const { id, ...gastoData } = data;
+            const dataToSave = {
+                ...gastoData,
+                date: gastoData.date.getTime(),
             };
             const expensesColRef = collection(firestore, "users", userId, "expenses");
-            await addDoc(expensesColRef, gastoData);
+            
+            if (id) {
+                await setDoc(doc(expensesColRef, id), dataToSave, { merge: true });
+            } else {
+                await addDoc(expensesColRef, dataToSave);
+            }
 
             toast({
                 title: 'Éxito',
-                description: 'Gasto agregado exitosamente.',
+                description: 'Gasto guardado exitosamente.',
             });
 
             // Check budget
@@ -101,10 +132,10 @@ export function ExpenseForm({ categorias, userId, onFormSuccess }: { categorias:
             onFormSuccess();
 
         } catch (error) {
-            console.error("Error adding expense:", error);
+            console.error("Error saving expense:", error);
             toast({
                 title: 'Error',
-                description: 'No se pudo agregar el gasto.',
+                description: 'No se pudo guardar el gasto.',
                 variant: 'destructive',
             });
         } finally {
@@ -114,6 +145,7 @@ export function ExpenseForm({ categorias, userId, onFormSuccess }: { categorias:
 
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <input type="hidden" {...register('id')} />
             <div>
                 <Label htmlFor="amount">Cantidad</Label>
                 <Input id="amount" type="number" step="0.01" placeholder="Ej: 45.50" {...register('amount')} />
@@ -125,7 +157,7 @@ export function ExpenseForm({ categorias, userId, onFormSuccess }: { categorias:
                     name="categoryId"
                     control={control}
                     render={({ field }) => (
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Selecciona una categoría" />
                             </SelectTrigger>
@@ -179,7 +211,7 @@ export function ExpenseForm({ categorias, userId, onFormSuccess }: { categorias:
                 <Textarea id="notes" placeholder="Ej: Cena con amigos" {...register('notes')}/>
             </div>
              <Button type="submit" disabled={isLoading} className="w-full">
-                {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Agregando...</> : 'Agregar Gasto'}
+                {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</> : 'Guardar Gasto'}
             </Button>
         </form>
     );

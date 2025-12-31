@@ -20,3 +20,18 @@ export type Gasto = {
   date: number; // timestamp
   notes?: string;
 };
+
+export type Appointment = {
+  id: string;
+  title: string;
+  date: number; // timestamp
+  notes?: string;
+};
+
+export type Note = {
+    id: string;
+    title: string;
+    content: string;
+    createdAt: number; // timestamp
+    updatedAt: number; // timestamp
+};

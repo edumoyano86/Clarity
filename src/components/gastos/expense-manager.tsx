@@ -10,6 +10,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { ExpenseForm } from './expense-form';
 import { Badge } from '../ui/badge';
 import { Icon } from '../icons';
+import { Button } from '../ui/button';
+import { Edit, Trash2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { useFirestore } from '@/firebase';
+import { deleteDoc, doc } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
@@ -23,8 +29,47 @@ interface ExpenseManagerProps {
 
 export function ExpenseManager({ gastos, categorias, userId }: ExpenseManagerProps) {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isAlertOpen, setIsAlertOpen] = useState(false);
+    const [selectedExpense, setSelectedExpense] = useState<Gasto | undefined>(undefined);
+    const [expenseToDelete, setExpenseToDelete] = useState<Gasto | null>(null);
+
+    const firestore = useFirestore();
+    const { toast } = useToast();
     
     const getCategory = (id: string) => categorias.find(c => c.id === id);
+
+    const handleOpenDialog = (gasto?: Gasto) => {
+        setSelectedExpense(gasto);
+        setIsDialogOpen(true);
+    };
+
+    const handleCloseDialog = () => {
+        setIsDialogOpen(false);
+        setSelectedExpense(undefined);
+    };
+
+    const handleOpenAlert = (gasto: Gasto) => {
+        setExpenseToDelete(gasto);
+        setIsAlertOpen(true);
+    };
+
+    const handleCloseAlert = () => {
+        setExpenseToDelete(null);
+        setIsAlertOpen(false);
+    };
+
+    const handleDelete = async () => {
+        if (!expenseToDelete) return;
+        try {
+            await deleteDoc(doc(firestore, 'users', userId, 'expenses', expenseToDelete.id));
+            toast({ title: 'Éxito', description: 'Gasto eliminado correctamente.' });
+        } catch (error) {
+            toast({ title: 'Error', description: 'No se pudo eliminar el gasto.', variant: 'destructive' });
+        } finally {
+            handleCloseAlert();
+        }
+    };
+
 
     return (
         <>
@@ -32,7 +77,7 @@ export function ExpenseManager({ gastos, categorias, userId }: ExpenseManagerPro
                 title="Gastos"
                 description="Registra y categoriza todos tus gastos."
                 buttonLabel="Añadir Gasto"
-                onButtonClick={() => setIsDialogOpen(true)}
+                onButtonClick={() => handleOpenDialog()}
             >
                 <Card>
                     <CardContent className='pt-6'>
@@ -41,7 +86,8 @@ export function ExpenseManager({ gastos, categorias, userId }: ExpenseManagerPro
                                 <TableRow>
                                     <TableHead>Categoría</TableHead>
                                     <TableHead>Fecha</TableHead>
-                                    <TableHead className='text-right'>Cantidad</TableHead>
+                                    <TableHead>Cantidad</TableHead>
+                                    <TableHead className='text-right'>Acciones</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -59,8 +105,16 @@ export function ExpenseManager({ gastos, categorias, userId }: ExpenseManagerPro
                                                 </div>
                                             </TableCell>
                                             <TableCell>{new Date(gasto.date).toLocaleDateString('es-ES')}</TableCell>
-                                            <TableCell className='text-right'>
+                                            <TableCell>
                                                 <Badge variant="outline">{formatCurrency(gasto.amount)}</Badge>
+                                            </TableCell>
+                                            <TableCell className='text-right'>
+                                                <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(gasto)}>
+                                                    <Edit className="h-4 w-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" onClick={() => handleOpenAlert(gasto)}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
                                             </TableCell>
                                         </TableRow>
                                     )
@@ -73,14 +127,29 @@ export function ExpenseManager({ gastos, categorias, userId }: ExpenseManagerPro
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Nuevo Gasto</DialogTitle>
+                        <DialogTitle>{selectedExpense ? 'Editar' : 'Nuevo'} Gasto</DialogTitle>
                          <DialogDescription>
                             Completa los detalles de tu gasto.
                         </DialogDescription>
                     </DialogHeader>
-                    <ExpenseForm categorias={categorias} userId={userId} onFormSuccess={() => setIsDialogOpen(false)} />
+                    <ExpenseForm categorias={categorias} userId={userId} expense={selectedExpense} onFormSuccess={handleCloseDialog} />
                 </DialogContent>
             </Dialog>
+
+            <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta acción no se puede deshacer. Se eliminará permanentemente el gasto.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={handleCloseAlert}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete}>Eliminar</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 }

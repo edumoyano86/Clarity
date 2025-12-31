@@ -11,6 +11,8 @@ import {
   Briefcase,
   PiggyBank,
   Landmark,
+  Calendar,
+  Notebook,
   type LucideIcon,
 } from "lucide-react";
 
@@ -27,6 +29,8 @@ export const iconMap: { [key: string]: LucideIcon } = {
   Briefcase,
   PiggyBank,
   Landmark,
+  Calendar,
+  Notebook,
 };
 
 export const availableIcons = [

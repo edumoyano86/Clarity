@@ -7,69 +7,70 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Appointment } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { CalendarIcon, Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
-import { Calendar } from '../ui/calendar';
-import { cn } from '@/lib/utils';
-import { es } from 'date-fns/locale';
 import { useFirestore } from '@/firebase';
 import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
-import { Ingreso } from '@/lib/definitions';
+import { Loader2, CalendarIcon } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Calendar } from '../ui/calendar';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Textarea } from '../ui/textarea';
 
-const IngresoSchema = z.object({
+const AppointmentSchema = z.object({
   id: z.string().optional(),
-  source: z.string({ required_error: 'La fuente es requerida.'}).min(1, 'La fuente es requerida'),
-  amount: z.coerce.number({ invalid_type_error: 'La cantidad debe ser un número.'}).positive('La cantidad debe ser un número positivo'),
-  date: z.date({ required_error: 'La fecha es requerida.'}),
+  title: z.string({ required_error: 'El título es requerido.' }).min(1, 'El título es requerido'),
+  date: z.date({ required_error: 'La fecha es requerida.' }),
+  notes: z.string().optional(),
 });
 
-type FormValues = z.infer<typeof IngresoSchema>;
+type FormValues = z.infer<typeof AppointmentSchema>;
 
-interface IncomeFormProps {
+interface AgendaFormProps {
     userId: string;
-    income?: Ingreso;
+    appointment?: Appointment;
     onFormSuccess: () => void;
 }
 
-export function IncomeForm({ userId, income, onFormSuccess }: IncomeFormProps) {
+export function AgendaForm({ userId, appointment, onFormSuccess }: AgendaFormProps) {
     const { toast } = useToast();
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = useState(false);
-    
+
     const { register, handleSubmit, formState: { errors }, control, reset } = useForm<FormValues>({
-        resolver: zodResolver(IngresoSchema),
+        resolver: zodResolver(AppointmentSchema),
     });
 
     useEffect(() => {
-        if (income) {
+        if (appointment) {
             reset({
-                id: income.id,
-                source: income.source,
-                amount: income.amount,
-                date: new Date(income.date),
+                id: appointment.id,
+                title: appointment.title,
+                date: new Date(appointment.date),
+                notes: appointment.notes || '',
             });
         } else {
-             reset({
+            reset({
                 id: '',
-                source: '',
-                amount: undefined,
+                title: '',
                 date: new Date(),
+                notes: '',
             });
         }
-    }, [income, reset]);
+    }, [appointment, reset]);
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         setIsLoading(true);
         try {
-            const { id, ...ingresoData } = data;
+            const { id, ...appointmentData } = data;
             const dataToSave = {
-                ...ingresoData,
-                date: ingresoData.date.getTime(),
+                ...appointmentData,
+                date: appointmentData.date.getTime(),
             };
-            
-            const collectionRef = collection(firestore, 'users', userId, 'incomes');
+
+            const collectionRef = collection(firestore, 'users', userId, 'appointments');
 
             if (id) {
                 await setDoc(doc(collectionRef, id), dataToSave, { merge: true });
@@ -79,14 +80,14 @@ export function IncomeForm({ userId, income, onFormSuccess }: IncomeFormProps) {
 
             toast({
                 title: 'Éxito',
-                description: 'Ingreso guardado exitosamente.',
+                description: 'Cita guardada exitosamente.',
             });
             onFormSuccess();
         } catch (error) {
-             console.error("Error saving income:", error);
+            console.error("Error saving appointment:", error);
             toast({
                 title: 'Error',
-                description: 'No se pudo guardar el ingreso.',
+                description: 'No se pudo guardar la cita.',
                 variant: 'destructive',
             });
         } finally {
@@ -96,19 +97,14 @@ export function IncomeForm({ userId, income, onFormSuccess }: IncomeFormProps) {
 
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <input type="hidden" {...register('id')} />
+             <input type="hidden" {...register('id')} />
             <div>
-                <Label htmlFor="source">Fuente del Ingreso</Label>
-                <Input id="source" placeholder="Ej: Salario, Venta online" {...register('source')} />
-                {errors.source && <p className="text-sm text-destructive">{errors.source.message}</p>}
+                <Label htmlFor="title">Título</Label>
+                <Input id="title" {...register('title')} />
+                {errors.title && <p className="text-sm text-destructive">{errors.title.message}</p>}
             </div>
             <div>
-                <Label htmlFor="amount">Cantidad</Label>
-                <Input id="amount" type="number" step="0.01" placeholder="Ej: 1500.00" {...register('amount')} />
-                 {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
-            </div>
-             <div>
-                <Label htmlFor="date">Fecha</Label>
+                <Label htmlFor="date">Fecha y Hora</Label>
                 <Controller
                     name="date"
                     control={control}
@@ -123,7 +119,7 @@ export function IncomeForm({ userId, income, onFormSuccess }: IncomeFormProps) {
                                 )}
                             >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                {field.value ? format(field.value, "PPP", { locale: es }) : <span>Selecciona una fecha</span>}
+                                {field.value ? format(field.value, "PPP p", { locale: es }) : <span>Selecciona una fecha</span>}
                             </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0">
@@ -133,15 +129,32 @@ export function IncomeForm({ userId, income, onFormSuccess }: IncomeFormProps) {
                                     onSelect={field.onChange}
                                     initialFocus
                                     locale={es}
-                                />
+                                    />
+                                {/* Simple time picker */}
+                                <div className="p-2 border-t">
+                                    <Input type="time" 
+                                        defaultValue={field.value ? format(field.value, 'HH:mm') : ''}
+                                        onChange={(e) => {
+                                            const time = e.target.value;
+                                            const [hours, minutes] = time.split(':').map(Number);
+                                            const newDate = new Date(field.value || new Date());
+                                            newDate.setHours(hours, minutes);
+                                            field.onChange(newDate);
+                                        }}
+                                    />
+                                </div>
                             </PopoverContent>
                         </Popover>
                     )}
                 />
                 {errors.date && <p className="text-sm text-destructive">{errors.date.message}</p>}
             </div>
-             <Button type="submit" disabled={isLoading} className="w-full">
-                {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</> : 'Guardar Ingreso'}
+            <div>
+                <Label htmlFor="notes">Notas (Opcional)</Label>
+                <Textarea id="notes" {...register('notes')} />
+            </div>
+            <Button type="submit" disabled={isLoading} className="w-full">
+                {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</> : 'Guardar Cita'}
             </Button>
         </form>
     );

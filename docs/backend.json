@@ -44,6 +44,29 @@
         "icono": { "type": "string", "description": "The icon for this category." }
       },
       "required": ["name", "icono"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "type": "object",
+      "description": "Represents a single appointment or event in the user's schedule.",
+      "properties": {
+        "title": { "type": "string", "description": "The title of the appointment." },
+        "date": { "type": "number", "description": "Timestamp of the appointment." },
+        "notes": { "type": "string", "description": "Optional notes for the appointment." }
+      },
+      "required": ["title", "date"]
+    },
+    "Note": {
+      "title": "Note",
+      "type": "object",
+      "description": "Represents a single note for the user.",
+      "properties": {
+        "title": { "type": "string", "description": "The title of the note." },
+        "content": { "type": "string", "description": "The content of the note." },
+        "createdAt": { "type": "number", "description": "Timestamp when the note was created." },
+        "updatedAt": { "type": "number", "description": "Timestamp when the note was last updated." }
+      },
+      "required": ["title", "content", "createdAt", "updatedAt"]
     }
   },
   "auth": {
@@ -65,6 +88,14 @@
     "/users/{userId}/expenseCategories/{categoryId}": {
       "schema": { "$ref": "#/entities/ExpenseCategory" },
       "description": "Stores expense categories defined by a specific user."
+    },
+    "/users/{userId}/appointments/{appointmentId}": {
+      "schema": { "$ref": "#/entities/Appointment" },
+      "description": "Stores appointments for a specific user."
+    },
+    "/users/{userId}/notes/{noteId}": {
+      "schema": { "$ref": "#/entities/Note" },
+      "description": "Stores notes for a specific user."
     }
   }
 }

@@ -17,6 +17,8 @@ import {
   Shapes,
   Settings,
   CircleHelp,
+  Calendar,
+  Notebook
 } from "lucide-react";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
@@ -26,6 +28,8 @@ const menuItems = [
   { href: "/ingresos", label: "Ingresos", icon: TrendingUp },
   { href: "/gastos", label: "Gastos", icon: TrendingDown },
   { href: "/categorias", label: "Categorías", icon: Shapes },
+  { href: "/agenda", label: "Agenda", icon: Calendar },
+  { href: "/notas", label: "Notas", icon: Notebook },
 ];
 
 export function MainSidebar() {
