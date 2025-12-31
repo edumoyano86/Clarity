@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { type ChartConfig, ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 
@@ -27,8 +27,8 @@ const formatCurrency = (amount: number) => {
 
 export function BalanceChart({ ingresos, gastos }: BalanceChartProps) {
     const chartData = [
-        { name: "Ingresos", value: ingresos, fill: "var(--color-ingresos)" },
-        { name: "Gastos", value: gastos, fill: "var(--color-gastos)" },
+        { name: "Ingresos", value: ingresos, fill: "hsl(var(--chart-2))" },
+        { name: "Gastos", value: gastos, fill: "hsl(var(--destructive))" },
     ];
 
   return (
@@ -39,32 +39,38 @@ export function BalanceChart({ ingresos, gastos }: BalanceChartProps) {
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-            <BarChart data={chartData} layout="horizontal" margin={{ left: 10 }}>
-                <YAxis 
-                    dataKey="name" 
-                    type="category" 
-                    tickLine={false} 
-                    axisLine={false}
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                    width={80}
-                />
-                <XAxis 
-                    dataKey="value" 
-                    type="number" 
-                    hide 
-                />
-                <Tooltip 
-                    cursor={{ fill: 'hsl(var(--muted))' }} 
-                    content={<ChartTooltipContent 
-                        formatter={(value) => formatCurrency(value as number)}
-                        hideLabel
-                    />} 
-                />
-                 <Bar dataKey="value" name="Valor" radius={4} />
-            </BarChart>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 20 }}>
+                  <YAxis 
+                      dataKey="name" 
+                      type="category" 
+                      tickLine={false} 
+                      axisLine={false}
+                      stroke="hsl(var(--muted-foreground))"
+                      tick={{ fontSize: 12 }}
+                      width={80}
+                  />
+                  <XAxis 
+                      dataKey="value" 
+                      type="number" 
+                      hide 
+                  />
+                  <Tooltip 
+                      cursor={{ fill: 'hsl(var(--muted))' }} 
+                      content={<ChartTooltipContent 
+                          formatter={(value) => formatCurrency(value as number)}
+                          hideLabel
+                      />} 
+                  />
+                  <Bar dataKey="value" name="Valor" radius={4} barSize={35}>
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Bar>
+              </BarChart>
+            </ResponsiveContainer>
         </ChartContainer>
       </CardContent>
     </Card>
   );
 }
-
