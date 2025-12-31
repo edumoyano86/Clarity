@@ -1,6 +1,6 @@
 "use client";
 
-import { Pie, PieChart, ResponsiveContainer, Tooltip, Legend, Cell } from "recharts";
+import { Pie, PieChart, Tooltip, Legend, Cell } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMemo } from "react";
 import { type ChartConfig, ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
@@ -39,7 +39,7 @@ export function ExpensesChart({ data }: ExpensesChartProps) {
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
           {data.length > 0 ? (
-            <PieChart>
+            <PieChart width={399} height={300}>
               <Tooltip
                 cursor={{ fill: 'hsl(var(--muted))' }}
                 content={<ChartTooltipContent nameKey="name" hideLabel />}
