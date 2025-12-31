@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from "@/components/ui/table";
-import { Investment, CoinPrice } from "@/lib/definitions";
+import { Investment, PriceData } from "@/lib/definitions";
 import { ManagerPage } from '../shared/manager-page';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { InvestmentForm } from './investment-form';
@@ -14,9 +14,10 @@ import { useFirestore } from '@/firebase';
 import { deleteDoc, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { getCryptoPrices } from '@/ai/flows/crypto-prices';
+import { getStockPrices } from '@/ai/flows/stock-prices';
 
-const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+const formatCurrency = (amount: number, currency = 'USD') => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 };
 
 interface InvestmentsManagerProps {
@@ -29,7 +30,7 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [selectedInvestment, setSelectedInvestment] = useState<Investment | undefined>(undefined);
     const [investmentToDelete, setInvestmentToDelete] = useState<Investment | null>(null);
-    const [prices, setPrices] = useState<CoinPrice>({});
+    const [prices, setPrices] = useState<PriceData>({});
     const [isLoadingPrices, setIsLoadingPrices] = useState(false);
 
     const firestore = useFirestore();
@@ -39,15 +40,23 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
         const fetchPrices = async () => {
             if (investments.length === 0) return;
             setIsLoadingPrices(true);
-            const coinIds = [...new Set(investments.map(inv => inv.coinId))];
+
+            const cryptoIds = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.assetId))];
+            const stockSymbols = [...new Set(investments.filter(i => i.assetType === 'stock').map(inv => inv.symbol))];
+
             try {
-                const fetchedPrices = await getCryptoPrices({ coinIds });
-                setPrices(fetchedPrices);
+                const results = await Promise.all([
+                    cryptoIds.length > 0 ? getCryptoPrices({ assetIds: cryptoIds }) : Promise.resolve({}),
+                    stockSymbols.length > 0 ? getStockPrices({ symbols: stockSymbols }) : Promise.resolve({}),
+                ]);
+                const combinedPrices = { ...results[0], ...results[1] };
+                setPrices(combinedPrices);
+
             } catch (error) {
-                console.error("Failed to fetch crypto prices:", error);
+                console.error("Failed to fetch asset prices:", error);
                 toast({
                     title: 'Error de Precios',
-                    description: 'No se pudieron obtener los precios de las criptomonedas.',
+                    description: 'No se pudieron obtener las cotizaciones de los activos.',
                     variant: 'destructive'
                 });
             } finally {
@@ -92,7 +101,8 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
 
     const renderPortfolioRow = (investment: Investment) => {
         const purchaseValue = investment.amount * investment.purchasePrice;
-        const currentValue = prices[investment.coinId] ? investment.amount * prices[investment.coinId].usd : null;
+        const currentPrice = prices[investment.assetId]?.price || prices[investment.symbol]?.price;
+        const currentValue = currentPrice ? investment.amount * currentPrice : null;
         const pnl = currentValue !== null ? currentValue - purchaseValue : null;
         const pnlPercent = pnl !== null && purchaseValue > 0 ? (pnl / purchaseValue) * 100 : null;
 
@@ -132,7 +142,7 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
         <>
             <ManagerPage
                 title="Portafolio de Inversiones"
-                description="Realiza un seguimiento de tus activos de criptomonedas."
+                description="Realiza un seguimiento de tus activos."
                 buttonLabel="Añadir Inversión"
                 onButtonClick={() => handleOpenForm()}
             >

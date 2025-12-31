@@ -18,25 +18,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { useFirestore } from '@/firebase';
 import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import { Investment } from '@/lib/definitions';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 
-// For simplicity, we'll hardcode a list of popular coins.
-// In a real app, this could be fetched from CoinGecko API.
 const popularCoins = [
     { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
     { id: 'ethereum', symbol: 'ETH', name: 'Ethereum' },
     { id: 'tether', symbol: 'USDT', name: 'Tether' },
     { id: 'binancecoin', symbol: 'BNB', name: 'BNB' },
     { id: 'solana', symbol: 'SOL', name: 'Solana' },
-    { id: 'usd-coin', symbol: 'USDC', name: 'USDC' },
-    { id: 'ripple', symbol: 'XRP', name: 'XRP' },
-    { id: 'dogecoin', symbol: 'DOGE', name: 'Dogecoin' },
-    { id: 'cardano', symbol: 'ADA', name: 'Cardano' },
-    { id: 'shiba-inu', symbol: 'SHIB', name: 'Shiba Inu' },
 ];
 
 const InvestmentSchema = z.object({
     id: z.string().optional(),
-    coinId: z.string({ required_error: 'Debes seleccionar una criptomoneda.' }),
+    assetType: z.enum(['crypto', 'stock'], { required_error: 'Debes seleccionar un tipo de activo.' }),
+    assetId: z.string().min(1, 'Debes seleccionar o ingresar un activo.'),
     amount: z.coerce.number().positive('La cantidad debe ser un número positivo.'),
     purchasePrice: z.coerce.number().positive('El precio debe ser un número positivo.'),
     purchaseDate: z.date({ required_error: 'La fecha de compra es requerida.' }),
@@ -55,15 +50,21 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = useState(false);
     
-    const { register, handleSubmit, formState: { errors }, control, reset } = useForm<FormValues>({
+    const { register, handleSubmit, formState: { errors }, control, reset, watch, setValue } = useForm<FormValues>({
         resolver: zodResolver(InvestmentSchema),
+        defaultValues: {
+            assetType: investment?.assetType || 'crypto',
+        }
     });
+
+    const assetType = watch('assetType');
 
     useEffect(() => {
         if (investment) {
             reset({
                 id: investment.id,
-                coinId: investment.coinId,
+                assetType: investment.assetType,
+                assetId: investment.assetId,
                 amount: investment.amount,
                 purchasePrice: investment.purchasePrice,
                 purchaseDate: new Date(investment.purchaseDate),
@@ -71,7 +72,8 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         } else {
              reset({
                 id: '',
-                coinId: undefined,
+                assetType: 'crypto',
+                assetId: '',
                 amount: undefined,
                 purchasePrice: undefined,
                 purchaseDate: new Date(),
@@ -79,23 +81,35 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         }
     }, [investment, reset]);
 
+    useEffect(() => {
+        setValue('assetId', '');
+    }, [assetType, setValue]);
+
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         setIsLoading(true);
         try {
-            const { id, coinId, ...investmentData } = data;
-            const selectedCoin = popularCoins.find(c => c.id === coinId);
+            const { id, assetId, assetType, ...investmentData } = data;
+            
+            let name = '';
+            let symbol = '';
 
-            if (!selectedCoin) {
-                toast({ title: 'Error', description: 'Criptomoneda no válida.', variant: 'destructive' });
-                setIsLoading(false);
-                return;
+            if (assetType === 'crypto') {
+                const selectedCoin = popularCoins.find(c => c.id === assetId);
+                if (!selectedCoin) throw new Error('Criptomoneda no válida');
+                name = selectedCoin.name;
+                symbol = selectedCoin.symbol;
+            } else { // stock
+                // For stocks, we use the ticker symbol as name/symbol and assetId
+                name = assetId.toUpperCase();
+                symbol = assetId.toUpperCase();
             }
 
             const dataToSave = {
                 ...investmentData,
-                coinId: selectedCoin.id,
-                name: selectedCoin.name,
-                symbol: selectedCoin.symbol,
+                assetType,
+                assetId,
+                name,
+                symbol,
                 purchaseDate: investmentData.purchaseDate.getTime(),
             };
             
@@ -127,28 +141,59 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <input type="hidden" {...register('id')} />
+
+            <Controller
+                name="assetType"
+                control={control}
+                render={({ field }) => (
+                    <RadioGroup
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        className="grid grid-cols-2 gap-4"
+                        >
+                        <div>
+                            <RadioGroupItem value="crypto" id="crypto" className="peer sr-only" />
+                            <Label htmlFor="crypto" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                Criptomoneda
+                            </Label>
+                        </div>
+                        <div>
+                            <RadioGroupItem value="stock" id="stock" className="peer sr-only" />
+                             <Label htmlFor="stock" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                Acción
+                            </Label>
+                        </div>
+                    </RadioGroup>
+                )}
+            />
+
             <div>
-                <Label htmlFor="coinId">Criptomoneda</Label>
-                 <Controller
-                    name="coinId"
-                    control={control}
-                    render={({ field }) => (
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Selecciona un activo" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {popularCoins.map(coin => (
-                                    <SelectItem key={coin.id} value={coin.id}>
-                                        {coin.name} ({coin.symbol.toUpperCase()})
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    )}
-                />
-                {errors.coinId && <p className="text-sm text-destructive">{errors.coinId.message}</p>}
+                <Label htmlFor="assetId">Activo</Label>
+                {assetType === 'crypto' ? (
+                     <Controller
+                        name="assetId"
+                        control={control}
+                        render={({ field }) => (
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Selecciona una criptomoneda" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {popularCoins.map(coin => (
+                                        <SelectItem key={coin.id} value={coin.id}>
+                                            {coin.name} ({coin.symbol.toUpperCase()})
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                    />
+                ) : (
+                    <Input id="assetId" placeholder="Ej: AAPL, GOOGL" {...register('assetId')} />
+                )}
+                {errors.assetId && <p className="text-sm text-destructive">{errors.assetId.message}</p>}
             </div>
+            
             <div>
                 <Label htmlFor="amount">Cantidad</Label>
                 <Input id="amount" type="number" step="any" placeholder="Ej: 0.5" {...register('amount')} />
