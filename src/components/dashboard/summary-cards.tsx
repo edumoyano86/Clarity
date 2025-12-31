@@ -1,33 +1,23 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, Wallet } from "lucide-react";
-import { Periodo } from "@/lib/actions";
+import { TrendingUp, TrendingDown, Wallet, BookUser } from "lucide-react";
 
 type SummaryCardsProps = {
   totalIngresos: number;
   totalGastos: number;
   balance: number;
-  periodo: Periodo;
+  cuentasPorPagar: number;
+  periodoLabel: string;
 };
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
 };
 
-const getPeriodoLabel = (periodo: Periodo) => {
-    switch (periodo) {
-        case 'mes_actual': return 'En este mes';
-        case 'mes_pasado': return 'En el mes pasado';
-        case 'ultimos_3_meses': return 'En los últimos 3 meses';
-        case 'ano_actual': return 'En este año';
-        default: return 'En el período';
-    }
-}
 
-export function SummaryCards({ totalIngresos, totalGastos, balance, periodo }: SummaryCardsProps) {
-  const periodoLabel = getPeriodoLabel(periodo);
+export function SummaryCards({ totalIngresos, totalGastos, balance, cuentasPorPagar, periodoLabel }: SummaryCardsProps) {
   
   return (
-    <div className="grid gap-4 md:grid-cols-3">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
@@ -46,6 +36,16 @@ export function SummaryCards({ totalIngresos, totalGastos, balance, periodo }: S
         <CardContent>
           <div className="text-2xl font-bold">{formatCurrency(totalGastos)}</div>
            <p className="text-xs text-muted-foreground">{periodoLabel}</p>
+        </CardContent>
+      </Card>
+        <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Cuentas por Pagar</CardTitle>
+          <BookUser className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{formatCurrency(cuentasPorPagar)}</div>
+          <p className="text-xs text-muted-foreground">Total de deudas pendientes</p>
         </CardContent>
       </Card>
       <Card>

@@ -4,7 +4,7 @@ import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { ExpensesChart } from "@/components/dashboard/expenses-chart";
 import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 import { SavingsSuggestions } from "@/components/dashboard/savings-suggestions";
-import { Categoria, Appointment, Transaction, Investment } from "@/lib/definitions";
+import { Categoria, Appointment, Transaction, Investment, Account } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
 import { useCollection, useFirestore, useUser } from "@/firebase";
 import { UpcomingAppointments } from "@/components/dashboard/upcoming-appointments";
@@ -45,6 +45,12 @@ export default function DashboardPage() {
     return query(collection(firestore, 'users', user.uid, 'investments'), orderBy('purchaseDate', 'asc'));
   }, [firestore, user]);
   const { data: investments, isLoading: loadingInvestments } = useCollection<Investment>(investmentsQuery);
+
+  const accountsQuery = useMemo(() => {
+    if (!firestore || !user) return null;
+    return query(collection(firestore, 'users', user.uid, 'accounts'), where('status', '==', 'pendiente'));
+  }, [firestore, user]);
+  const { data: accounts, isLoading: loadingAccounts } = useCollection<Account>(accountsQuery);
 
   const upcomingAppointmentsQuery = useMemo(() => {
     if (!firestore || !user) return null;
@@ -141,6 +147,8 @@ export default function DashboardPage() {
       .sort((a, b) => b.date - a.date)
       .slice(0, 5);
 
+    const totalCuentasPorPagar = (accounts || []).reduce((sum, acc) => sum + (acc.amount - acc.paidAmount), 0);
+
     return {
       totalIngresos,
       totalGastos,
@@ -148,8 +156,9 @@ export default function DashboardPage() {
       gastosPorCategoria,
       transaccionesRecientes,
       categorias,
+      totalCuentasPorPagar,
     };
-  }, [periodo, transactions, categorias]);
+  }, [periodo, transactions, categorias, accounts]);
 
   const periodos: { key: Periodo, label: string }[] = [
     { key: 'mes_actual', label: 'Este Mes' },
@@ -158,7 +167,7 @@ export default function DashboardPage() {
     { key: 'ano_actual', label: 'Este Año' },
   ];
 
-  const isLoading = isUserLoading || loadingTransactions || loadingCategorias || loadingInvestments;
+  const isLoading = isUserLoading || loadingTransactions || loadingCategorias || loadingInvestments || loadingAccounts;
 
   if (isLoading) {
     return <div className="flex h-full items-center justify-center"><p>Cargando...</p></div>
@@ -192,7 +201,8 @@ export default function DashboardPage() {
             totalIngresos={dashboardData.totalIngresos}
             totalGastos={dashboardData.totalGastos}
             balance={dashboardData.balance}
-            periodo={periodo}
+            cuentasPorPagar={dashboardData.totalCuentasPorPagar}
+            periodoLabel={getPeriodoLabel(periodo)}
           />
           <div className="grid gap-8 md:grid-cols-2">
             <InvestmentsChart data={investments || []} />
@@ -214,4 +224,14 @@ export default function DashboardPage() {
       )}
     </div>
   );
+}
+
+const getPeriodoLabel = (periodo: Periodo) => {
+    switch (periodo) {
+        case 'mes_actual': return 'En este mes';
+        case 'mes_pasado': return 'En el mes pasado';
+        case 'ultimos_3_meses': return 'En los últimos 3 meses';
+        case 'ano_actual': return 'En este año';
+        default: return 'En el período';
+    }
 }
