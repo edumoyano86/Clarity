@@ -67,10 +67,7 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
                 const stockPrices = results[1];
 
                 // Combine prices using the correct key
-                const combinedPrices: PriceData = { ...cryptoPrices };
-                for (const symbol in stockPrices) {
-                    combinedPrices[symbol] = stockPrices[symbol];
-                }
+                const combinedPrices: PriceData = { ...cryptoPrices, ...stockPrices };
 
                 setPrices(combinedPrices);
 
@@ -120,7 +117,7 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
             await deleteDoc(doc(firestore, 'users', userId, 'investments', investmentToDelete.id));
             toast({ title: 'Éxito', description: 'Inversión eliminada correctamente.' });
         } catch (error) {
-            toast({ title: 'Error', description: 'No se pudo eliminar la inversión.', variant: 'destructive' });
+            toast({ title: 'Error', description: 'No se pudo eliminar la inversión.', variant = 'destructive' });
         } finally {
             handleCloseAlert();
         }
