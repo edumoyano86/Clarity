@@ -5,7 +5,8 @@ import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
 import { Auth } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
-import { initializeFirebase, useUser as useAuthUserHook } from '@/firebase';
+import { initializeFirebase } from '@/firebase';
+import { useUser as useAuthUserHook } from '@/firebase/auth/use-user';
 
 // Initialize Firebase services immediately.
 // This is safe to do at the module level in a client component.
@@ -63,6 +64,4 @@ export const useFirebaseApp = (): FirebaseApp => {
   return useFirebase().firebaseApp;
 };
 
-export const useUser = () => {
-    return useAuthUserHook();
-};
+export const useUser = useAuthUserHook;
