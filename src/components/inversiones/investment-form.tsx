@@ -21,9 +21,15 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { getCryptoPrices } from '@/ai/flows/crypto-prices';
 import { getStockPrices } from '@/ai/flows/stock-prices';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
+import { searchStocks } from '@/ai/flows/stock-search';
 
 interface CoinGeckoCoin {
     id: string;
+    symbol: string;
+    name: string;
+}
+
+interface StockSearchResult {
     symbol: string;
     name: string;
 }
@@ -65,11 +71,19 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = useState(false);
     
-    const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<CoinGeckoCoin[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
+    // States for crypto search
+    const [cryptoSearchQuery, setCryptoSearchQuery] = useState('');
+    const [cryptoSearchResults, setCryptoSearchResults] = useState<CoinGeckoCoin[]>([]);
+    const [isSearchingCrypto, setIsSearchingCrypto] = useState(false);
     const [selectedCoin, setSelectedCoin] = useState<CoinGeckoCoin | null>(null);
-    const [isListVisible, setIsListVisible] = useState(true);
+    const [isCryptoListVisible, setIsCryptoListVisible] = useState(true);
+
+    // States for stock search
+    const [stockSearchQuery, setStockSearchQuery] = useState('');
+    const [stockSearchResults, setStockSearchResults] = useState<StockSearchResult[]>([]);
+    const [isSearchingStock, setIsSearchingStock] = useState(false);
+    const [selectedStock, setSelectedStock] = useState<StockSearchResult | null>(null);
+    const [isStockListVisible, setIsStockListVisible] = useState(true);
 
     
     const { register, handleSubmit, formState: { errors }, control, reset, watch, setValue } = useForm<FormValues>({
@@ -82,27 +96,48 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
 
     const assetType = watch('assetType');
     
+    // --- Crypto Search Logic ---
     const searchCoins = useCallback(async (query: string) => {
         if (query.length < 2) {
-            setSearchResults([]);
-            setIsSearching(false);
+            setCryptoSearchResults([]);
+            setIsSearchingCrypto(false);
             return;
         }
-        setIsSearching(true);
+        setIsSearchingCrypto(true);
         try {
             const response = await fetch(`https://api.coingecko.com/api/v3/search?query=${query}`);
             if (!response.ok) throw new Error('Network response was not ok.');
             const data = await response.json();
-            setSearchResults(data.coins || []);
+            setCryptoSearchResults(data.coins || []);
         } catch (error) {
             console.error("Failed to search coins:", error);
-            setSearchResults([]);
+            setCryptoSearchResults([]);
         } finally {
-            setIsSearching(false);
+            setIsSearchingCrypto(false);
         }
     }, []);
+    const debouncedCryptoSearch = useCallback(debounce(searchCoins, 300), [searchCoins]);
 
-    const debouncedSearch = useCallback(debounce(searchCoins, 300), [searchCoins]);
+    // --- Stock Search Logic ---
+    const searchStockSymbols = useCallback(async (query: string) => {
+        if (query.length < 2) {
+            setStockSearchResults([]);
+            setIsSearchingStock(false);
+            return;
+        }
+        setIsSearchingStock(true);
+        try {
+            const response = await searchStocks({ query });
+            setStockSearchResults(response.results || []);
+        } catch (error) {
+            console.error("Failed to search stocks:", error);
+            setStockSearchResults([]);
+        } finally {
+            setIsSearchingStock(false);
+        }
+    }, []);
+    const debouncedStockSearch = useCallback(debounce(searchStockSymbols, 500), [searchStockSymbols]);
+
 
     useEffect(() => {
         if (investment) {
@@ -116,8 +151,12 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             });
             if(investment.assetType === 'crypto') {
                 setSelectedCoin({ id: investment.assetId, name: investment.name, symbol: investment.symbol });
-                setSearchQuery(investment.name);
-                setIsListVisible(false);
+                setCryptoSearchQuery(investment.name);
+                setIsCryptoListVisible(false);
+            } else { // Stock
+                setSelectedStock({ symbol: investment.symbol, name: investment.name });
+                setStockSearchQuery(investment.name);
+                setIsStockListVisible(false);
             }
         } else {
              reset({
@@ -129,7 +168,9 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 purchaseDate: new Date(),
             });
             setSelectedCoin(null);
-            setSearchQuery('');
+            setCryptoSearchQuery('');
+            setSelectedStock(null);
+            setStockSearchQuery('');
         }
     }, [investment, reset]);
 
@@ -137,9 +178,15 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         // Reset search when asset type changes
         setValue('assetId', '');
         setSelectedCoin(null);
-        setSearchQuery('');
-        setSearchResults([]);
-        setIsListVisible(true);
+        setCryptoSearchQuery('');
+        setCryptoSearchResults([]);
+        setIsCryptoListVisible(true);
+
+        setSelectedStock(null);
+        setStockSearchQuery('');
+        setStockSearchResults([]);
+        setIsStockListVisible(true);
+
     }, [assetType, setValue]);
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
@@ -155,7 +202,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     if (assetType === 'crypto') {
                         priceData = await getCryptoPrices({ assetIds: [assetId] });
                         finalPurchasePrice = priceData[assetId]?.price || 0;
-                    } else {
+                    } else { // Stock
                         priceData = await getStockPrices({ symbols: [assetId.toUpperCase()] });
                         finalPurchasePrice = priceData[assetId.toUpperCase()]?.price || 0;
                     }
@@ -185,9 +232,10 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 if (!selectedCoin || selectedCoin.id !== assetId) throw new Error('Por favor selecciona una criptomoneda de la lista.');
                 name = selectedCoin.name;
                 symbol = selectedCoin.symbol;
-            } else {
-                name = assetId.toUpperCase();
-                symbol = assetId.toUpperCase();
+            } else { // Stock
+                if (!selectedStock || selectedStock.symbol !== assetId) throw new Error('Por favor selecciona una acción de la lista.');
+                name = selectedStock.name;
+                symbol = selectedStock.symbol;
             }
 
             const dataToSave = {
@@ -260,32 +308,32 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                      <Command shouldFilter={false} className="relative overflow-visible">
                         <CommandInput 
                             placeholder="Busca por nombre o símbolo..."
-                            value={searchQuery}
+                            value={cryptoSearchQuery}
                             onValueChange={(query) => {
-                                setSearchQuery(query);
-                                debouncedSearch(query);
-                                if (!isListVisible) setIsListVisible(true);
+                                setCryptoSearchQuery(query);
+                                debouncedCryptoSearch(query);
+                                if (!isCryptoListVisible) setIsCryptoListVisible(true);
                             }}
-                             onFocus={() => setIsListVisible(true)}
+                             onFocus={() => setIsCryptoListVisible(true)}
                         />
-                        {isListVisible && (
+                        {isCryptoListVisible && (
                             <CommandList className="absolute top-10 z-10 w-full rounded-md border bg-popover text-popover-foreground shadow-md">
-                                {isSearching && <CommandEmpty>Buscando...</CommandEmpty>}
-                                {!isSearching && searchResults.length === 0 && searchQuery.length > 1 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}
-                                {searchResults.length > 0 && (
+                                {isSearchingCrypto && <CommandEmpty>Buscando...</CommandEmpty>}
+                                {!isSearchingCrypto && cryptoSearchResults.length === 0 && cryptoSearchQuery.length > 1 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}
+                                {cryptoSearchResults.length > 0 && (
                                 <CommandGroup>
-                                    {searchResults.map((coin) => (
+                                    {cryptoSearchResults.map((coin) => (
                                     <CommandItem
                                         key={coin.id}
                                         value={coin.id}
                                         onSelect={(currentValue) => {
-                                            const selected = searchResults.find(c => c.id.toLowerCase() === currentValue.toLowerCase());
+                                            const selected = cryptoSearchResults.find(c => c.id.toLowerCase() === currentValue.toLowerCase());
                                             if (selected) {
                                                 setSelectedCoin(selected);
                                                 setValue('assetId', selected.id);
-                                                setSearchQuery(selected.name);
+                                                setCryptoSearchQuery(selected.name);
                                             }
-                                            setIsListVisible(false);
+                                            setIsCryptoListVisible(false);
                                         }}
                                     >
                                         <Check
@@ -302,8 +350,52 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                             </CommandList>
                         )}
                     </Command>
-                ) : (
-                    <Input id="assetId" placeholder="Ej: AAPL, GOOGL" {...register('assetId')} />
+                ) : ( // Stock Search
+                     <Command shouldFilter={false} className="relative overflow-visible">
+                        <CommandInput 
+                            placeholder="Busca por nombre o símbolo..."
+                            value={stockSearchQuery}
+                            onValueChange={(query) => {
+                                setStockSearchQuery(query);
+                                debouncedStockSearch(query);
+                                if (!isStockListVisible) setIsStockListVisible(true);
+                            }}
+                             onFocus={() => setIsStockListVisible(true)}
+                        />
+                        {isStockListVisible && (
+                            <CommandList className="absolute top-10 z-10 w-full rounded-md border bg-popover text-popover-foreground shadow-md">
+                                {isSearchingStock && <CommandEmpty>Buscando...</CommandEmpty>}
+                                {!isSearchingStock && stockSearchResults.length === 0 && stockSearchQuery.length > 1 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}
+                                {stockSearchResults.length > 0 && (
+                                <CommandGroup>
+                                    {stockSearchResults.map((stock) => (
+                                    <CommandItem
+                                        key={stock.symbol}
+                                        value={stock.symbol}
+                                        onSelect={(currentValue) => {
+                                            const selected = stockSearchResults.find(s => s.symbol.toLowerCase() === currentValue.toLowerCase());
+                                            if (selected) {
+                                                setSelectedStock(selected);
+                                                setValue('assetId', selected.symbol);
+                                                setStockSearchQuery(selected.name);
+                                            }
+                                            setIsStockListVisible(false);
+                                        }}
+                                    >
+                                        <Check
+                                            className={cn(
+                                                "mr-2 h-4 w-4",
+                                                (selectedStock?.symbol === stock.symbol) ? "opacity-100" : "opacity-0"
+                                            )}
+                                        />
+                                        {stock.name} ({stock.symbol.toUpperCase()})
+                                    </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                                )}
+                            </CommandList>
+                        )}
+                    </Command>
                 )}
                 {errors.assetId && <p className="text-sm text-destructive">{errors.assetId.message}</p>}
             </div>
