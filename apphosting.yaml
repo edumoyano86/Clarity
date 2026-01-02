@@ -39,7 +39,7 @@ frontend:
   #   - npm run dev
   #   - next start
   #   - gunicorn --workers=2 -b :$PORT main:app
-  run: npm run start
+  run: npm run dev
 
   # The resources required by the frontend.
   resources:
