@@ -65,7 +65,6 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = useState(false);
     
-    // --- Crypto Search State ---
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<CoinGeckoCoin[]>([]);
     const [isSearching, setIsSearching] = useState(false);
@@ -280,7 +279,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                                         key={coin.id}
                                         value={coin.id}
                                         onSelect={(currentValue) => {
-                                            const selected = searchResults.find(c => c.id === currentValue);
+                                            const selected = searchResults.find(c => c.id.toLowerCase() === currentValue.toLowerCase());
                                             if (selected) {
                                                 setSelectedCoin(selected);
                                                 setValue('assetId', selected.id);
