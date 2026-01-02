@@ -34,7 +34,6 @@ export const FirebaseProvider: React.FC<{ children: ReactNode }> = ({ children }
   );
 };
 
-
 function useFirebaseContext() {
     const context = useContext(FirebaseContext);
     if (context === undefined) {
@@ -43,13 +42,8 @@ function useFirebaseContext() {
     return context;
 }
 
-export const useFirebase = () => {
-  const context = useFirebaseContext();
-  return {
-    firebaseApp: context.firebaseApp,
-    firestore: context.firestore,
-    auth: context.auth,
-  };
+export const useFirebase = (): FirebaseContextState => {
+  return useFirebaseContext();
 };
 
 export const useAuth = (): Auth => {

@@ -1,12 +1,11 @@
 'use client';
-import { useUser, useFirebase } from '@/firebase';
+import { useUser, FirebaseProvider } from '@/firebase';
 import Header from "@/components/layout/header";
 import { MainSidebar } from "@/components/layout/main-sidebar";
 import {
   Sidebar,
   SidebarProvider,
 } from "@/components/ui/sidebar";
-import { FirebaseProvider } from "@/firebase/provider";
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { AppointmentNotifier } from '@/components/layout/appointment-notifier';
