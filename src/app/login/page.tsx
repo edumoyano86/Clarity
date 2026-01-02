@@ -1,12 +1,12 @@
 'use client';
 
-import { FirebaseProvider } from '@/firebase';
+import { FirebaseClientProvider } from '@/firebase';
 import { AuthForm } from '@/components/auth/auth-form';
 import { Logo } from '@/components/logo';
 
 export default function LoginPage() {
     return (
-        <FirebaseProvider>
+        <FirebaseClientProvider>
             <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
                 <div className="w-full max-w-sm">
                     <div className="mb-8 flex justify-center">
@@ -15,6 +15,6 @@ export default function LoginPage() {
                     <AuthForm />
                 </div>
             </div>
-        </FirebaseProvider>
+        </FirebaseClientProvider>
     )
 }

@@ -1,5 +1,5 @@
 'use client';
-import { useUser, FirebaseProvider } from '@/firebase';
+import { useUser, FirebaseClientProvider } from '@/firebase';
 import Header from "@/components/layout/header";
 import { MainSidebar } from "@/components/layout/main-sidebar";
 import {
@@ -41,7 +41,7 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <FirebaseProvider>
+    <FirebaseClientProvider>
       <AuthGuard>
         <SidebarProvider>
           <div className="flex min-h-screen">
@@ -58,6 +58,6 @@ export default function MainLayout({
           <AppointmentNotifier />
         </SidebarProvider>
       </AuthGuard>
-    </FirebaseProvider>
+    </FirebaseClientProvider>
   );
 }
