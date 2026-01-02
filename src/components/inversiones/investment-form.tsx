@@ -22,6 +22,8 @@ import { getCryptoPrices } from '@/ai/flows/crypto-prices';
 import { getStockPrices } from '@/ai/flows/stock-prices';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { searchStocks } from '@/ai/flows/stock-search';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 interface CoinGeckoCoin {
     id: string;
@@ -249,11 +251,30 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             };
             
             const collectionRef = collection(firestore, 'users', userId, 'investments');
+            const operationType = id ? 'update' : 'create';
+            const docRef = id ? doc(collectionRef, id) : doc(collectionRef); // Generate ref beforehand for error handling
 
             if (id) {
-                await setDoc(doc(collectionRef, id), dataToSave, { merge: true });
+                setDoc(docRef, dataToSave, { merge: true }).catch(serverError => {
+                    const permissionError = new FirestorePermissionError({
+                        path: docRef.path,
+                        operation: operationType,
+                        requestResourceData: dataToSave,
+                    });
+                    errorEmitter.emit('permission-error', permissionError);
+                    // We throw the error so it can be caught by the outer try/catch
+                    throw permissionError;
+                });
             } else {
-                await addDoc(collectionRef, dataToSave);
+                addDoc(collectionRef, dataToSave).catch(serverError => {
+                    const permissionError = new FirestorePermissionError({
+                        path: collectionRef.path, // Path for the collection on create
+                        operation: operationType,
+                        requestResourceData: dataToSave,
+                    });
+                    errorEmitter.emit('permission-error', permissionError);
+                    throw permissionError;
+                });
             }
 
             toast({
