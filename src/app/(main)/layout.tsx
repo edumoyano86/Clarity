@@ -1,5 +1,5 @@
 'use client';
-import { useUser, FirebaseClientProvider } from '@/firebase';
+import { useUser } from '@/firebase';
 import Header from "@/components/layout/header";
 import { MainSidebar } from "@/components/layout/main-sidebar";
 import {
@@ -10,7 +10,11 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { AppointmentNotifier } from '@/components/layout/appointment-notifier';
 
-function AuthGuard({ children }: { children: React.ReactNode }) {
+export default function MainLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
 
@@ -21,7 +25,8 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [user, isUserLoading, router]);
 
-  // While loading, don't render children to avoid executing hooks with null user.
+  // While loading, or if no user, show a loading message.
+  // This prevents rendering children that might depend on the user.
   if (isUserLoading || !user) {
     return (
        <div className="flex h-screen w-full items-center justify-center">
@@ -31,33 +36,20 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   // Render children only when loading is complete and user exists.
-  return <>{children}</>;
-}
-
-
-export default function MainLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
   return (
-    <FirebaseClientProvider>
-      <AuthGuard>
-        <SidebarProvider>
-          <div className="flex min-h-screen">
-            <Sidebar>
-              <MainSidebar />
-            </Sidebar>
-            <div className="flex flex-col w-full">
-                <Header />
-                <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
-                    {children}
-                </main>
-            </div>
-          </div>
-          <AppointmentNotifier />
-        </SidebarProvider>
-      </AuthGuard>
-    </FirebaseClientProvider>
+    <SidebarProvider>
+      <div className="flex min-h-screen">
+        <Sidebar>
+          <MainSidebar />
+        </Sidebar>
+        <div className="flex flex-col w-full">
+            <Header />
+            <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
+                {children}
+            </main>
+        </div>
+      </div>
+      <AppointmentNotifier />
+    </SidebarProvider>
   );
 }
