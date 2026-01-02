@@ -1,15 +1,14 @@
 'use client';
-import { useCollection, useFirestore, useUser } from "@/firebase";
+import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase";
 import { Appointment } from "@/lib/definitions";
 import { AgendaManager } from "@/components/agenda/agenda-manager";
 import { collection, orderBy, query } from "firebase/firestore";
-import { useMemo } from "react";
 
 export default function AgendaPage() {
     const firestore = useFirestore();
     const { user, isUserLoading } = useUser();
 
-    const appointmentsQuery = useMemo(() => {
+    const appointmentsQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
         return query(collection(firestore, 'users', user.uid, 'appointments'), orderBy('date', 'asc'));
     }, [firestore, user]);

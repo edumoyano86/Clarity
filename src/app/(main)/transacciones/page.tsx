@@ -1,28 +1,27 @@
 'use client';
 
-import { useCollection, useFirestore, useUser } from "@/firebase";
+import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase";
 import { Transaction, Categoria, Account } from "@/lib/definitions";
 import { TransactionsManager } from "@/components/transacciones/transactions-manager";
 import { collection, query, orderBy } from "firebase/firestore";
-import { useMemo } from "react";
 
 export default function TransaccionesPage() {
     const firestore = useFirestore();
     const { user, isUserLoading } = useUser();
     
-    const transactionsQuery = useMemo(() => {
+    const transactionsQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
         return query(collection(firestore, 'users', user.uid, 'transactions'), orderBy('date', 'desc'));
     }, [firestore, user]);
     const { data: transactions, isLoading: loadingTransactions } = useCollection<Transaction>(transactionsQuery);
 
-    const categoriasQuery = useMemo(() => {
+    const categoriasQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
         return collection(firestore, 'users', user.uid, 'expenseCategories');
     }, [firestore, user]);
     const { data: categorias, isLoading: loadingCategorias } = useCollection<Categoria>(categoriasQuery);
 
-    const accountsQuery = useMemo(() => {
+    const accountsQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
         return collection(firestore, 'users', user.uid, 'accounts');
     }, [firestore, user]);

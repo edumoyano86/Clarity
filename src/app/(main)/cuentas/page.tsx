@@ -1,15 +1,14 @@
 'use client';
-import { useCollection, useFirestore, useUser } from "@/firebase";
+import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase";
 import { Account, Categoria } from "@/lib/definitions";
 import { AccountsManager } from "@/components/cuentas/accounts-manager";
 import { collection, query, orderBy } from "firebase/firestore";
-import { useMemo } from "react";
 
 export default function CuentasPage() {
     const firestore = useFirestore();
     const { user, isUserLoading } = useUser();
     
-    const accountsQuery = useMemo(() => {
+    const accountsQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
         return query(collection(firestore, 'users', user.uid, 'accounts'), orderBy('dueDate', 'asc'));
     }, [firestore, user]);
