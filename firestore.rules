@@ -92,12 +92,20 @@ service cloud.firestore {
 
       /**
        * @description Generic rule to control access to all user-specific subcollections.
-       * This applies to transactions, expenseCategories, accounts, investments, etc.
        * @path /users/{userId}/{collectionId}/{docId}
-       * @allow The owner of the data tree can perform any action on their own documents.
        */
       match /{collectionId}/{docId} {
+        // Allow full read/write access for individual documents to the owner.
         allow read, write: if isOwner(userId);
+      }
+      
+      /**
+       * @description Explicitly allow the owner to list documents in their own subcollections.
+       * This is crucial for fetching collections on the client-side.
+       * @path /users/{userId}/{collectionId}
+       */
+      match /{collectionId} {
+        allow list: if isOwner(userId);
       }
     }
   }
