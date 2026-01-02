@@ -68,8 +68,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     const [isSearching, setIsSearching] = useState(false);
     const [selectedCoin, setSelectedCoin] = useState<CoinGeckoCoin | null>(null);
     const [open, setOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-
+    
     const { register, handleSubmit, formState: { errors }, control, reset, watch, setValue } = useForm<FormValues>({
         resolver: zodResolver(InvestmentSchema),
         defaultValues: {
@@ -137,7 +136,6 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     useEffect(() => {
         setValue('assetId', '');
         setSelectedCoin(null);
-        setSearchQuery('');
         setSearchResults([]);
     }, [assetType, setValue]);
 
@@ -279,15 +277,11 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                                     <Command>
                                         <CommandInput 
                                             placeholder="Busca por nombre o símbolo..."
-                                            value={searchQuery}
-                                            onValueChange={(query) => {
-                                                setSearchQuery(query);
-                                                debouncedSearch(query);
-                                            }}
+                                            onValueChange={debouncedSearch}
                                         />
                                         <CommandList>
                                             {isSearching && <CommandEmpty>Buscando...</CommandEmpty>}
-                                            {!isSearching && searchQuery.length > 1 && searchResults.length === 0 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}
+                                            {!isSearching && searchResults.length === 0 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}
                                             <CommandGroup>
                                                 {searchResults.map((coin) => (
                                                 <CommandItem
