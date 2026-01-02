@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { CalendarIcon, Loader2, Check, ChevronsUpDown } from 'lucide-react';
+import { CalendarIcon, Loader2, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { Calendar } from '../ui/calendar';
 import { cn } from '@/lib/utils';
@@ -64,10 +64,14 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     const { toast } = useToast();
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = useState(false);
+    
+    // --- Crypto Search State ---
+    const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<CoinGeckoCoin[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [selectedCoin, setSelectedCoin] = useState<CoinGeckoCoin | null>(null);
-    const [open, setOpen] = useState(false);
+    const [isListVisible, setIsListVisible] = useState(true);
+
     
     const { register, handleSubmit, formState: { errors }, control, reset, watch, setValue } = useForm<FormValues>({
         resolver: zodResolver(InvestmentSchema),
@@ -79,33 +83,27 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
 
     const assetType = watch('assetType');
     
-     const debouncedSearch = useCallback(
-        debounce(async (query: string) => {
-            if (query.length < 2) {
-                setSearchResults([]);
-                setIsSearching(false);
-                return;
-            }
-            setIsSearching(true);
-            try {
-                const response = await fetch(`https://api.coingecko.com/api/v3/search?query=${query}`);
-                if (!response.ok) throw new Error('Network response was not ok.');
-                const data = await response.json();
-                setSearchResults(data.coins || []);
-            } catch (error) {
-                console.error("Failed to search coins:", error);
-                toast({
-                    title: 'Error de Búsqueda',
-                    description: 'No se pudieron buscar las criptomonedas.',
-                    variant: 'destructive',
-                });
-                setSearchResults([]);
-            } finally {
-                setIsSearching(false);
-            }
-        }, 300), 
-    [toast]);
+    const searchCoins = useCallback(async (query: string) => {
+        if (query.length < 2) {
+            setSearchResults([]);
+            setIsSearching(false);
+            return;
+        }
+        setIsSearching(true);
+        try {
+            const response = await fetch(`https://api.coingecko.com/api/v3/search?query=${query}`);
+            if (!response.ok) throw new Error('Network response was not ok.');
+            const data = await response.json();
+            setSearchResults(data.coins || []);
+        } catch (error) {
+            console.error("Failed to search coins:", error);
+            setSearchResults([]);
+        } finally {
+            setIsSearching(false);
+        }
+    }, []);
 
+    const debouncedSearch = useCallback(debounce(searchCoins, 300), [searchCoins]);
 
     useEffect(() => {
         if (investment) {
@@ -119,6 +117,8 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             });
             if(investment.assetType === 'crypto') {
                 setSelectedCoin({ id: investment.assetId, name: investment.name, symbol: investment.symbol });
+                setSearchQuery(investment.name);
+                setIsListVisible(false);
             }
         } else {
              reset({
@@ -130,13 +130,17 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 purchaseDate: new Date(),
             });
             setSelectedCoin(null);
+            setSearchQuery('');
         }
     }, [investment, reset]);
 
     useEffect(() => {
+        // Reset search when asset type changes
         setValue('assetId', '');
         setSelectedCoin(null);
+        setSearchQuery('');
         setSearchResults([]);
+        setIsListVisible(true);
     }, [assetType, setValue]);
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
@@ -174,7 +178,6 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     });
                 }
             }
-
 
             let name = '';
             let symbol = '';
@@ -255,63 +258,51 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             <div>
                 <Label htmlFor="assetId">Activo</Label>
                 {assetType === 'crypto' ? (
-                     <Controller
-                        name="assetId"
-                        control={control}
-                        render={({ field }) => (
-                            <Popover open={open} onOpenChange={setOpen} modal={true}>
-                                <PopoverTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    aria-expanded={open}
-                                    className="w-full justify-between"
-                                >
-                                    {selectedCoin
-                                    ? selectedCoin.name
-                                    : "Busca una criptomoneda..."}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                    <Command>
-                                        <CommandInput 
-                                            placeholder="Busca por nombre o símbolo..."
-                                            onValueChange={debouncedSearch}
+                     <Command shouldFilter={false} className="relative overflow-visible">
+                        <CommandInput 
+                            placeholder="Busca por nombre o símbolo..."
+                            value={searchQuery}
+                            onValueChange={(query) => {
+                                setSearchQuery(query);
+                                debouncedSearch(query);
+                                if (!isListVisible) setIsListVisible(true);
+                            }}
+                             onFocus={() => setIsListVisible(true)}
+                        />
+                        {isListVisible && (
+                            <CommandList className="absolute top-10 z-10 w-full rounded-md border bg-popover text-popover-foreground shadow-md">
+                                {isSearching && <CommandEmpty>Buscando...</CommandEmpty>}
+                                {!isSearching && searchResults.length === 0 && searchQuery.length > 1 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}
+                                {searchResults.length > 0 && (
+                                <CommandGroup>
+                                    {searchResults.map((coin) => (
+                                    <CommandItem
+                                        key={coin.id}
+                                        value={coin.id}
+                                        onSelect={(currentValue) => {
+                                            const selected = searchResults.find(c => c.id === currentValue);
+                                            if (selected) {
+                                                setSelectedCoin(selected);
+                                                setValue('assetId', selected.id);
+                                                setSearchQuery(selected.name);
+                                            }
+                                            setIsListVisible(false);
+                                        }}
+                                    >
+                                        <Check
+                                            className={cn(
+                                                "mr-2 h-4 w-4",
+                                                (selectedCoin?.id === coin.id) ? "opacity-100" : "opacity-0"
+                                            )}
                                         />
-                                        <CommandList>
-                                            {isSearching && <CommandEmpty>Buscando...</CommandEmpty>}
-                                            {!isSearching && searchResults.length === 0 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}
-                                            <CommandGroup>
-                                                {searchResults.map((coin) => (
-                                                <CommandItem
-                                                    key={coin.id}
-                                                    value={coin.id}
-                                                    onSelect={(currentValue) => {
-                                                        const selected = searchResults.find(c => c.id === currentValue);
-                                                        if (selected) {
-                                                            setSelectedCoin(selected);
-                                                            field.onChange(selected.id);
-                                                        }
-                                                        setOpen(false)
-                                                    }}
-                                                >
-                                                    <Check
-                                                    className={cn(
-                                                        "mr-2 h-4 w-4",
-                                                        field.value === coin.id ? "opacity-100" : "opacity-0"
-                                                    )}
-                                                    />
-                                                    {coin.name} ({coin.symbol.toUpperCase()})
-                                                </CommandItem>
-                                                ))}
-                                            </CommandGroup>
-                                        </CommandList>
-                                    </Command>
-                                </PopoverContent>
-                            </Popover>
+                                        {coin.name} ({coin.symbol.toUpperCase()})
+                                    </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                                )}
+                            </CommandList>
                         )}
-                    />
+                    </Command>
                 ) : (
                     <Input id="assetId" placeholder="Ej: AAPL, GOOGL" {...register('assetId')} />
                 )}
@@ -334,7 +325,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     name="purchaseDate"
                     control={control}
                     render={({ field }) => (
-                        <Popover modal={true}>
+                        <Popover>
                             <PopoverTrigger asChild>
                             <Button
                                 variant={"outline"}
