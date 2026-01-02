@@ -1,0 +1,66 @@
+# Specifies the version of the App Hosting manifest schema.
+version: 1
+
+# Specifies the bundle of resources that will be deployed.
+bundle:
+  # The release stage of the bundle.
+  # Can be "canary" or "stable".
+  release: stable
+  # The base directory of the app.
+  # All paths are relative to this directory.
+  base: .
+  # The files and directories to include in the bundle.
+  # If this is not specified, all files in the base directory are included.
+  include:
+    - /*
+    - .next/
+    - next.config.mjs
+    - package.json
+    - public/
+    - src/
+  # The files and directories to exclude from the bundle.
+  # If this is not specified, no files are excluded.
+  exclude:
+    - .firebase/
+    - .git/
+    - .github/
+    - node_modules/
+    - README.md
+
+# Specifies the frontend of the app.
+frontend:
+  # The command to start the frontend server.
+  # This is required.
+  # All path are relative to the base directory.
+  # The port to run the server on is specified by the PORT environment variable.
+  #
+  # Example:
+  #   - npm start
+  #   - npm run dev
+  #   - next start
+  #   - gunicorn --workers=2 -b :$PORT main:app
+  run: npm run start
+
+  # The resources required by the frontend.
+  resources:
+    # The amount of CPU to allocate to the frontend.
+    # The value is in CPU units.
+    # 1 CPU unit = 1 vCPU.
+    # This is required.
+    cpu: 1
+    # The amount of memory to allocate to the frontend.
+    # The value is in GB.
+    # This is required.
+    memory: 2
+
+# Specifies the environment variables to be set for the app.
+#
+# Example:
+#   env:
+#     - variable: FOO
+#       value: bar
+#     - variable: BAZ
+#       value: qux
+#     - variable: SECRET_API_KEY
+#       secret: my-secret-api-key
+env: []
