@@ -1,5 +1,42 @@
 {
   "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user's profile within the personal finance application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user profile."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The user's first name."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The user's last name."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address.",
+          "format": "email"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user profile was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "email",
+        "createdAt"
+      ]
+    },
     "Income": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Income",
@@ -12,22 +49,24 @@
         },
         "userId": {
           "type": "string",
-          "description": "Reference to the User who owns this income. (Relationship: User 1:N Income)"
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N Income)"
         },
         "source": {
           "type": "string",
-          "description": "The source of the income (e.g., salary, investment).",
-          "format": "string"
+          "description": "The source of the income (e.g., salary, investment)."
         },
         "amount": {
           "type": "number",
-          "description": "The amount of income received.",
-          "format": "number"
+          "description": "The amount of income received."
         },
         "date": {
           "type": "string",
           "description": "The date the income was received.",
           "format": "date-time"
+        },
+        "incomeCategory": {
+          "type": "string",
+          "description": "The income category."
         }
       },
       "required": [
@@ -35,7 +74,8 @@
         "userId",
         "source",
         "amount",
-        "date"
+        "date",
+        "incomeCategory"
       ]
     },
     "Expense": {
@@ -50,16 +90,15 @@
         },
         "userId": {
           "type": "string",
-          "description": "Reference to the User who owns this expense. (Relationship: User 1:N Expense)"
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N Expense)"
         },
-        "categoryId": {
+        "category": {
           "type": "string",
-          "description": "Reference to the ExpenseCategory for this expense. (Relationship: ExpenseCategory 1:N Expense)"
+          "description": "The category of the expense (e.g., housing, food, transportation)."
         },
         "amount": {
           "type": "number",
-          "description": "The amount of the expense.",
-          "format": "number"
+          "description": "The amount of the expense."
         },
         "date": {
           "type": "string",
@@ -74,16 +113,132 @@
       "required": [
         "id",
         "userId",
-        "categoryId",
+        "category",
         "amount",
-        "date"
+        "date",
+        "description"
+      ]
+    },
+    "BudgetAlert": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "BudgetAlert",
+      "type": "object",
+      "description": "Represents a budget alert that is triggered when a user exceeds a spending limit.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the budget alert."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N BudgetAlert)"
+        },
+        "category": {
+          "type": "string",
+          "description": "The category for which the alert is set (e.g., food, transportation)."
+        },
+        "limit": {
+          "type": "number",
+          "description": "The spending limit for the category."
+        },
+        "currentSpending": {
+          "type": "number",
+          "description": "The current spending in the category."
+        },
+        "alertThreshold": {
+          "type": "number",
+          "description": "The percentage of spending at which the alert is triggered (e.g., 90%)."
+        },
+        "triggered": {
+          "type": "boolean",
+          "description": "Indicates whether the alert has been triggered."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "category",
+        "limit",
+        "currentSpending",
+        "alertThreshold",
+        "triggered"
+      ]
+    },
+    "SavingSuggestion": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SavingSuggestion",
+      "type": "object",
+      "description": "Represents a personalized saving suggestion for a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the saving suggestion."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N SavingSuggestion)"
+        },
+        "description": {
+          "type": "string",
+          "description": "The description of the saving suggestion."
+        },
+        "potentialSavings": {
+          "type": "number",
+          "description": "The potential savings amount."
+        },
+        "category": {
+          "type": "string",
+          "description": "The category the saving suggestion applies to."
+        },
+        "priority": {
+          "type": "string",
+          "description": "The priority of the saving suggestion (e.g., high, medium, low)."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "description",
+        "potentialSavings",
+        "category",
+        "priority"
+      ]
+    },
+    "IncomeCategory": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "IncomeCategory",
+      "type": "object",
+      "description": "Represents a custom income category defined by the user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the income category."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N IncomeCategory)"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the income category."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the income category."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "name",
+        "description"
       ]
     },
     "ExpenseCategory": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "ExpenseCategory",
       "type": "object",
-      "description": "Represents a category for expenses (e.g., food, housing, transportation).",
+      "description": "Represents a custom expense category defined by the user.",
       "properties": {
         "id": {
           "type": "string",
@@ -91,48 +246,22 @@
         },
         "userId": {
           "type": "string",
-          "description": "Reference to the User who created this category. (Relationship: User 1:N ExpenseCategory)"
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N ExpenseCategory)"
         },
         "name": {
           "type": "string",
-          "description": "The name of the expense category (e.g., Food, Housing)."
+          "description": "The name of the expense category."
         },
-        "budgetLimit": {
-          "type": "number",
-          "description": "Optional budget limit for this category.",
-          "format": "number"
+        "description": {
+          "type": "string",
+          "description": "A description of the expense category."
         }
       },
       "required": [
         "id",
         "userId",
-        "name"
-      ]
-    },
-    "User": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "User",
-      "type": "object",
-      "description": "Represents a user of the application.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the user."
-        },
-        "email": {
-          "type": "string",
-          "description": "The user's email address.",
-          "format": "email"
-        },
-        "name": {
-          "type": "string",
-          "description": "The user's display name."
-        }
-      },
-      "required": [
-        "id",
-        "email",
-        "name"
+        "name",
+        "description"
       ]
     }
   },
@@ -147,11 +276,11 @@
       {
         "path": "/users/{userId}",
         "definition": {
-          "entityName": "User",
+          "entityName": "UserProfile",
           "schema": {
-            "$ref": "#/backend/entities/User"
+            "$ref": "#/backend/entities/UserProfile"
           },
-          "description": "Stores user profile information. This path serves as the root for all user-specific data.",
+          "description": "Stores user profile information. Each user has a dedicated document identified by their unique user ID.",
           "params": [
             {
               "name": "userId",
@@ -167,7 +296,7 @@
           "schema": {
             "$ref": "#/backend/entities/Income"
           },
-          "description": "Stores income entries for a specific user.",
+          "description": "Stores income entries for a specific user. Each income document is associated with a user ID.",
           "params": [
             {
               "name": "userId",
@@ -187,7 +316,7 @@
           "schema": {
             "$ref": "#/backend/entities/Expense"
           },
-          "description": "Stores expense entries for a specific user.",
+          "description": "Stores expense entries for a specific user. Each expense document is associated with a user ID.",
           "params": [
             {
               "name": "userId",
@@ -201,13 +330,73 @@
         }
       },
       {
+        "path": "/users/{userId}/budgetAlerts/{alertId}",
+        "definition": {
+          "entityName": "BudgetAlert",
+          "schema": {
+            "$ref": "#/backend/entities/BudgetAlert"
+          },
+          "description": "Stores budget alerts for a specific user. Each alert document is associated with a user ID.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "alertId",
+              "description": "The unique identifier for the budget alert."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/savingSuggestions/{suggestionId}",
+        "definition": {
+          "entityName": "SavingSuggestion",
+          "schema": {
+            "$ref": "#/backend/entities/SavingSuggestion"
+          },
+          "description": "Stores saving suggestions for a specific user. Each suggestion document is associated with a user ID.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "suggestionId",
+              "description": "The unique identifier for the saving suggestion."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/incomeCategories/{categoryId}",
+        "definition": {
+          "entityName": "IncomeCategory",
+          "schema": {
+            "$ref": "#/backend/entities/IncomeCategory"
+          },
+          "description": "Stores custom income categories defined by a specific user. Each category document is associated with a user ID.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "categoryId",
+              "description": "The unique identifier for the income category."
+            }
+          ]
+        }
+      },
+      {
         "path": "/users/{userId}/expenseCategories/{categoryId}",
         "definition": {
           "entityName": "ExpenseCategory",
           "schema": {
             "$ref": "#/backend/entities/ExpenseCategory"
           },
-          "description": "Stores expense categories for a specific user.",
+          "description": "Stores custom expense categories defined by a specific user. Each category document is associated with a user ID.",
           "params": [
             {
               "name": "userId",
@@ -221,6 +410,6 @@
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to manage personal finance data for individual users. It leverages path-based ownership to ensure data privacy and simplifies security rules. Each user's data (income, expenses, and expense categories) is stored under their respective user ID, facilitating secure access control. This approach ensures Authorization Independence by eliminating the need for `get()` calls in security rules and enables atomic operations. Specifically, we are leveraging path based ownership which creates an implicit authorization context based on the user's `uid`. This enables QAPs because list operations can be secured based on the path. Each entity related to a User is nested under the `/users/{userId}` path which simplifies security rules and enforces data isolation. By organizing the data in this manner, we ensure that users can only access their own financial information. This approach avoids the complexity of managing shared data or complex role-based access control."
+    "reasoning": "The Firestore structure is designed to create a personal finance management application for individual users ('Finanzas Personales'). It prioritizes user-owned data with path-based ownership for Income, Expenses, BudgetAlerts, SavingSuggestions, IncomeCategories, and ExpenseCategories. User profiles are stored in a dedicated `users` collection. This structure ensures that all documents within a collection share the same security requirements, simplifying security rule design and enhancing security. Authorization Independence is achieved because all subcollections are directly tied to a user's document, and no `get()` calls are needed to determine ownership. Rules are not filters because list operations are scoped to a single user. Timestamps (createdAt in UserProfile) support invariant checks, and ownership is explicit in each document's `userId` field. The structure uses explicit state modeling (e.g., `triggered` boolean in `BudgetAlert`) and a predictable schema."
   }
 }
