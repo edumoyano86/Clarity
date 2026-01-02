@@ -1,20 +1,176 @@
+/**
+ * Core Philosophy: This ruleset enforces a strict user-ownership model for a
+ * personal finance application. All data is considered private and can only
+ * be accessed by the user who created it. There is no concept of public or
+ * shared data.
+ *
+ * Data Structure: The entire data model is hierarchical, with all user-specific
+ * data (profiles, incomes, expenses, etc.) nested within a top-level `users`
+ * collection. The structure `/users/{userId}/{subcollection}/{docId}` ensures
+ * that ownership is determined by the document's path.
+ *
+ * Key Security Decisions:
+ * - User Isolation: A user can only ever access documents under their own
+ *   `/users/{userId}` path.
+ * - No User Listing: The top-level `/users` collection cannot be listed to
+ *   prevent enumeration of all application users.
+ * - Self-Creation: A newly authenticated user is permitted to create their
+ *   own profile document in the `/users/{userId}` path, where `{userId}`
+ *   matches their authentication UID.
+ * - Deny by Default: Any access not explicitly granted is denied.
+ *
+ * Denormalization for Authorization: This ruleset relies on path-based
+ * security. The `userId` in the path is the sole source of truth for
+ * authorization checks. To ensure data integrity, each document created
+ * within a user's data tree must contain a `userId` (or `id` for the profile)
+ * field that matches the `userId` from the path. This link is enforced as
+ * immutable upon creation.
+ *
+ * Structural Segregation: The use of distinct subcollections for each user
+ * (`/users/{userId}/...`) is a powerful form of structural segregation. It
+ * guarantees that `list` operations are inherently secure, as a query for
+ * `/users/some-user-id/incomes` can never accidentally leak data from another
+ * user.
+ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    //-------------------------------------------------------------------------
+    // Helper Functions
+    //-------------------------------------------------------------------------
+
+    /**
+     * Checks if the user is authenticated.
+     */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    match /users/{userId} {
-      // Users can read and update their own profile.
-      // Users can create their own profile upon registration.
-      allow read, update, create: if isSignedIn() && request.auth.uid == userId;
+    /**
+     * Checks if the authenticated user's UID matches the provided userId.
+     * This is the primary function for enforcing data ownership.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Rules for subcollections
-    match /users/{userId}/{collection}/{docId} {
-      // Any user can read/write to their own subcollections.
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    /**
+     * Checks for ownership on an existing document. Used for update and delete
+     * operations to prevent acting on non-existent data.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * Validates that the user profile document being created contains an 'id'
+     * field that matches the document's path, ensuring relational integrity.
+     */
+    function hasValidUserProfileDataOnCreate(userId) {
+      return request.resource.data.id == userId;
+    }
+
+    /**
+     * Enforces immutability of the user profile's 'id' field during updates.
+     */
+    function hasValidUserProfileDataOnUpdate() {
+      return request.resource.data.id == resource.data.id;
+    }
+
+    /**
+     * Validates that subcollection documents (e.g., Income, Expense) contain a
+     * 'userId' field that matches the document's path upon creation.
+     */
+    function hasValidSubcollectionDataOnCreate(userId) {
+      return request.resource.data.userId == userId;
+    }
+
+    /**
+     * Enforces immutability of the 'userId' field in subcollection documents
+     * during updates.
+     */
+    function hasValidSubcollectionDataOnUpdate() {
+      return request.resource.data.userId == resource.data.userId;
+    }
+
+    //-------------------------------------------------------------------------
+    // Collection Rules
+    //-------------------------------------------------------------------------
+
+    /**
+     * @description Controls access to a user's own profile document.
+     * @path /users/{userId}
+     * @allow (create) An authenticated user creating their own profile document for the first time.
+     * @deny (list) Any user attempting to list all user profiles in the application.
+     * @principle Restricts access to a user's own data tree and prevents user enumeration.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && hasValidUserProfileDataOnCreate(userId);
+      allow update: if isExistingOwner(userId) && hasValidUserProfileDataOnUpdate();
+      allow delete: if isExistingOwner(userId);
+
+      /**
+       * @description Controls access to a user's private income records.
+       * @path /users/{userId}/incomes/{incomeId}
+       * @allow (create) The owner creating a new income record for themselves. `auth.uid` must match `{userId}`.
+       * @deny (get) A different user (`auth.uid != {userId}`) trying to read an income record.
+       * @principle Enforces strict ownership for all reads and writes within a user's private subcollection.
+       */
+      match /incomes/{incomeId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && hasValidSubcollectionDataOnCreate(userId);
+        allow update: if isExistingOwner(userId) && hasValidSubcollectionDataOnUpdate();
+        allow delete: if isExistingOwner(userId);
+      }
+
+      /**
+       * @description Controls access to a user's private expense records.
+       * @path /users/{userId}/expenses/{expenseId}
+       * @allow (list) The owner listing all of their expense documents. `auth.uid` must match `{userId}`.
+       * @deny (update) A different user (`auth.uid != {userId}`) trying to modify an expense record.
+       * @principle Enforces strict ownership for all reads and writes within a user's private subcollection.
+       */
+      match /expenses/{expenseId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && hasValidSubcollectionDataOnCreate(userId);
+        allow update: if isExistingOwner(userId) && hasValidSubcollectionDataOnUpdate();
+        allow delete: if isExistingOwner(userId);
+      }
+
+      /**
+       * @description Controls access to a user's private budget alerts.
+       * @path /users/{userId}/budgetAlerts/{alertId}
+       * @allow (delete) The owner deleting one of their budget alerts. `auth.uid` must match `{userId}`.
+       * @deny (create) An unauthenticated user trying to create a budget alert.
+       * @principle Enforces strict ownership for all reads and writes within a user's private subcollection.
+       */
+      match /budgetAlerts/{alertId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && hasValidSubcollectionDataOnCreate(userId);
+        allow update: if isExistingOwner(userId) && hasValidSubcollectionDataOnUpdate();
+        allow delete: if isExistingOwner(userId);
+      }
+
+      /**
+       * @description Controls access to a user's private saving suggestions.
+       * @path /users/{userId}/savingSuggestions/{suggestionId}
+       * @allow (get) The owner reading a specific saving suggestion. `auth.uid` must match `{userId}`.
+       * @deny (list) A different user (`auth.uid != {userId}`) trying to list saving suggestions.
+       * @principle Enforces strict ownership for all reads and writes within a user's private subcollection.
+       */
+      match /savingSuggestions/{suggestionId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && hasValidSubcollectionDataOnCreate(userId);
+        allow update: if isExistingOwner(userId) && hasValidSubcollectionDataOnUpdate();
+        allow delete: if isExistingOwner(userId);
+      }
     }
   }
 }
