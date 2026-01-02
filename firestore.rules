@@ -174,8 +174,20 @@ service cloud.firestore {
         allow update: if isExistingOwner(userId);
         allow delete: if isExistingOwner(userId);
       }
+       /**
+       * @description Manages a user's appointments.
+       * @path /users/{userId}/appointments/{appointmentId}
+       * @allow (list): A user with auth.uid 'user123' lists all their appointments under /users/user123/appointments.
+       * @deny (create): An unauthenticated user tries to create an appointment document.
+       * @principle Enforces document ownership for all operations within a user-specific subcollection.
+       */
+      match /appointments/{appointmentId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isCreatingValidSubDoc(userId);
+        allow update: if isExistingOwner(userId) && isUpdatingImmutableSubDoc();
+        allow delete: if isExistingOwner(userId);
+      }
     }
   }
 }
-
-    
