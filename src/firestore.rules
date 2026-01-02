@@ -1,29 +1,31 @@
 /**
- * Core Philosophy: This ruleset enforces a strict user-ownership model for a personal finance application.
- * All data is considered private and is accessible only by the user who created it. The security model
- * ensures that one user cannot read, write, or even know about the existence of another user's data.
+ * @file firestore.rules
+ * @description Firestore Security Rules for a personal finance application.
  *
- * Data Structure: The entire data model is hierarchical, with all user-specific data nested
- * under a top-level `users` collection. Each user's data, including their profile, incomes, expenses,
- * and categories, is stored in a document or subcollection under `/users/{userId}`. This structure
- * naturally isolates user data and simplifies security rules.
+ * @version 1.1
  *
- * Key Security Decisions:
- * - User Isolation: The rules prevent any cross-user data access. A user's authentication token
- *   is the sole key to their entire data tree.
- * - No User Enumeration: Listing documents in the top-level `/users` collection is explicitly
- *   disallowed to protect user privacy and prevent scraping of user IDs.
- * - Path-Based Security: Authorization is primarily determined by the `{userId}` wildcard in the
- *   document path, which must match the authenticated user's ID. This is fast and efficient.
+ * @philosophy
+ * This ruleset enforces a strict user-ownership security model. All user-generated
+ * content is private and can only be accessed by the user who created it. There are
+ * no public or shared collections.
  *
- * Denormalization for Authorization: The data model is well-designed for security. Each document in a
- * user's subcollection (e.g., an `Income` document) contains a `userId` field. This denormalized field
- * is used to enforce relational integrity on creation and updates, ensuring that data is always correctly
- * associated with its owner. This avoids costly `get()` calls to parent documents.
+ * @structure
+ * All data is stored hierarchically under a top-level `users` collection. Each user's
+ * data, including their profile, income, expenses, and other financial records, is
+ * nested under their unique user ID (`/users/{userId}/...`). This structural segregation
+ * makes security rules simple, performant, and highly secure.
  *
- * Structural Segregation: The use of a per-user data tree (`/users/{userId}/...`) is a form of
- * structural segregation that provides the highest level of security and privacy for user data.
- * There is no concept of public or shared data in this application.
+ * @decisions
+ * - Strict Ownership: All rules are based on matching the authenticated user's UID
+ *   (`request.auth.uid`) with the `userId` parameter in the document path.
+ * - No Public Data: There are no globally readable collections. Listing documents
+ *   is only permitted within a user's own data tree.
+ * - Relational Integrity: On creation, documents must contain an ownership field (e.g., `id` or `userId`)
+ *   that matches the user ID in the path. This field is enforced as immutable upon update
+ *   to prevent documents from being re-assigned to different users.
+ * - Prototyping Flexibility: These rules do not validate the specific shape or data types
+ *   of documents beyond what is required for authorization, allowing for rapid front-end
+ *   development and iteration.
  */
 rules_version = '2';
 service cloud.firestore {
