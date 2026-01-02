@@ -324,7 +324,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     name="purchaseDate"
                     control={control}
                     render={({ field }) => (
-                        <Popover>
+                        <Popover modal={true}>
                             <PopoverTrigger asChild>
                             <Button
                                 variant={"outline"}
