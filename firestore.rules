@@ -144,6 +144,21 @@ service cloud.firestore {
         allow update: if isExistingOwner(userId) && isUpdatingImmutableSubDoc();
         allow delete: if isExistingOwner(userId);
       }
+      
+      /**
+       * @description Manages a user's transactions.
+       * @path /users/{userId}/transactions/{transactionId}
+       * @allow (list): A user with auth.uid 'user123' lists all their transactions under /users/user123/transactions.
+       * @deny (create): An unauthenticated user tries to create an transaction document.
+       * @principle Enforces document ownership for all operations within a user-specific subcollection.
+       */
+      match /transactions/{transactionId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isExistingOwner(userId);
+        allow delete: if isExistingOwner(userId);
+      }
 
       /**
        * @description Manages a user's custom expense categories.
@@ -155,8 +170,8 @@ service cloud.firestore {
       match /expenseCategories/{categoryId} {
         allow get: if isOwner(userId);
         allow list: if isOwner(userId);
-        allow create: if isOwner(userId) && isCreatingValidSubDoc(userId);
-        allow update: if isExistingOwner(userId) && isUpdatingImmutableSubDoc();
+        allow create: if isOwner(userId);
+        allow update: if isExistingOwner(userId);
         allow delete: if isExistingOwner(userId);
       }
       
@@ -188,6 +203,38 @@ service cloud.firestore {
         allow update: if isExistingOwner(userId) && isUpdatingImmutableSubDoc();
         allow delete: if isExistingOwner(userId);
       }
+      
+      /**
+       * @description Manages a user's payable accounts.
+       * @path /users/{userId}/accounts/{accountId}
+       * @allow (list): A user with auth.uid 'user123' lists all their accounts under /users/user123/accounts.
+       * @deny (create): An unauthenticated user tries to create an account document.
+       * @principle Enforces document ownership for all operations within a user-specific subcollection.
+       */
+      match /accounts/{accountId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isExistingOwner(userId);
+        allow delete: if isExistingOwner(userId);
+      }
+
+      /**
+       * @description Manages a user's notes.
+       * @path /users/{userId}/notes/{noteId}
+       * @allow (list): A user with auth.uid 'user123' lists all their notes under /users/user123/notes.
+       * @deny (create): An unauthenticated user tries to create a note document.
+       * @principle Enforces document ownership for all operations within a user-specific subcollection.
+       */
+      match /notes/{noteId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isExistingOwner(userId);
+        allow delete: if isExistingOwner(userId);
+      }
     }
   }
 }
+
+    
