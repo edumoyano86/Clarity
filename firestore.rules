@@ -3,7 +3,7 @@
  * @file firestore.rules
  * @description Firestore Security Rules for a personal finance application.
  *
- * @version 1.4
+ * @version 1.5
  *
  * @philosophy
  * This ruleset enforces a strict user-ownership security model. All user-generated
