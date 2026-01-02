@@ -1,8 +1,9 @@
 export const firebaseConfig = {
-  "projectId": "studio-468089430-c9a2d",
-  "appId": "1:359313498136:web:671195af2ef3b9ef4aa36d",
-  "apiKey": "AIzaSyCWL9_jlU0amaMimjFIaqrsVfoM0i1GsIk",
-  "authDomain": "studio-468089430-c9a2d.firebaseapp.com",
-  "measurementId": "",
-  "messagingSenderId": "359313498136"
+  apiKey: "AIzaSyD3S3kiDZuOVYBFUsBDoh7HtAEDts6sGKo",
+  authDomain: "clarity-d5e76.firebaseapp.com",
+  projectId: "clarity-d5e76",
+  storageBucket: "clarity-d5e76.appspot.com",
+  messagingSenderId: "570928058130",
+  appId: "1:570928058130:web:be71618c75f203d3b7edcb",
+  measurementId: "G-8SSH26CXZH"
 };
