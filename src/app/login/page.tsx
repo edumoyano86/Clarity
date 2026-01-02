@@ -1,6 +1,6 @@
 'use client';
 
-import { FirebaseProvider } from '@/firebase/provider';
+import { FirebaseProvider } from '@/firebase';
 import { AuthForm } from '@/components/auth/auth-form';
 import { Logo } from '@/components/logo';
 
