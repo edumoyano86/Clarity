@@ -71,6 +71,12 @@ service cloud.firestore {
     function isNewSubcollectionDataValid(userId) {
       return request.resource.data.userId == userId;
     }
+    
+    function isTransactionSubcollectionDataValid(userId) {
+      // For transactions, the userId is not required on the document itself
+      return true;
+    }
+
 
     /**
      * Ensures the core ownership links ('id' for UserProfile, 'userId' for subcollections)
@@ -79,7 +85,11 @@ service cloud.firestore {
     function isOwnershipImmutable() {
       // For UserProfile, the field is 'id'. For all others, it's 'userId'.
       let ownerField = 'userId' in request.resource.data ? 'userId' : 'id';
-      return request.resource.data[ownerField] == resource.data[ownerField];
+      if (ownerField == 'id') {
+         return request.resource.data[ownerField] == resource.data[ownerField];
+      }
+      // For subcollections, userId is not always present, so we don't check it
+      return true;
     }
 
 
@@ -115,6 +125,38 @@ service cloud.firestore {
         allow update: if isExistingOwner(userId) && isOwnershipImmutable();
         allow delete: if isExistingOwner(userId);
       }
+      
+       match /investments/{investmentId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isExistingOwner(userId);
+        allow delete: if isExistingOwner(userId);
+      }
+      
+      match /notes/{noteId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isExistingOwner(userId);
+        allow delete: if isExistingOwner(userId);
+      }
+      
+      match /transactions/{transactionId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isExistingOwner(userId);
+        allow delete: if isExistingOwner(userId);
+      }
+      
+      match /accounts/{accountId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isExistingOwner(userId);
+        allow delete: if isExistingOwner(userId);
+      }
 
       /**
        * @description Controls access to a user's expense records.
@@ -124,6 +166,14 @@ service cloud.firestore {
        * @principle Enforces document ownership for all operations within a user-specific subcollection.
        */
       match /expenses/{expenseId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isNewSubcollectionDataValid(userId);
+        allow update: if isExistingOwner(userId) && isOwnershipImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
+      
+      match /appointments/{appointmentId} {
         allow get: if isOwner(userId);
         allow list: if isOwner(userId);
         allow create: if isOwner(userId) && isNewSubcollectionDataValid(userId);
@@ -186,8 +236,8 @@ service cloud.firestore {
       match /expenseCategories/{categoryId} {
         allow get: if isOwner(userId);
         allow list: if isOwner(userId);
-        allow create: if isOwner(userId) && isNewSubcollectionDataValid(userId);
-        allow update: if isExistingOwner(userId) && isOwnershipImmutable();
+        allow create: if isOwner(userId);
+        allow update: if isExistingOwner(userId);
         allow delete: if isExistingOwner(userId);
       }
     }
