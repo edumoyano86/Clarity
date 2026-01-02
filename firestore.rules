@@ -176,8 +176,8 @@ service cloud.firestore {
       match /appointments/{appointmentId} {
         allow get: if isOwner(userId);
         allow list: if isOwner(userId);
-        allow create: if isOwner(userId) && isNewSubcollectionDataValid(userId);
-        allow update: if isExistingOwner(userId) && isOwnershipImmutable();
+        allow create: if isOwner(userId);
+        allow update: if isExistingOwner(userId);
         allow delete: if isExistingOwner(userId);
       }
 
