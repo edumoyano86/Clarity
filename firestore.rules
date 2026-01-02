@@ -3,7 +3,7 @@
  * @file firestore.rules
  * @description Firestore Security Rules for a personal finance application.
  *
- * @version 1.5
+ * @version 2.0
  *
  * @philosophy
  * This ruleset enforces a strict user-ownership security model. All user-generated
@@ -12,18 +12,17 @@
  *
  * @structure
  * All data is stored hierarchically under a top-level `users` collection. Each user's
- * data, including their profile, income, expenses, and other financial records, is
- * nested under their unique user ID (`/users/{userId}/...`). This structural segregation
- * makes security rules simple, performant, and highly secure.
+ * data, including their profile and all subcollections, is nested under their unique
+ * user ID (`/users/{userId}/...`). This structural segregation makes security rules
+ * simple, performant, and highly secure.
  *
  * @decisions
  * - Strict Ownership: All rules are based on matching the authenticated user's UID
  *   (`request.auth.uid`) with the `userId` parameter in the document path.
- * - No Public Data: There are no globally readable collections. Listing documents
- *   is only permitted within a user's own data tree.
- * - Relational Integrity: On creation, documents should have an ownership field if applicable.
- *   This field is enforced as immutable upon update to prevent documents from being
- *   re-assigned to different users.
+ * - No Public Data: There are no globally readable collections.
+ * - Consolidated Rules: A single recursive wildcard match (`/{path=**}`) is used
+ *   to apply ownership rules to all documents and subcollections under a user's
+ *   directory, simplifying logic and preventing conflicting rules.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -33,44 +32,13 @@ service cloud.firestore {
     // Helper Functions
     // ------------------------------------------------------------------------
 
-    /**
-     * Checks if a user is authenticated.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * Checks if the currently authenticated user's ID matches the provided userId.
-     * This is the foundation of the ownership model.
-     */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
-
-    /**
-     * Validates that the UserProfile document being created has an 'id' field
-     * that matches the user's auth UID.
-     */
-    function isNewProfileDataValid(userId) {
-      return request.resource.data.id == userId;
-    }
-
-    /**
-     * Ensures the core ownership links ('id' for UserProfile, 'userId' for subcollections)
-     * cannot be changed after a document is created.
-     */
-    function isOwnershipImmutable() {
-      // For UserProfile, the field is 'id'. For all others, it might be 'userId'.
-      if ('userId' in request.resource.data && 'userId' in resource.data) {
-        return request.resource.data.userId == resource.data.userId;
-      }
-      if ('id' in request.resource.data && 'id' in resource.data) {
-         return request.resource.data.id == resource.data.id;
-      }
-      return true; // If fields don't exist on both, we can't compare, so we allow.
-    }
-
 
     // ------------------------------------------------------------------------
     // Collection Rules
@@ -78,34 +46,29 @@ service cloud.firestore {
 
     /**
      * @description Controls access to a user's own profile document and all their subcollections.
+     * This single block secures all user data.
      * @path /users/{userId}
      */
     match /users/{userId} {
-      // Allow the owner to read and create their own profile.
+      // READ: Allow owner to read their own profile.
       allow get: if isOwner(userId);
-      allow create: if isOwner(userId) && isNewProfileDataValid(userId);
-      // Allow updates only if ownership is not being changed.
-      allow update: if isOwner(userId) && isOwnershipImmutable();
-      allow delete: if isOwner(userId);
-      // Deny listing all user profiles for security reasons.
+      
+      // WRITE (CREATE): Allow owner to create their own profile.
+      allow create: if isOwner(userId);
+
+      // WRITE (UPDATE, DELETE): Allow owner to update or delete their own profile.
+      allow update, delete: if isOwner(userId);
+      
+      // LIST: Deny listing all user profiles for security.
       allow list: if false;
 
       /**
-       * @description Generic rule to control access to all user-specific subcollections.
-       * @path /users/{userId}/{collectionId}/{docId}
+       * @description Generic rule to control access to ALL user-specific subcollections recursively.
+       * This includes listing documents in a collection and reading/writing individual documents.
+       * @path /users/{userId}/{path=**}
        */
-      match /{collectionId}/{docId} {
-        // Allow full read/write access for individual documents to the owner.
+      match /{path=**} {
         allow read, write: if isOwner(userId);
-      }
-      
-      /**
-       * @description Explicitly allow the owner to list documents in their own subcollections.
-       * This is crucial for fetching collections on the client-side.
-       * @path /users/{userId}/{collectionId}
-       */
-      match /{collectionId} {
-        allow list: if isOwner(userId);
       }
     }
   }
