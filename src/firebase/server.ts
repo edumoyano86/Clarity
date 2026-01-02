@@ -7,7 +7,7 @@ import { credential } from 'firebase-admin';
 
 const firebaseConfig = {
   credential: credential.applicationDefault(),
-  projectId: process.env.FIREBASE_PROJECT_ID,
+  projectId: 'clarity-d5e76',
 };
 
 let app: FirebaseApp;
