@@ -97,6 +97,7 @@ export function PortfolioChart({ investments, prices, isLoading, displayCurrency
                 </div>
             )}
             {!showLoadingState && chartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
                  <AreaChart data={chartData} margin={{ left: 12, right: 12 }}>
                      <defs>
                         <linearGradient id="fillPurchase" x1="0" y1="0" x2="0" y2="1">
@@ -140,6 +141,7 @@ export function PortfolioChart({ investments, prices, isLoading, displayCurrency
                     <Area type="monotone" dataKey="purchaseValue" stroke="var(--color-purchaseValue)" fill="url(#fillPurchase)" name="Valor de Compra" />
                     <Area type="monotone" dataKey="currentValue" stroke="var(--color-currentValue)" fill="url(#fillCurrent)" name="Valor Actual" />
                 </AreaChart>
+                </ResponsiveContainer>
             ) : null}
             {!showLoadingState && chartData.length === 0 && (
                 <div className="flex h-full items-center justify-center">
