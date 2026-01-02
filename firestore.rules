@@ -159,6 +159,23 @@ service cloud.firestore {
         allow update: if isExistingOwner(userId) && isUpdatingImmutableSubDoc();
         allow delete: if isExistingOwner(userId);
       }
+      
+      /**
+       * @description Manages a user's investments.
+       * @path /users/{userId}/investments/{investmentId}
+       * @allow (list): A user with auth.uid 'user123' lists all their investments under /users/user123/investments.
+       * @deny (create): An unauthenticated user tries to create an investment document.
+       * @principle Enforces document ownership for all operations within a user-specific subcollection.
+       */
+      match /investments/{investmentId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isExistingOwner(userId);
+        allow delete: if isExistingOwner(userId);
+      }
     }
   }
 }
+
+    
