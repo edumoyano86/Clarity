@@ -9,6 +9,7 @@ import {
 import { FirebaseProvider } from "@/firebase/provider";
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { AppointmentNotifier } from '@/components/layout/appointment-notifier';
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
@@ -55,6 +56,7 @@ export default function MainLayout({
                 </main>
             </div>
           </div>
+          <AppointmentNotifier />
         </SidebarProvider>
       </AuthGuard>
     </FirebaseProvider>
