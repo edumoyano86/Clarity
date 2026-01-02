@@ -6,7 +6,7 @@ import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 import { SavingsSuggestions } from "@/components/dashboard/savings-suggestions";
 import { Categoria, Appointment, Transaction, Investment, Account } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
-import { useCollection, useFirestore, useUser } from "@/firebase";
+import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase";
 import { UpcomingAppointments } from "@/components/dashboard/upcoming-appointments";
 import { collection, query, where, orderBy, limit } from "firebase/firestore";
 import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear, startOfToday } from 'date-fns';
@@ -28,31 +28,31 @@ export default function DashboardPage() {
   const firestore = useFirestore();
   const [periodo, setPeriodo] = useState<Periodo>('mes_actual');
 
-  const transactionsQuery = useMemo(() => {
+  const transactionsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return collection(firestore, 'users', user.uid, 'transactions');
   }, [firestore, user]);
   const { data: transactions, isLoading: loadingTransactions } = useCollection<Transaction>(transactionsQuery);
 
-  const categoriesQuery = useMemo(() => {
+  const categoriesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return collection(firestore, 'users', user.uid, 'expenseCategories');
   }, [firestore, user]);
   const { data: categorias, isLoading: loadingCategorias } = useCollection<Categoria>(categoriesQuery);
 
-   const investmentsQuery = useMemo(() => {
+   const investmentsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(collection(firestore, 'users', user.uid, 'investments'), orderBy('purchaseDate', 'asc'));
   }, [firestore, user]);
   const { data: investments, isLoading: loadingInvestments } = useCollection<Investment>(investmentsQuery);
 
-  const accountsQuery = useMemo(() => {
+  const accountsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(collection(firestore, 'users', user.uid, 'accounts'), where('status', '==', 'pendiente'));
   }, [firestore, user]);
   const { data: accounts, isLoading: loadingAccounts } = useCollection<Account>(accountsQuery);
 
-  const upcomingAppointmentsQuery = useMemo(() => {
+  const upcomingAppointmentsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     const todayTimestamp = startOfToday().getTime();
     return query(
