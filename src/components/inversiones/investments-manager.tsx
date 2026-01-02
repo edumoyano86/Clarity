@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from "@/components/ui/table";
 import { Investment, PriceData } from "@/lib/definitions";
@@ -120,6 +120,25 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
         }
     };
 
+    const sortedInvestments = useMemo(() => {
+        if (!investments || investments.length === 0) return [];
+
+        return investments
+            .map(investment => {
+                let currentPriceKey: string;
+                if (investment.assetType === 'crypto') {
+                    currentPriceKey = investment.assetId;
+                } else { // stock
+                    currentPriceKey = investment.symbol;
+                }
+                const currentPrice = prices[currentPriceKey]?.price;
+                const currentValue = currentPrice ? investment.amount * currentPrice : 0;
+                return { ...investment, currentValue };
+            })
+            .sort((a, b) => b.currentValue - a.currentValue);
+    }, [investments, prices]);
+
+
     const renderPortfolioRow = (investment: Investment) => {
         const purchaseValue = investment.amount * investment.purchasePrice;
         
@@ -208,12 +227,12 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {investments.length > 0 ? (
-                                        investments.map(renderPortfolioRow)
+                                    {sortedInvestments.length > 0 ? (
+                                        sortedInvestments.map(renderPortfolioRow)
                                     ) : (
                                         <TableRow>
                                             <TableCell colSpan={7} className="text-center h-24">
-                                                No tienes inversiones registradas.
+                                                {isLoadingPrices ? 'Cargando precios...' : 'No tienes inversiones registradas.'}
                                             </TableCell>
                                         </TableRow>
                                     )}
