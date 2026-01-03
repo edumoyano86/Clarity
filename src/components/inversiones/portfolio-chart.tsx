@@ -47,29 +47,30 @@ export function PortfolioChart({ investments, prices, isLoading: isLoadingPrices
             const cryptoIds = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.assetId))];
             
             const results = [];
-            for (const id of cryptoIds) {
-                try {
-                    const response = await fetch(`https://api.coingecko.com/api/v3/coins/${id}/market_chart/range?vs_currency=usd&from=${startDate.getTime() / 1000}&to=${endDate.getTime() / 1000}`);
-                    if (!response.ok) {
-                        // If response is not ok (e.g., 429 Throttled), log it and continue
-                        console.warn(`Failed to fetch history for ${id}: ${response.statusText}`);
-                        results.push({ id, prices: null }); // Push null to indicate failure
-                    } else {
-                        const data = await response.json();
-                        results.push({ id, prices: data.prices });
+            if (cryptoIds.length > 0) {
+                for (const id of cryptoIds) {
+                    try {
+                        const response = await fetch(`https://api.coingecko.com/api/v3/coins/${id}/market_chart/range?vs_currency=usd&from=${startDate.getTime() / 1000}&to=${endDate.getTime() / 1000}`);
+                        if (!response.ok) {
+                            console.warn(`Failed to fetch history for ${id}: ${response.statusText}`);
+                            results.push({ id, prices: null });
+                        } else {
+                            const data = await response.json();
+                            results.push({ id, prices: data.prices });
+                        }
+                    } catch (error) {
+                        console.error(`Error fetching history for ${id}:`, error);
+                        results.push({ id, prices: null });
                     }
-                } catch (error) {
-                    console.error(`Error fetching history for ${id}:`, error);
-                    results.push({ id, prices: null });
+                    await sleep(300);
                 }
-                await sleep(300); // Wait 300ms between API calls to avoid rate limiting
             }
 
             try {
                 const priceHistory: { [id: string]: { [date: string]: number } } = {};
                 
                 results.forEach(result => {
-                    if (result && result.prices) { // Check if result and result.prices are not null
+                    if (result && result.prices) {
                         priceHistory[result.id] = {};
                         result.prices.forEach(([timestamp, price]: [number, number]) => {
                             const dateStr = format(startOfDay(new Date(timestamp)), 'yyyy-MM-dd');
@@ -85,11 +86,11 @@ export function PortfolioChart({ investments, prices, isLoading: isLoadingPrices
                     let dailyTotalValue = 0;
 
                     investments.forEach(inv => {
-                        if (inv.purchaseDate > currentDate.getTime()) return; // Investment not yet made
+                        if (inv.purchaseDate > currentDate.getTime()) return;
 
                         if (inv.assetType === 'crypto') {
                             let historicalPrice: number | undefined;
-                            for (let i = 0; i <= 5; i++) { // Check up to 5 days back for a price
+                            for (let i = 0; i <= 5; i++) {
                                 const checkDate = subDays(currentDate, i);
                                 const checkDateStr = format(checkDate, 'yyyy-MM-dd');
                                 if (priceHistory[inv.assetId]?.[checkDateStr]) {
