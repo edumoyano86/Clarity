@@ -9,14 +9,13 @@ export function usePortfolioHistory(investments: Investment[]) {
     const [portfolioHistory, setPortfolioHistory] = useState<PortfolioDataPoint[]>([]);
     const [totalValue, setTotalValue] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
-    const { prices, isLoading: isLoadingPrices } = usePrices(investments);
+    const { prices, isLoading: isLoadingPrices } = usePrices(investments || []);
 
-    const investmentsKey = useMemo(() => investments.map(i => i.id + i.amount).join(','), [investments]);
+    const investmentsKey = useMemo(() => investments?.map(i => i.id + i.amount).join(',') || '', [investments]);
 
     useEffect(() => {
         const fetchHistory = async () => {
             if (isLoadingPrices || !investments) {
-                // Wait until prices and investments are loaded
                 return;
             }
 
@@ -40,7 +39,6 @@ export function usePortfolioHistory(investments: Investment[]) {
             const cryptoIds = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.assetId))];
             
             if (cryptoIds.length === 0) {
-                // If only stocks, we can't easily get history, so we'll show a simplified view
                  const newChartData: PortfolioDataPoint[] = [];
                  const endDate = new Date();
                  for (let i = 0; i <= 90; i++) {
@@ -49,7 +47,6 @@ export function usePortfolioHistory(investments: Investment[]) {
                      let dailyTotal = 0;
                      investments.forEach(inv => {
                          if (inv.purchaseDate <= dayTimestamp) {
-                            // For stocks, use current price as we don't fetch their history
                             const price = prices[inv.symbol]?.price || inv.purchasePrice;
                             dailyTotal += inv.amount * price;
                          }
@@ -74,13 +71,10 @@ export function usePortfolioHistory(investments: Investment[]) {
                             }
                             return res.json().then(data => ({ id, prices: data.prices }));
                         })
-                        .catch(err => {
-                            console.error(`Error fetching history for ${id}:`, err);
-                            return { id, prices: null };
-                        })
                 );
 
                 const results = await Promise.allSettled(promises);
+                
                 const successfulResults = results
                     .filter(result => result.status === 'fulfilled' && result.value.prices)
                     .map(result => (result as PromiseFulfilledResult<any>).value);
@@ -105,7 +99,6 @@ export function usePortfolioHistory(investments: Investment[]) {
 
                     let dailyTotal = 0;
                     investments.forEach(inv => {
-                        // Only include investments that existed on this day
                         if (inv.purchaseDate <= dayTimestamp) {
                             let priceToUse = 0;
                             if (inv.assetType === 'crypto') {
@@ -114,11 +107,9 @@ export function usePortfolioHistory(investments: Investment[]) {
                                     priceToUse = assetPriceHistory.get(dateStr)!;
                                     lastKnownPrices[inv.assetId] = priceToUse;
                                 } else {
-                                    // If no price for today, use the last known price for this asset
                                     priceToUse = lastKnownPrices[inv.assetId] || inv.purchasePrice;
                                 }
-                            } else { // stock
-                                // For stocks, use current price as we don't fetch their history
+                            } else {
                                 priceToUse = prices[inv.symbol]?.price || inv.purchasePrice;
                             }
                             dailyTotal += inv.amount * priceToUse;
@@ -131,7 +122,7 @@ export function usePortfolioHistory(investments: Investment[]) {
 
             } catch (error) {
                 console.error("An error occurred while building portfolio history:", error);
-                setPortfolioHistory([]); // Clear history on major error
+                setPortfolioHistory([]);
             } finally {
                 setIsLoading(false);
             }
@@ -139,7 +130,7 @@ export function usePortfolioHistory(investments: Investment[]) {
 
         fetchHistory();
 
-    }, [investmentsKey, isLoadingPrices]); // Depend on the key and price loading state
+    }, [investmentsKey, isLoadingPrices]); 
 
     return { portfolioHistory, totalValue, isLoading };
 }
