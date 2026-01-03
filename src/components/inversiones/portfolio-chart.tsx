@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { AreaChart, Area, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Pie, PieChart, Tooltip, Legend, Cell } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { type ChartConfig, ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { Investment, PriceData } from '@/lib/definitions';
 import { Loader2 } from 'lucide-react';
-import { format, subDays, startOfDay } from 'date-fns';
+import { useMemo } from 'react';
 
 interface PortfolioChartProps {
     investments: Investment[];
@@ -14,133 +13,63 @@ interface PortfolioChartProps {
     isLoading: boolean;
 };
 
-const chartConfig = {
-  value: {
-    label: 'Valor del Portafolio',
-    color: 'hsl(var(--chart-1))',
-  },
-} satisfies ChartConfig;
+const CHART_COLORS = [
+    "hsl(var(--chart-1))",
+    "hsl(var(--chart-2))",
+    "hsl(var(--chart-3))",
+    "hsl(var(--chart-4))",
+    "hsl(var(--chart-5))",
+];
 
 const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 };
 
-// Helper to introduce a delay
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-export function PortfolioChart({ investments, prices, isLoading: isLoadingPrices }: PortfolioChartProps) {
-    const [historyData, setHistoryData] = useState<any[]>([]);
-    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-
-    useEffect(() => {
-        const fetchHistory = async () => {
-            if (!investments || investments.length === 0) {
-                setHistoryData([]);
-                setIsLoadingHistory(false);
-                return;
-            };
-
-            setIsLoadingHistory(true);
-            const endDate = new Date();
-            const startDate = subDays(endDate, 90);
-            
-            const cryptoIds = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.assetId))];
-            
-            const results = [];
-            if (cryptoIds.length > 0) {
-                for (const id of cryptoIds) {
-                    try {
-                        const response = await fetch(`https://api.coingecko.com/api/v3/coins/${id}/market_chart/range?vs_currency=usd&from=${startDate.getTime() / 1000}&to=${endDate.getTime() / 1000}`);
-                        if (!response.ok) {
-                            console.warn(`Failed to fetch history for ${id}: ${response.statusText}`);
-                            results.push({ id, prices: null });
-                        } else {
-                            const data = await response.json();
-                            results.push({ id, prices: data.prices });
-                        }
-                    } catch (error) {
-                        console.error(`Error fetching history for ${id}:`, error);
-                        results.push({ id, prices: null });
-                    }
-                    await sleep(300); // Wait 300ms between calls to avoid rate limiting
-                }
-            }
-
-            try {
-                const priceHistory: { [id: string]: { [date: string]: number } } = {};
-                
-                results.forEach(result => {
-                    if (result && result.prices) {
-                        priceHistory[result.id] = {};
-                        result.prices.forEach(([timestamp, price]: [number, number]) => {
-                            const dateStr = format(startOfDay(new Date(timestamp)), 'yyyy-MM-dd');
-                            priceHistory[result.id][dateStr] = price;
-                        });
-                    }
-                });
-
-                const timeline: any[] = [];
-                for (let d = startOfDay(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                    const currentDate = new Date(d);
-                    const dateStr = format(currentDate, 'yyyy-MM-dd');
-                    let dailyTotalValue = 0;
-
-                    investments.forEach(inv => {
-                        if (inv.purchaseDate > currentDate.getTime()) return;
-
-                        if (inv.assetType === 'crypto') {
-                            let historicalPrice: number | undefined;
-                            for (let i = 0; i <= 5; i++) {
-                                const checkDate = subDays(currentDate, i);
-                                const checkDateStr = format(checkDate, 'yyyy-MM-dd');
-                                if (priceHistory[inv.assetId]?.[checkDateStr]) {
-                                    historicalPrice = priceHistory[inv.assetId][checkDateStr];
-                                    break;
-                                }
-                            }
-                            if (historicalPrice) {
-                                dailyTotalValue += inv.amount * historicalPrice;
-                            }
-                        } else { 
-                             const priceKey = inv.symbol;
-                             const currentPrice = prices[priceKey]?.price;
-                             if (currentPrice) {
-                                dailyTotalValue += inv.amount * currentPrice;
-                             }
-                        }
-                    });
-
-                    if (dailyTotalValue > 0) {
-                      timeline.push({ date: currentDate.getTime(), value: dailyTotalValue });
-                    }
-                }
-                
-                if (timeline.length === 1) {
-                     timeline.unshift({ date: subDays(new Date(timeline[0].date), 1).getTime(), value: 0 });
-                }
-                setHistoryData(timeline);
-
-            } catch (error) {
-                console.error("Error processing portfolio history:", error);
-                setHistoryData([]);
-            } finally {
-                setIsLoadingHistory(false);
-            }
-        };
-
-        if(!isLoadingPrices) {
-            fetchHistory();
-        }
-
-    }, [investments, isLoadingPrices, prices]);
+export function PortfolioChart({ investments, prices, isLoading }: PortfolioChartProps) {
   
-  const showLoadingState = isLoadingPrices || isLoadingHistory;
+  const { chartData, chartConfig, totalValue } = useMemo(() => {
+    if (!investments || investments.length === 0 || isLoading) {
+      return { chartData: [], chartConfig: {}, totalValue: 0 };
+    }
+
+    const data = investments.map((inv, index) => {
+        const priceKey = inv.assetType === 'crypto' ? inv.assetId : inv.symbol;
+        const currentPrice = prices[priceKey]?.price || 0;
+        const value = inv.amount * currentPrice;
+        return {
+            name: inv.name,
+            value: value,
+            fill: CHART_COLORS[index % CHART_COLORS.length]
+        };
+    }).filter(item => item.value > 0.01); // Filter out assets with negligible value
+
+    const total = data.reduce((acc, item) => acc + item.value, 0);
+
+    const config: ChartConfig = {
+        value: {
+            label: 'Valor (USD)',
+        },
+    };
+    data.forEach(item => {
+        config[item.name] = {
+            label: item.name,
+            color: item.fill,
+        };
+    });
+
+    return { chartData: data, chartConfig: config, totalValue: total };
+
+  }, [investments, prices, isLoading]);
+  
+  const showLoadingState = isLoading;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Evolución del Portafolio (90d)</CardTitle>
-        <CardDescription>Crecimiento del valor de tus inversiones a lo largo del tiempo.</CardDescription>
+        <CardTitle>Composición del Portafolio</CardTitle>
+        <CardDescription>
+            Distribución de tus activos. Valor total: {formatCurrency(totalValue)}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[350px] w-full">
@@ -149,53 +78,63 @@ export function PortfolioChart({ investments, prices, isLoading: isLoadingPrices
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
             )}
-            {!showLoadingState && historyData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                 <AreaChart data={historyData} margin={{ left: 12, right: 12 }}>
-                     <defs>
-                        <linearGradient id="fillValue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--color-value)" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="var(--color-value)" stopOpacity={0.1}/>
-                        </linearGradient>
-                    </defs>
-                    <CartesianGrid vertical={false} />
-                    <XAxis
-                        dataKey="date"
-                        tickLine={false}
-                        axisLine={false}
-                        tickMargin={8}
-                        tickFormatter={(value) => format(new Date(value), "dd MMM")}
-                        type="number"
-                        domain={['dataMin', 'dataMax']}
-                    />
-                    <YAxis 
-                        tickLine={false}
-                        axisLine={false}
-                        tickMargin={8}
-                        tickFormatter={(value) => formatCurrency(Number(value))}
-                        domain={['auto', 'auto']}
-                    />
-                    <Tooltip 
+            {!showLoadingState && chartData.length > 0 ? (
+                 <PieChart>
+                    <Tooltip
+                        cursor={{ fill: 'hsl(var(--muted))' }}
                         content={<ChartTooltipContent 
-                            formatter={(value) => formatCurrency(value as number)}
-                            labelFormatter={(label) => {
-                                const date = new Date(Number(label));
-                                if (date instanceof Date && !isNaN(date.getTime())) {
-                                  return format(date, "PPP");
-                                }
-                                return "";
-                            }}
-                            indicator="dot"
-                            />} 
+                            formatter={(value, name) => [formatCurrency(value as number), name]}
+                            nameKey="name" 
+                            hideLabel 
+                        />}
                     />
-                    <Area type="monotone" dataKey="value" stroke="var(--color-value)" fill="url(#fillValue)" name="Valor" />
-                </AreaChart>
-                </ResponsiveContainer>
+                    <Pie
+                        data={chartData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={120}
+                        labelLine={false}
+                        label={({
+                            cx,
+                            cy,
+                            midAngle,
+                            innerRadius,
+                            outerRadius,
+                            percent,
+                        }) => {
+                            const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                            const x = cx + radius * Math.cos(-midAngle * (Math.PI / 180));
+                            const y = cy + radius * Math.sin(-midAngle * (Math.PI / 180));
+
+                            if (percent < 0.05) return null; // Don't render label for small slices
+
+                            return (
+                                <text
+                                x={x}
+                                y={y}
+                                fill="white"
+                                textAnchor="middle"
+                                dominantBaseline="central"
+                                className="text-xs font-bold"
+                                >
+                                {`${(percent * 100).toFixed(0)}%`}
+                                </text>
+                            );
+                        }}
+                    >
+                        {chartData.map((entry) => (
+                            <Cell key={`cell-${entry.name}`} fill={entry.fill} />
+                        ))}
+                    </Pie>
+                    <Legend />
+                </PieChart>
             ) : null}
-            {!showLoadingState && historyData.length === 0 && (
+            {!showLoadingState && chartData.length === 0 && (
                 <div className="flex h-full items-center justify-center">
                     <p className="text-muted-foreground text-center">
-                        Añade tu primera inversión para ver la evolución del portafolio.
+                        Añade tu primera inversión para ver la composición del portafolio.
                     </p>
                 </div>
             )}
