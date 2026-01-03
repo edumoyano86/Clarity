@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Investment, PortfolioDataPoint, PriceData } from '@/lib/definitions';
+import { Investment, PortfolioDataPoint } from '@/lib/definitions';
 import { usePrices } from './use-prices';
 import { format, subDays, startOfDay } from 'date-fns';
 
@@ -11,18 +11,23 @@ export function usePortfolioHistory(investments: Investment[]) {
     const [isLoading, setIsLoading] = useState(true);
     const { prices, isLoading: isLoadingPrices } = usePrices(investments);
 
-    const investmentsKey = useMemo(() => investments.map(i => i.id).join(','), [investments]);
+    const investmentsKey = useMemo(() => investments.map(i => i.id + i.amount).join(','), [investments]);
 
     useEffect(() => {
         const fetchHistory = async () => {
-            if (isLoadingPrices) return;
+            if (isLoadingPrices || !investments) {
+                // Wait until prices and investments are loaded
+                return;
+            }
 
-            if (!investments || investments.length === 0) {
+            if (investments.length === 0) {
                 setPortfolioHistory([]);
                 setTotalValue(0);
                 setIsLoading(false);
                 return;
             }
+            
+            setIsLoading(true);
 
             // Calculate current total value
             const currentTotalValue = investments.reduce((acc, inv) => {
@@ -35,13 +40,26 @@ export function usePortfolioHistory(investments: Investment[]) {
             const cryptoIds = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.assetId))];
             
             if (cryptoIds.length === 0) {
-                // If only stocks, we can't easily get history, so we'll show a simplified view or message
+                // If only stocks, we can't easily get history, so we'll show a simplified view
+                 const newChartData: PortfolioDataPoint[] = [];
+                 const endDate = new Date();
+                 for (let i = 0; i <= 90; i++) {
+                     const date = subDays(endDate, 90 - i);
+                     const dayTimestamp = startOfDay(date).getTime();
+                     let dailyTotal = 0;
+                     investments.forEach(inv => {
+                         if (inv.purchaseDate <= dayTimestamp) {
+                            // For stocks, use current price as we don't fetch their history
+                            const price = prices[inv.symbol]?.price || inv.purchasePrice;
+                            dailyTotal += inv.amount * price;
+                         }
+                     });
+                     newChartData.push({ date: dayTimestamp, value: dailyTotal });
+                 }
+                setPortfolioHistory(newChartData);
                 setIsLoading(false);
-                setPortfolioHistory([]);
                 return;
             }
-
-            setIsLoading(true);
 
             try {
                 const endDate = new Date();
@@ -77,6 +95,8 @@ export function usePortfolioHistory(investments: Investment[]) {
                     priceHistoryMap.set(result.id, assetMap);
                 });
 
+                const lastKnownPrices: {[key: string]: number} = {};
+
                 const newChartData: PortfolioDataPoint[] = [];
                 for (let i = 0; i <= 90; i++) {
                     const date = subDays(endDate, 90 - i);
@@ -85,14 +105,23 @@ export function usePortfolioHistory(investments: Investment[]) {
 
                     let dailyTotal = 0;
                     investments.forEach(inv => {
+                        // Only include investments that existed on this day
                         if (inv.purchaseDate <= dayTimestamp) {
-                            let price = 0;
+                            let priceToUse = 0;
                             if (inv.assetType === 'crypto') {
-                                price = priceHistoryMap.get(inv.assetId)?.get(dateStr) || prices[inv.assetId]?.price || inv.purchasePrice;
-                            } else {
-                                price = prices[inv.symbol]?.price || inv.purchasePrice;
+                                const assetPriceHistory = priceHistoryMap.get(inv.assetId);
+                                if (assetPriceHistory?.has(dateStr)) {
+                                    priceToUse = assetPriceHistory.get(dateStr)!;
+                                    lastKnownPrices[inv.assetId] = priceToUse;
+                                } else {
+                                    // If no price for today, use the last known price for this asset
+                                    priceToUse = lastKnownPrices[inv.assetId] || inv.purchasePrice;
+                                }
+                            } else { // stock
+                                // For stocks, use current price as we don't fetch their history
+                                priceToUse = prices[inv.symbol]?.price || inv.purchasePrice;
                             }
-                            dailyTotal += inv.amount * price;
+                            dailyTotal += inv.amount * priceToUse;
                         }
                     });
                     newChartData.push({ date: dayTimestamp, value: dailyTotal });
