@@ -251,29 +251,25 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             };
             
             const collectionRef = collection(firestore, 'users', userId, 'investments');
-            const operationType = id ? 'update' : 'create';
-            const docRef = id ? doc(collectionRef, id) : doc(collectionRef); // Generate ref beforehand for error handling
-
+            
             if (id) {
-                setDoc(docRef, dataToSave, { merge: true }).catch(serverError => {
-                    const permissionError = new FirestorePermissionError({
+                const docRef = doc(collectionRef, id);
+                await setDoc(docRef, dataToSave, { merge: true }).catch(serverError => {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({
                         path: docRef.path,
-                        operation: operationType,
+                        operation: 'update',
                         requestResourceData: dataToSave,
-                    });
-                    errorEmitter.emit('permission-error', permissionError);
-                    // We throw the error so it can be caught by the outer try/catch
-                    throw permissionError;
+                    }));
+                    throw serverError; // Re-throw to be caught by outer catch
                 });
             } else {
-                addDoc(collectionRef, dataToSave).catch(serverError => {
-                    const permissionError = new FirestorePermissionError({
-                        path: collectionRef.path, // Path for the collection on create
-                        operation: operationType,
+                await addDoc(collectionRef, dataToSave).catch(serverError => {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({
+                        path: collectionRef.path,
+                        operation: 'create',
                         requestResourceData: dataToSave,
-                    });
-                    errorEmitter.emit('permission-error', permissionError);
-                    throw permissionError;
+                    }));
+                    throw serverError; // Re-throw to be caught by outer catch
                 });
             }
 
