@@ -36,6 +36,7 @@ export function PortfolioChart({ investments, prices, isLoading: isLoadingPrices
         const fetchHistory = async () => {
             if (!investments || investments.length === 0) {
                 setHistoryData([]);
+                setIsLoadingHistory(false);
                 return;
             };
 
