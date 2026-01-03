@@ -7,9 +7,6 @@ import { type ChartConfig, ChartContainer, ChartTooltipContent } from '@/compone
 import { Investment, PriceData } from '@/lib/definitions';
 import { Loader2 } from 'lucide-react';
 import { format, subDays, startOfDay } from 'date-fns';
-import { getCryptoPrices } from '@/ai/flows/crypto-prices';
-import { getStockPrices } from '@/ai/flows/stock-prices';
-
 
 interface PortfolioChartProps {
     investments: Investment[];
@@ -36,6 +33,7 @@ export function PortfolioChart({ investments, prices, isLoading: isLoadingPrices
         const fetchHistory = async () => {
             if (!investments || investments.length === 0) {
                 setHistoryData([]);
+                setIsLoadingHistory(false);
                 return;
             };
 
@@ -54,65 +52,70 @@ export function PortfolioChart({ investments, prices, isLoading: isLoadingPrices
                     .then(data => ({ id, prices: data.prices }))
             );
 
-            const results = await Promise.all(historyPromises);
-            const priceHistory: { [id: string]: { [date: string]: number } } = {};
-            
-            results.forEach(result => {
-                if (result.prices) {
-                    priceHistory[result.id] = {};
-                    result.prices.forEach(([timestamp, price]: [number, number]) => {
-                        const dateStr = format(startOfDay(new Date(timestamp)), 'yyyy-MM-dd');
-                        priceHistory[result.id][dateStr] = price;
-                    });
-                }
-            });
-
-            const timeline: any[] = [];
-            for (let d = startOfDay(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                const currentDate = new Date(d);
-                const dateStr = format(currentDate, 'yyyy-MM-dd');
-                let dailyTotalValue = 0;
-
-                investments.forEach(inv => {
-                    if (inv.purchaseDate > currentDate.getTime()) return; // Investment not yet made
-
-                    if (inv.assetType === 'crypto') {
-                        // Find the closest available historical price going backwards
-                        let historicalPrice: number | undefined;
-                        for (let i = 0; i <= 5; i++) { // Check up to 5 days back
-                            const checkDate = subDays(currentDate, i);
-                            const checkDateStr = format(checkDate, 'yyyy-MM-dd');
-                            if (priceHistory[inv.assetId]?.[checkDateStr]) {
-                                historicalPrice = priceHistory[inv.assetId][checkDateStr];
-                                break;
-                            }
-                        }
-                        if (historicalPrice) {
-                            dailyTotalValue += inv.amount * historicalPrice;
-                        }
-                    } else { // Stock
-                        // For stocks, use the current price for all historical points as a fallback
-                         const priceKey = inv.symbol;
-                         const currentPrice = prices[priceKey]?.price;
-                         if (currentPrice) {
-                            dailyTotalValue += inv.amount * currentPrice;
-                         }
+            try {
+                const results = await Promise.all(historyPromises);
+                const priceHistory: { [id: string]: { [date: string]: number } } = {};
+                
+                results.forEach(result => {
+                    if (result.prices) {
+                        priceHistory[result.id] = {};
+                        result.prices.forEach(([timestamp, price]: [number, number]) => {
+                            const dateStr = format(startOfDay(new Date(timestamp)), 'yyyy-MM-dd');
+                            priceHistory[result.id][dateStr] = price;
+                        });
                     }
                 });
 
-                if (dailyTotalValue > 0) {
-                  timeline.push({ date: currentDate.getTime(), value: dailyTotalValue });
+                const timeline: any[] = [];
+                for (let d = startOfDay(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                    const currentDate = new Date(d);
+                    const dateStr = format(currentDate, 'yyyy-MM-dd');
+                    let dailyTotalValue = 0;
+
+                    investments.forEach(inv => {
+                        if (inv.purchaseDate > currentDate.getTime()) return; // Investment not yet made
+
+                        if (inv.assetType === 'crypto') {
+                            // Find the closest available historical price going backwards
+                            let historicalPrice: number | undefined;
+                            for (let i = 0; i <= 5; i++) { // Check up to 5 days back
+                                const checkDate = subDays(currentDate, i);
+                                const checkDateStr = format(checkDate, 'yyyy-MM-dd');
+                                if (priceHistory[inv.assetId]?.[checkDateStr]) {
+                                    historicalPrice = priceHistory[inv.assetId][checkDateStr];
+                                    break;
+                                }
+                            }
+                            if (historicalPrice) {
+                                dailyTotalValue += inv.amount * historicalPrice;
+                            }
+                        } else { // Stock
+                            // For stocks, use the current price for all historical points as a fallback
+                             const priceKey = inv.symbol;
+                             const currentPrice = prices[priceKey]?.price;
+                             if (currentPrice) {
+                                dailyTotalValue += inv.amount * currentPrice;
+                             }
+                        }
+                    });
+
+                    if (dailyTotalValue > 0) {
+                      timeline.push({ date: currentDate.getTime(), value: dailyTotalValue });
+                    }
                 }
-            }
-            
-            // Ensure there are at least two points for the area chart to render
-            if (timeline.length === 1) {
-                 timeline.unshift({ date: subDays(new Date(timeline[0].date), 1).getTime(), value: 0 });
-            }
+                
+                // Ensure there are at least two points for the area chart to render
+                if (timeline.length === 1) {
+                     timeline.unshift({ date: subDays(new Date(timeline[0].date), 1).getTime(), value: 0 });
+                }
+                setHistoryData(timeline);
 
-
-            setHistoryData(timeline);
-            setIsLoadingHistory(false);
+            } catch (error) {
+                console.error("Error fetching portfolio history:", error);
+                setHistoryData([]);
+            } finally {
+                setIsLoadingHistory(false);
+            }
         };
 
         if(!isLoadingPrices) {
