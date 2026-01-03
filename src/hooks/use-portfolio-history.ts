@@ -38,28 +38,6 @@ export function usePortfolioHistory(investments: Investment[]) {
 
             const cryptoIds = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.assetId))];
             
-            // If there are no crypto assets, we can't fetch history, so we show a flat line based on current prices for stocks.
-             if (cryptoIds.length === 0) {
-                 const newChartData: PortfolioDataPoint[] = [];
-                 const endDate = new Date();
-                 for (let i = 0; i <= 90; i++) {
-                     const date = subDays(endDate, 90 - i);
-                     const dayTimestamp = startOfDay(date).getTime();
-                     let dailyTotal = 0;
-                     // For non-crypto assets, we assume a flat price (the current one) as we don't fetch their history.
-                     investments.forEach(inv => {
-                         if (inv.purchaseDate <= dayTimestamp) {
-                            const price = prices[inv.symbol]?.price || inv.purchasePrice;
-                            dailyTotal += inv.amount * price;
-                         }
-                     });
-                     newChartData.push({ date: dayTimestamp, value: dailyTotal });
-                 }
-                setPortfolioHistory(newChartData);
-                setIsLoading(false);
-                return;
-            }
-
             try {
                 const endDate = new Date();
                 const startDate = subDays(endDate, 90);
@@ -71,7 +49,7 @@ export function usePortfolioHistory(investments: Investment[]) {
                                 console.warn(`Failed to fetch history for ${id}: ${res.statusText}`);
                                 return { id, prices: null };
                             }
-                            return res.json().then(data => ({ id, prices: data.prices }));
+                            return res.json().then(data => ({ id, prices: data.prices as [number, number][] }));
                         })
                 );
 
@@ -80,19 +58,33 @@ export function usePortfolioHistory(investments: Investment[]) {
                 const successfulResults = results
                     .filter(result => result.status === 'fulfilled' && result.value.prices)
                     .map(result => (result as PromiseFulfilledResult<{id: string, prices: [number, number][]}>).value);
-
+                
                 const priceHistoryMap = new Map<string, Map<string, number>>();
+
+                // 1. Create a complete, gap-filled price history for each fetched crypto asset
                 successfulResults.forEach(result => {
-                    const assetMap = new Map<string, number>();
-                    result.prices.forEach(([timestamp, price]: [number, number]) => {
-                        const dateStr = format(new Date(timestamp), 'yyyy-MM-dd');
-                        assetMap.set(dateStr, price);
+                    const dailyPrices = new Map<string, number>();
+                    result.prices.forEach(([timestamp, price]) => {
+                        dailyPrices.set(format(new Date(timestamp), 'yyyy-MM-dd'), price);
                     });
-                    priceHistoryMap.set(result.id, assetMap);
+
+                    const filledPrices = new Map<string, number>();
+                    let lastKnownPrice: number | null = null;
+                    for (let i = 0; i <= 90; i++) {
+                        const date = subDays(endDate, 90-i);
+                        const dateStr = format(date, 'yyyy-MM-dd');
+                        if (dailyPrices.has(dateStr)) {
+                            lastKnownPrice = dailyPrices.get(dateStr)!;
+                            filledPrices.set(dateStr, lastKnownPrice);
+                        } else if (lastKnownPrice !== null) {
+                            filledPrices.set(dateStr, lastKnownPrice); // Fill gap with last known price
+                        }
+                    }
+                    priceHistoryMap.set(result.id, filledPrices);
                 });
 
-                const lastKnownPrices: {[key: string]: number} = {};
 
+                // 2. Calculate portfolio value for each day
                 const newChartData: PortfolioDataPoint[] = [];
                 for (let i = 0; i <= 90; i++) {
                     const date = subDays(endDate, 90 - i);
@@ -101,18 +93,13 @@ export function usePortfolioHistory(investments: Investment[]) {
 
                     let dailyTotal = 0;
                     investments.forEach(inv => {
+                        // Only include investments that existed on this day
                         if (inv.purchaseDate <= dayTimestamp) {
                             let priceToUse: number;
                             if (inv.assetType === 'crypto') {
                                 const assetPriceHistory = priceHistoryMap.get(inv.assetId);
-                                if (assetPriceHistory?.has(dateStr)) {
-                                    priceToUse = assetPriceHistory.get(dateStr)!;
-                                    lastKnownPrices[inv.assetId] = priceToUse; // Update last known price
-                                } else {
-                                    // If no price for today, use last known price or fallback to purchase price
-                                    priceToUse = lastKnownPrices[inv.assetId] || inv.purchasePrice;
-                                }
-                            } else { // For stocks, use current price as fallback for history
+                                priceToUse = assetPriceHistory?.get(dateStr) || inv.purchasePrice; // Fallback to purchase price if still no data
+                            } else { // For stocks, use current price as a stable fallback for history
                                 priceToUse = prices[inv.symbol]?.price || inv.purchasePrice;
                             }
                             dailyTotal += inv.amount * priceToUse;
@@ -133,7 +120,7 @@ export function usePortfolioHistory(investments: Investment[]) {
 
         fetchHistory();
 
-    }, [investmentsKey, isLoadingPrices]); // Depend on prices finishing loading
+    }, [investmentsKey, isLoadingPrices]); 
 
     return { portfolioHistory, totalValue, isLoading };
 }
