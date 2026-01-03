@@ -10,7 +10,7 @@ import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebas
 import { UpcomingAppointments } from "@/components/dashboard/upcoming-appointments";
 import { collection, query, where, orderBy, limit } from "firebase/firestore";
 import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear, startOfToday } from 'date-fns';
-import { InvestmentsChart } from "@/components/dashboard/investments-chart";
+import { PortfolioChart } from "@/components/inversiones/portfolio-chart";
 import { BalanceChart } from "@/components/dashboard/balance-chart";
 
 type Periodo = 'mes_actual' | 'mes_pasado' | 'ultimos_3_meses' | 'ano_actual';
@@ -205,7 +205,7 @@ export default function DashboardPage() {
             periodoLabel={getPeriodoLabel(periodo)}
           />
           <div className="grid gap-8 md:grid-cols-2">
-            <InvestmentsChart data={investments || []} />
+            <PortfolioChart investments={investments || []} />
             <BalanceChart ingresos={dashboardData.totalIngresos} gastos={dashboardData.totalGastos} />
           </div>
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
