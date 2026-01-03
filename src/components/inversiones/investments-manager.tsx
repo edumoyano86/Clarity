@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from "@/components/ui/table";
-import { Investment } from "@/lib/definitions";
+import { Investment, PriceData, PortfolioDataPoint } from "@/lib/definitions";
 import { ManagerPage } from '../shared/manager-page';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { InvestmentForm } from './investment-form';
@@ -22,12 +22,15 @@ import { SellInvestmentDialog } from './sell-investment-dialog';
 interface InvestmentsManagerProps {
     investments: Investment[];
     userId: string;
+    portfolioHistory: PortfolioDataPoint[];
+    totalValue: number;
+    isLoadingHistory: boolean;
 }
 
 // For simplicity, using a fixed rate. This could be fetched from an API in a future iteration.
 const USD_TO_ARS_RATE = 1050; 
 
-export function InvestmentsManager({ investments, userId }: InvestmentsManagerProps) {
+export function InvestmentsManager({ investments, userId, portfolioHistory, totalValue, isLoadingHistory }: InvestmentsManagerProps) {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [isSellDialogOpen, setIsSellDialogOpen] = useState(false);
@@ -152,7 +155,11 @@ export function InvestmentsManager({ investments, userId }: InvestmentsManagerPr
                 onButtonClick={() => handleOpenForm()}
             >
                 <div className="space-y-8">
-                    <PortfolioChart investments={investments} prices={prices} isLoading={isLoadingPrices} />
+                    <PortfolioChart 
+                        portfolioHistory={portfolioHistory} 
+                        totalValue={totalValue} 
+                        isLoading={isLoadingHistory} 
+                    />
                     <Card>
                         <CardHeader>
                             <div className='flex justify-between items-center'>

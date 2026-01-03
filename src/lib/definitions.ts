@@ -58,3 +58,8 @@ export type PriceData = {
     price: number;
   };
 };
+
+export type PortfolioDataPoint = {
+    date: number;
+    value: number;
+};
