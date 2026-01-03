@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { AreaChart, Area, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts';
+import { AreaChart, Area, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { type ChartConfig, ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { Investment, PriceData } from '@/lib/definitions';
@@ -25,6 +25,9 @@ const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
 };
 
+// Helper to introduce a delay
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export function PortfolioChart({ investments, prices, isLoading: isLoadingPrices }: PortfolioChartProps) {
     const [historyData, setHistoryData] = useState<any[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -43,21 +46,30 @@ export function PortfolioChart({ investments, prices, isLoading: isLoadingPrices
             
             const cryptoIds = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.assetId))];
             
-            // NOTE: We are skipping stock history for now as Finnhub free tier only allows 1 year of daily data, not specific date ranges.
-            // This is a limitation we can address in a future iteration with a different API or paid plan.
-            
-            const historyPromises = cryptoIds.map(id => 
-                fetch(`https://api.coingecko.com/api/v3/coins/${id}/market_chart/range?vs_currency=usd&from=${startDate.getTime() / 1000}&to=${endDate.getTime() / 1000}`)
-                    .then(res => res.json())
-                    .then(data => ({ id, prices: data.prices }))
-            );
+            const results = [];
+            for (const id of cryptoIds) {
+                try {
+                    const response = await fetch(`https://api.coingecko.com/api/v3/coins/${id}/market_chart/range?vs_currency=usd&from=${startDate.getTime() / 1000}&to=${endDate.getTime() / 1000}`);
+                    if (!response.ok) {
+                        // If response is not ok (e.g., 429 Throttled), log it and continue
+                        console.warn(`Failed to fetch history for ${id}: ${response.statusText}`);
+                        results.push({ id, prices: null }); // Push null to indicate failure
+                    } else {
+                        const data = await response.json();
+                        results.push({ id, prices: data.prices });
+                    }
+                } catch (error) {
+                    console.error(`Error fetching history for ${id}:`, error);
+                    results.push({ id, prices: null });
+                }
+                await sleep(300); // Wait 300ms between API calls to avoid rate limiting
+            }
 
             try {
-                const results = await Promise.all(historyPromises);
                 const priceHistory: { [id: string]: { [date: string]: number } } = {};
                 
                 results.forEach(result => {
-                    if (result.prices) {
+                    if (result && result.prices) { // Check if result and result.prices are not null
                         priceHistory[result.id] = {};
                         result.prices.forEach(([timestamp, price]: [number, number]) => {
                             const dateStr = format(startOfDay(new Date(timestamp)), 'yyyy-MM-dd');
@@ -76,9 +88,8 @@ export function PortfolioChart({ investments, prices, isLoading: isLoadingPrices
                         if (inv.purchaseDate > currentDate.getTime()) return; // Investment not yet made
 
                         if (inv.assetType === 'crypto') {
-                            // Find the closest available historical price going backwards
                             let historicalPrice: number | undefined;
-                            for (let i = 0; i <= 5; i++) { // Check up to 5 days back
+                            for (let i = 0; i <= 5; i++) { // Check up to 5 days back for a price
                                 const checkDate = subDays(currentDate, i);
                                 const checkDateStr = format(checkDate, 'yyyy-MM-dd');
                                 if (priceHistory[inv.assetId]?.[checkDateStr]) {
@@ -89,8 +100,7 @@ export function PortfolioChart({ investments, prices, isLoading: isLoadingPrices
                             if (historicalPrice) {
                                 dailyTotalValue += inv.amount * historicalPrice;
                             }
-                        } else { // Stock
-                            // For stocks, use the current price for all historical points as a fallback
+                        } else { 
                              const priceKey = inv.symbol;
                              const currentPrice = prices[priceKey]?.price;
                              if (currentPrice) {
@@ -104,14 +114,13 @@ export function PortfolioChart({ investments, prices, isLoading: isLoadingPrices
                     }
                 }
                 
-                // Ensure there are at least two points for the area chart to render
                 if (timeline.length === 1) {
                      timeline.unshift({ date: subDays(new Date(timeline[0].date), 1).getTime(), value: 0 });
                 }
                 setHistoryData(timeline);
 
             } catch (error) {
-                console.error("Error fetching portfolio history:", error);
+                console.error("Error processing portfolio history:", error);
                 setHistoryData([]);
             } finally {
                 setIsLoadingHistory(false);
