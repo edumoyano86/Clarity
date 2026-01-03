@@ -26,7 +26,8 @@ export function usePortfolioHistory(investments: Investment[]) {
                 return;
             }
             
-            setIsLoading(true);
+            // Do not set loading to true on subsequent fetches, only on initial load.
+            // This prevents the UI from flickering when a new investment is added.
 
             // Calculate current total value
             const currentTotalValue = investments.reduce((acc, inv) => {
@@ -61,7 +62,6 @@ export function usePortfolioHistory(investments: Investment[]) {
                 
                 const priceHistoryMap = new Map<string, Map<string, number>>();
 
-                // 1. Create a complete, gap-filled price history for each fetched crypto asset
                 successfulResults.forEach(result => {
                     const dailyPrices = new Map<string, number>();
                     result.prices.forEach(([timestamp, price]) => {
@@ -77,14 +77,12 @@ export function usePortfolioHistory(investments: Investment[]) {
                             lastKnownPrice = dailyPrices.get(dateStr)!;
                             filledPrices.set(dateStr, lastKnownPrice);
                         } else if (lastKnownPrice !== null) {
-                            filledPrices.set(dateStr, lastKnownPrice); // Fill gap with last known price
+                            filledPrices.set(dateStr, lastKnownPrice);
                         }
                     }
                     priceHistoryMap.set(result.id, filledPrices);
                 });
 
-
-                // 2. Calculate portfolio value for each day
                 const newChartData: PortfolioDataPoint[] = [];
                 for (let i = 0; i <= 90; i++) {
                     const date = subDays(endDate, 90 - i);
@@ -93,13 +91,12 @@ export function usePortfolioHistory(investments: Investment[]) {
 
                     let dailyTotal = 0;
                     investments.forEach(inv => {
-                        // Only include investments that existed on this day
                         if (inv.purchaseDate <= dayTimestamp) {
                             let priceToUse: number;
                             if (inv.assetType === 'crypto') {
                                 const assetPriceHistory = priceHistoryMap.get(inv.assetId);
-                                priceToUse = assetPriceHistory?.get(dateStr) || inv.purchasePrice; // Fallback to purchase price if still no data
-                            } else { // For stocks, use current price as a stable fallback for history
+                                priceToUse = assetPriceHistory?.get(dateStr) || inv.purchasePrice;
+                            } else {
                                 priceToUse = prices[inv.symbol]?.price || inv.purchasePrice;
                             }
                             dailyTotal += inv.amount * priceToUse;
@@ -112,7 +109,7 @@ export function usePortfolioHistory(investments: Investment[]) {
 
             } catch (error) {
                 console.error("An error occurred while building portfolio history:", error);
-                setPortfolioHistory([]); // Reset on error
+                setPortfolioHistory([]);
             } finally {
                 setIsLoading(false);
             }
