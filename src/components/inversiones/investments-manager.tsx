@@ -193,7 +193,7 @@ export function InvestmentsManager({ investments, userId, portfolioHistory, tota
                                     ) : (
                                         <TableRow>
                                             <TableCell colSpan={7} className="text-center h-24">
-                                                {isLoadingPrices ? 'Cargando precios...' : 'No tienes inversiones registradas.'}
+                                                {isLoadingPrices || isLoadingHistory ? 'Cargando...' : 'No tienes inversiones registradas.'}
                                             </TableCell>
                                         </TableRow>
                                     )}

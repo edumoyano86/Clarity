@@ -18,7 +18,7 @@ export default function InversionesPage() {
     const { data: investments, isLoading: loadingInvestments } = useCollection<Investment>(investmentsQuery);
     const { portfolioHistory, totalValue, isLoading: isLoadingHistory } = usePortfolioHistory(investments || []);
 
-    if (isUserLoading || loadingInvestments || !user) {
+    if (isUserLoading || !user) {
         return <p>Cargando inversiones...</p>
     }
 
@@ -27,6 +27,6 @@ export default function InversionesPage() {
         userId={user.uid}
         portfolioHistory={portfolioHistory}
         totalValue={totalValue}
-        isLoadingHistory={isLoadingHistory}
+        isLoadingHistory={isLoadingHistory || loadingInvestments}
         />;
 }
