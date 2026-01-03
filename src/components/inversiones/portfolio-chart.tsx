@@ -36,7 +36,6 @@ export function PortfolioChart({ investments, prices, isLoading: isLoadingPrices
         const fetchHistory = async () => {
             if (!investments || investments.length === 0) {
                 setHistoryData([]);
-                setIsLoadingHistory(false);
                 return;
             };
 
@@ -62,7 +61,7 @@ export function PortfolioChart({ investments, prices, isLoading: isLoadingPrices
                         console.error(`Error fetching history for ${id}:`, error);
                         results.push({ id, prices: null });
                     }
-                    await sleep(300);
+                    await sleep(300); // Wait 300ms between calls to avoid rate limiting
                 }
             }
 
