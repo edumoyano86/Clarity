@@ -43,7 +43,6 @@ export function usePrices(investments: Investment[] | null) {
                     description: 'No se pudieron obtener algunas cotizaciones de los activos.',
                     variant: 'destructive'
                 });
-                setPrices({}); // Clear prices on error
             } finally {
                 setIsLoading(false);
             }
