@@ -20,12 +20,10 @@ export function usePortfolioHistory(investments: Investment[], periodInDays: Por
 
     useEffect(() => {
         const fetchHistory = async () => {
-            if (!investments) {
-                 if (investments === null || investments.length === 0) {
-                    setPortfolioHistory([]);
-                    setTotalValue(0);
-                    setIsLoading(false);
-                }
+            if (!investments || investments.length === 0) {
+                setPortfolioHistory([]);
+                setTotalValue(0);
+                setIsLoading(false);
                 return;
             }
              if (isLoadingPrices) return;
@@ -52,7 +50,7 @@ export function usePortfolioHistory(investments: Investment[], periodInDays: Por
             // --- Fetch Crypto History from Finnhub ---
             const cryptoPromises = cryptoSymbols.map(async (symbol) => {
                 await delay(350); // Rate limit
-                const resolution = periodInDays <= 7 ? '60' : 'D';
+                const resolution = 'D'; // Always use daily for history consistency
                 return fetch(`https://finnhub.io/api/v1/crypto/candle?symbol=${symbol}&resolution=${resolution}&from=${startTimestamp}&to=${endTimestamp}&token=${process.env.NEXT_PUBLIC_FINNHUB_API_KEY}`)
                     .then(res => res.ok ? res.json() : Promise.reject(`Finnhub API failed for ${symbol}`))
                     .then(data => ({ symbol, data }));
@@ -91,47 +89,41 @@ export function usePortfolioHistory(investments: Investment[], periodInDays: Por
                  }
             });
 
-
             // --- Calculate Portfolio Value Over Time ---
             const newChartData: PortfolioDataPoint[] = [];
-            
-            for (let i = 0; i <= periodInDays; i++) {
-                const currentDate = subDays(endDate, periodInDays - i);
+            const lastKnownPrices: { [key: string]: number } = {};
+
+            for (let i = 0; i < periodInDays; i++) {
+                const currentDate = startOfDay(subDays(endDate, periodInDays - 1 - i));
                 const currentDateStr = format(currentDate, 'yyyy-MM-dd');
                 let dailyTotal = 0;
 
                 investments.forEach(inv => {
-                    if (isAfter(currentDate, startOfDay(new Date(inv.purchaseDate))) || format(currentDate, 'yyyy-MM-dd') === format(new Date(inv.purchaseDate), 'yyyy-MM-dd')) {
+                     // Only include the investment in the calculation if its purchase date is on or before the current date in the loop
+                    if (!isAfter(new Date(inv.purchaseDate), currentDate)) {
                         const priceKey = inv.assetType === 'crypto' ? inv.assetId : inv.symbol;
                         const historyForAsset = allPriceHistory.get(priceKey);
-                        let priceToUse = inv.purchasePrice;
-
-                        if (historyForAsset) {
-                           let priceFound = false;
-                           for(let j = 0; j <= i; j++) {
-                               const pastDateStr = format(subDays(currentDate, j), 'yyyy-MM-dd');
-                               if (historyForAsset.has(pastDateStr)) {
-                                   priceToUse = historyForAsset.get(pastDateStr)!;
-                                   priceFound = true;
-                                   break;
-                               }
-                           }
-                            if (!priceFound) {
-                                // If no past data found at all, use purchase price as ultimate fallback
-                                priceToUse = inv.purchasePrice;
-                            }
-                        }
                         
-                        // For the very last point (today), always use the most current price fetched by usePrices
-                        if (i === periodInDays) {
-                           priceToUse = prices[priceKey]?.price || priceToUse;
-                        }
+                        let priceForDay = lastKnownPrices[priceKey]; // Start with the last known price
 
-                        dailyTotal += inv.amount * priceToUse;
+                        if (historyForAsset && historyForAsset.has(currentDateStr)) {
+                            // If we have a price for the exact day, use it and update last known price
+                            priceForDay = historyForAsset.get(currentDateStr)!;
+                            lastKnownPrices[priceKey] = priceForDay;
+                        } else if (priceForDay === undefined) {
+                            // If we don't have a price for the day and no last known price, fallback to purchase price
+                            priceForDay = inv.purchasePrice;
+                        }
+                        // Otherwise, we continue using the sticky lastKnownPrice
+
+                        dailyTotal += inv.amount * priceForDay;
                     }
                 });
                 newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
             }
+            
+             // Add today's value as the last point, using the most current prices
+            newChartData.push({ date: new Date().getTime(), value: currentTotalValue });
 
             setPortfolioHistory(newChartData);
         };
