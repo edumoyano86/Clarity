@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from "@/components/ui/table";
-import { Investment, PriceData, PortfolioDataPoint } from "@/lib/definitions";
+import { Investment, PriceData, PortfolioDataPoint, PriceHistory } from "@/lib/definitions";
 import { ManagerPage } from '../shared/manager-page';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { InvestmentForm } from './investment-form';
@@ -18,7 +18,8 @@ import { PortfolioChart } from './portfolio-chart';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
 import { SellInvestmentDialog } from './sell-investment-dialog';
-import { PortfolioPeriod } from '@/hooks/use-portfolio-history';
+import { PortfolioPeriod, usePortfolioHistory } from '@/hooks/use-portfolio-history';
+import { format, startOfDay } from 'date-fns';
 
 interface InvestmentsManagerProps {
     investments: Investment[];
@@ -43,6 +44,7 @@ export function InvestmentsManager({ investments, userId, portfolioHistory, tota
     const { prices, isLoading: isLoadingPrices } = usePrices(investments);
     const [showInArs, setShowInArs] = useState(false);
 
+    const { priceHistory } = usePortfolioHistory(investments, period);
 
     const firestore = useFirestore();
     const { toast } = useToast();
@@ -106,9 +108,12 @@ export function InvestmentsManager({ investments, userId, portfolioHistory, tota
 
 
     const renderPortfolioRow = (investment: Investment) => {
-        const purchaseValue = investment.amount * investment.purchasePrice;
-        
         const priceKey = investment.assetType === 'crypto' ? investment.assetId : investment.symbol;
+        
+        const purchaseDateStr = format(startOfDay(new Date(investment.purchaseDate)), 'yyyy-MM-dd');
+        const purchasePrice = priceHistory.get(priceKey)?.get(purchaseDateStr) || 0;
+        const purchaseValue = investment.amount * purchasePrice;
+        
         const currentPrice = prices[priceKey]?.price;
         const currentValue = currentPrice ? investment.amount * currentPrice : null;
         const pnl = currentValue !== null ? currentValue - purchaseValue : null;
@@ -121,7 +126,7 @@ export function InvestmentsManager({ investments, userId, portfolioHistory, tota
                     <div className='text-sm text-muted-foreground'>{investment.symbol.toUpperCase()}</div>
                 </TableCell>
                 <TableCell>{investment.amount}</TableCell>
-                <TableCell>{formatCurrency(investment.purchasePrice)}</TableCell>
+                <TableCell>{formatCurrency(purchasePrice)}</TableCell>
                 <TableCell>{formatCurrency(purchaseValue)}</TableCell>
                 <TableCell>
                     {isLoadingPrices ? <Loader2 className="h-4 w-4 animate-spin" /> : currentValue !== null ? formatCurrency(currentValue) : '-'}

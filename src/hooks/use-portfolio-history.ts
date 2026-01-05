@@ -12,6 +12,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export function usePortfolioHistory(investments: Investment[], periodInDays: PortfolioPeriod = 90) {
     const [portfolioHistory, setPortfolioHistory] = useState<PortfolioDataPoint[]>([]);
+    const [priceHistory, setPriceHistory] = useState<PriceHistory>(new Map());
     const [totalValue, setTotalValue] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
     const { prices, isLoading: isLoadingPrices } = usePrices(investments || []);
@@ -20,19 +21,19 @@ export function usePortfolioHistory(investments: Investment[], periodInDays: Por
 
     useEffect(() => {
         const fetchHistory = async () => {
-            if (!investments || investments.length === 0) {
+            if (!investments || investments.length === 0 || isLoadingPrices) {
                 setPortfolioHistory([]);
+                setPriceHistory(new Map());
                 setTotalValue(0);
                 setIsLoading(false);
                 return;
             }
-             if (isLoadingPrices) return;
              
             setIsLoading(true);
 
             const currentTotalValue = investments.reduce((acc, inv) => {
                 const priceKey = inv.assetType === 'crypto' ? inv.assetId : inv.symbol;
-                const currentPrice = prices[priceKey]?.price || inv.purchasePrice;
+                const currentPrice = prices[priceKey]?.price || 0;
                 return acc + (inv.amount * currentPrice);
             }, 0);
             setTotalValue(currentTotalValue);
@@ -88,33 +89,36 @@ export function usePortfolioHistory(investments: Investment[], periodInDays: Por
                     console.warn(`Could not fetch stock history:`, result.reason);
                  }
             });
+            
+            // --- Fill Price Gaps ---
+            for (const [symbol, pricesMap] of allPriceHistory.entries()) {
+                let lastKnownPrice: number | undefined = undefined;
+                 for (let i = 0; i <= periodInDays; i++) {
+                    const currentDate = startOfDay(subDays(endDate, periodInDays - i));
+                    const currentDateStr = format(currentDate, 'yyyy-MM-dd');
+                    if (pricesMap.has(currentDateStr)) {
+                        lastKnownPrice = pricesMap.get(currentDateStr);
+                    } else if (lastKnownPrice !== undefined) {
+                        pricesMap.set(currentDateStr, lastKnownPrice);
+                    }
+                }
+            }
+            setPriceHistory(allPriceHistory);
+
 
             // --- Calculate Portfolio Value Over Time ---
             const newChartData: PortfolioDataPoint[] = [];
-            const lastKnownPrices: { [key: string]: number } = {};
 
-            for (let i = 0; i < periodInDays; i++) {
-                const currentDate = startOfDay(subDays(endDate, periodInDays - 1 - i));
+            for (let i = 0; i <= periodInDays; i++) {
+                const currentDate = startOfDay(subDays(endDate, periodInDays - i));
                 const currentDateStr = format(currentDate, 'yyyy-MM-dd');
                 let dailyTotal = 0;
 
                 investments.forEach(inv => {
-                     // Only include the investment in the calculation if its purchase date is on or before the current date in the loop
                     if (!isAfter(new Date(inv.purchaseDate), currentDate)) {
                         const priceKey = inv.assetType === 'crypto' ? inv.assetId : inv.symbol;
                         const historyForAsset = allPriceHistory.get(priceKey);
-                        
-                        let priceForDay = lastKnownPrices[priceKey]; // Start with the last known price
-
-                        if (historyForAsset && historyForAsset.has(currentDateStr)) {
-                            // If we have a price for the exact day, use it and update last known price
-                            priceForDay = historyForAsset.get(currentDateStr)!;
-                            lastKnownPrices[priceKey] = priceForDay;
-                        } else if (priceForDay === undefined) {
-                            // If we don't have a price for the day and no last known price, fallback to purchase price
-                            priceForDay = inv.purchasePrice;
-                        }
-                        // Otherwise, we continue using the sticky lastKnownPrice
+                        const priceForDay = historyForAsset?.get(currentDateStr) || 0; // It should always find a price now
 
                         dailyTotal += inv.amount * priceForDay;
                     }
@@ -136,5 +140,5 @@ export function usePortfolioHistory(investments: Investment[], periodInDays: Por
 
     }, [investmentsKey, isLoadingPrices, periodInDays]);
 
-    return { portfolioHistory, totalValue, isLoading };
+    return { portfolioHistory, totalValue, isLoading, priceHistory };
 }

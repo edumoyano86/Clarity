@@ -18,8 +18,6 @@ import { useFirestore } from '@/firebase';
 import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import { Investment } from '@/lib/definitions';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import { getCryptoPrices } from '@/ai/flows/crypto-prices';
-import { getStockPrices } from '@/ai/flows/stock-prices';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { searchStocks } from '@/ai/flows/stock-search';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -41,7 +39,6 @@ const InvestmentSchema = z.object({
     assetType: z.enum(['crypto', 'stock'], { required_error: 'Debes seleccionar un tipo de activo.' }),
     assetId: z.string().min(1, 'Debes seleccionar o ingresar un activo.'), // For stocks, this is the symbol. For crypto, it's the Finnhub symbol.
     amount: z.coerce.number().positive('La cantidad debe ser un número positivo.'),
-    purchasePrice: z.coerce.number().positive('El precio debe ser un número positivo.').optional().or(z.literal('')),
     purchaseDate: z.date({ required_error: 'La fecha de compra es requerida.' }),
 });
 
@@ -86,7 +83,6 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         resolver: zodResolver(InvestmentSchema),
         defaultValues: {
             assetType: investment?.assetType || 'crypto',
-            purchasePrice: investment?.purchasePrice || '',
         }
     });
 
@@ -106,7 +102,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         } finally {
             setIsLoading(false);
         }
-    }, [finnhubCryptoSymbols, toast]);
+    }, [finnhubCryptoSymbols.length, toast]);
      
     // --- Crypto Search Logic (Local Filter) ---
     const searchCoins = useCallback((query: string) => {
@@ -152,7 +148,6 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 assetType: investment.assetType,
                 assetId: investment.assetId,
                 amount: investment.amount,
-                purchasePrice: investment.purchasePrice,
                 purchaseDate: new Date(investment.purchaseDate),
             });
             if(investment.assetType === 'crypto') {
@@ -170,7 +165,6 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 assetType: 'crypto',
                 assetId: '',
                 amount: undefined,
-                purchasePrice: '',
                 purchaseDate: new Date(),
             });
             setSelectedCoin(null);
@@ -200,27 +194,6 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         try {
             const { id, assetId, assetType, ...investmentData } = data;
             
-            let finalPurchasePrice = investmentData.purchasePrice ? Number(investmentData.purchasePrice) : 0;
-
-            if (!finalPurchasePrice) {
-                try {
-                    let priceData;
-                    if (assetType === 'crypto') {
-                        priceData = await getCryptoPrices({ symbols: [assetId] });
-                        finalPurchasePrice = priceData[assetId]?.price || 0;
-                    } else {
-                        priceData = await getStockPrices({ symbols: [assetId.toUpperCase()] });
-                        finalPurchasePrice = priceData[assetId.toUpperCase()]?.price || 0;
-                    }
-                    if(finalPurchasePrice === 0) {
-                       toast({ title: 'Advertencia', description: 'No se pudo obtener el precio actual. Se guardará con precio 0.', variant: 'destructive'});
-                    }
-                } catch (apiError) {
-                    console.error("API Error fetching price:", apiError);
-                    toast({ title: 'Error de API', description: 'No se pudo obtener el precio actual. Se guardará con precio 0.', variant: 'destructive'});
-                }
-            }
-
             let name = '';
             let symbol = '';
 
@@ -234,7 +207,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 symbol = selectedStock.symbol;
             }
 
-            const dataToSave = { ...investmentData, assetType, assetId, name, symbol, purchasePrice: finalPurchasePrice, purchaseDate: investmentData.purchaseDate.getTime() };
+            const dataToSave = { ...investmentData, assetType, assetId, name, symbol, purchaseDate: investmentData.purchaseDate.getTime() };
             
             const collectionRef = collection(firestore, 'users', userId, 'investments');
             
@@ -378,11 +351,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 <Input id="amount" type="number" step="any" placeholder="Ej: 0.5" {...register('amount')} />
                  {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
             </div>
-            <div>
-                <Label htmlFor="purchasePrice">Precio de Compra (por unidad, en USD) - Opcional</Label>
-                <Input id="purchasePrice" type="number" step="any" placeholder="Dejar vacío para usar precio actual" {...register('purchasePrice')} />
-                 {errors.purchasePrice && <p className="text-sm text-destructive">{errors.purchasePrice.message}</p>}
-            </div>
+
              <div>
                 <Label htmlFor="purchaseDate">Fecha de Compra</Label>
                 <Controller

@@ -48,7 +48,6 @@ export type Investment = {
     name: string;
     symbol: string; // Ticker symbol (BTC, AAPL)
     amount: number;
-    purchasePrice: number;
     purchaseDate: number; // timestamp
 };
 

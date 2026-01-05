@@ -90,10 +90,9 @@
         "name": { "type": "string" },
         "symbol": { "type": "string" },
         "amount": { "type": "number" },
-        "purchasePrice": { "type": "number" },
         "purchaseDate": { "type": "number", "description": "Timestamp" }
       },
-      "required": ["id", "assetType", "assetId", "name", "symbol", "amount", "purchasePrice", "purchaseDate"]
+      "required": ["id", "assetType", "assetId", "name", "symbol", "amount", "purchaseDate"]
     },
     "Appointment": {
       "$schema": "http://json-schema.org/draft-07/schema#",
