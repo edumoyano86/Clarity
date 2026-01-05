@@ -92,23 +92,21 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
 
     const assetType = watch('assetType');
 
-    // Fetch all Finnhub crypto symbols once
-    useEffect(() => {
-        const fetchAllCryptoSymbols = async () => {
-            try {
-                // Using a public proxy to bypass CORS issues if any.
-                const response = await fetch(`https://finnhub.io/api/v1/crypto/symbol?exchange=binance&token=${process.env.NEXT_PUBLIC_FINNHUB_API_KEY}`);
-                if (!response.ok) throw new Error('Network response was not ok.');
-                const data: FinnhubCryptoSymbol[] = await response.json();
-                setFinnhubCryptoSymbols(data);
-            } catch (error) {
-                console.error("Failed to fetch all crypto symbols:", error);
-                toast({ title: "Error", description: "No se pudieron cargar los símbolos de criptomonedas.", variant: 'destructive'});
-            }
-        };
-        // This is now public, so we don't need a Genkit flow.
-        // fetchAllCryptoSymbols();
-    }, [toast]);
+    const fetchAllCryptoSymbols = useCallback(async () => {
+        if (finnhubCryptoSymbols.length > 0) return; // Don't fetch if already loaded
+        setIsLoading(true);
+        try {
+            const response = await fetch(`https://finnhub.io/api/v1/crypto/symbol?exchange=binance&token=${process.env.NEXT_PUBLIC_FINNHUB_API_KEY}`);
+            if (!response.ok) throw new Error('Network response was not ok.');
+            const data: FinnhubCryptoSymbol[] = await response.json();
+            setFinnhubCryptoSymbols(data);
+        } catch (error) {
+            console.error("Failed to fetch all crypto symbols:", error);
+            toast({ title: "Error", description: "No se pudieron cargar los símbolos de criptomonedas.", variant: 'destructive'});
+        } finally {
+            setIsLoading(false);
+        }
+    }, [finnhubCryptoSymbols, toast]);
      
     // --- Crypto Search Logic (Local Filter) ---
     const searchCoins = useCallback((query: string) => {
@@ -296,25 +294,15 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                                 debouncedCryptoSearch(query);
                                 if (!isCryptoListVisible) setIsCryptoListVisible(true);
                             }}
-                             onFocus={() => { setIsCryptoListVisible(true); if (finnhubCryptoSymbols.length === 0 && !isLoading) { (async () => {
-                                 setIsLoading(true);
-                                 try {
-                                     const response = await fetch(`https://finnhub.io/api/v1/crypto/symbol?exchange=binance&token=${process.env.NEXT_PUBLIC_FINNHUB_API_KEY}`);
-                                     if (!response.ok) throw new Error('Network response was not ok.');
-                                     const data: FinnhubCryptoSymbol[] = await response.json();
-                                     setFinnhubCryptoSymbols(data);
-                                 } catch (error) {
-                                     console.error("Failed to fetch all crypto symbols:", error);
-                                     toast({ title: "Error", description: "No se pudieron cargar los símbolos de criptomonedas.", variant: 'destructive'});
-                                 } finally {
-                                     setIsLoading(false);
-                                 }
-                             })()}}}
+                             onFocus={() => { 
+                                setIsCryptoListVisible(true); 
+                                fetchAllCryptoSymbols();
+                             }}
                         />
                         {isCryptoListVisible && (
                             <CommandList className="absolute top-10 z-10 w-full rounded-md border bg-popover text-popover-foreground shadow-md">
-                                {isSearchingCrypto && <CommandEmpty>Buscando...</CommandEmpty>}
-                                {!isSearchingCrypto && cryptoSearchResults.length === 0 && cryptoSearchQuery.length > 1 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}
+                                {(isLoading || isSearchingCrypto) && <CommandEmpty>Buscando...</CommandEmpty>}
+                                {!isLoading && !isSearchingCrypto && cryptoSearchResults.length === 0 && cryptoSearchQuery.length > 1 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}
                                 {cryptoSearchResults.length > 0 && (
                                 <CommandGroup>
                                     {cryptoSearchResults.map((coin) => (
