@@ -18,7 +18,7 @@ import { PortfolioChart } from './portfolio-chart';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
 import { SellInvestmentDialog } from './sell-investment-dialog';
-import { PortfolioPeriod, usePortfolioHistory } from '@/hooks/use-portfolio-history';
+import { PortfolioPeriod } from '@/hooks/use-portfolio-history';
 import { format, startOfDay } from 'date-fns';
 
 interface InvestmentsManagerProps {
@@ -29,12 +29,12 @@ interface InvestmentsManagerProps {
     isLoadingHistory: boolean;
     period: PortfolioPeriod;
     setPeriod: (period: PortfolioPeriod) => void;
+    priceHistory: PriceHistory;
 }
 
-// For simplicity, using a fixed rate. This could be fetched from an API in a future iteration.
 const USD_TO_ARS_RATE = 1050; 
 
-export function InvestmentsManager({ investments, userId, portfolioHistory, totalValue, isLoadingHistory, period, setPeriod }: InvestmentsManagerProps) {
+export function InvestmentsManager({ investments, userId, portfolioHistory, totalValue, isLoadingHistory, period, setPeriod, priceHistory }: InvestmentsManagerProps) {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [isSellDialogOpen, setIsSellDialogOpen] = useState(false);
@@ -44,12 +44,11 @@ export function InvestmentsManager({ investments, userId, portfolioHistory, tota
     const { prices, isLoading: isLoadingPrices } = usePrices(investments);
     const [showInArs, setShowInArs] = useState(false);
 
-    const { priceHistory } = usePortfolioHistory(investments, period);
-
     const firestore = useFirestore();
     const { toast } = useToast();
 
     const formatCurrency = (amount: number) => {
+        if (isNaN(amount)) amount = 0;
         if (showInArs) {
             return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount * USD_TO_ARS_RATE);
         }
@@ -119,6 +118,8 @@ export function InvestmentsManager({ investments, userId, portfolioHistory, tota
         const pnl = currentValue !== null ? currentValue - purchaseValue : null;
         const pnlPercent = pnl !== null && purchaseValue > 0 ? (pnl / purchaseValue) * 100 : null;
 
+        const isLoadingRow = isLoadingPrices || isLoadingHistory;
+
         return (
             <TableRow key={investment.id}>
                 <TableCell>
@@ -126,13 +127,13 @@ export function InvestmentsManager({ investments, userId, portfolioHistory, tota
                     <div className='text-sm text-muted-foreground'>{investment.symbol.toUpperCase()}</div>
                 </TableCell>
                 <TableCell>{investment.amount}</TableCell>
-                <TableCell>{formatCurrency(purchasePrice)}</TableCell>
-                <TableCell>{formatCurrency(purchaseValue)}</TableCell>
+                <TableCell>{isLoadingRow ? <Loader2 className="h-4 w-4 animate-spin" /> : formatCurrency(purchasePrice)}</TableCell>
+                <TableCell>{isLoadingRow ? <Loader2 className="h-4 w-4 animate-spin" /> : formatCurrency(purchaseValue)}</TableCell>
                 <TableCell>
-                    {isLoadingPrices ? <Loader2 className="h-4 w-4 animate-spin" /> : currentValue !== null ? formatCurrency(currentValue) : '-'}
+                    {isLoadingRow ? <Loader2 className="h-4 w-4 animate-spin" /> : currentValue !== null ? formatCurrency(currentValue) : '-'}
                 </TableCell>
                 <TableCell>
-                    {isLoadingPrices ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+                    {isLoadingRow ? <Loader2 className="h-4 w-4 animate-spin" /> : (
                         pnl !== null && pnlPercent !== null ? (
                             <div className={`flex items-center gap-1 font-medium ${pnl >= 0 ? 'text-green-600' : 'text-destructive'}`}>
                                 {pnl >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
@@ -207,12 +208,12 @@ export function InvestmentsManager({ investments, userId, portfolioHistory, tota
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {sortedInvestments.length > 0 ? (
+                                    {investments.length > 0 ? (
                                         sortedInvestments.map(renderPortfolioRow)
                                     ) : (
                                         <TableRow>
                                             <TableCell colSpan={7} className="text-center h-24">
-                                                {isLoadingPrices || isLoadingHistory ? 'Cargando...' : 'No tienes inversiones registradas.'}
+                                                {isLoadingHistory ? 'Cargando...' : 'No tienes inversiones registradas.'}
                                             </TableCell>
                                         </TableRow>
                                     )}

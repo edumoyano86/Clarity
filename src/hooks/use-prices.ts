@@ -8,7 +8,7 @@ import { useToast } from './use-toast';
 
 export function usePrices(investments: Investment[] | null) {
     const [prices, setPrices] = useState<PriceData>({});
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
     
     const investmentsKey = investments?.map(inv => `${inv.id}-${inv.assetId}`).join(',') || '';
@@ -33,8 +33,6 @@ export function usePrices(investments: Investment[] | null) {
                     stockSymbols.length > 0 ? getStockPrices({ symbols: stockSymbols }) : Promise.resolve({}),
                 ]);
                 
-                // When mapping crypto prices, the key is the Finnhub symbol (which is our assetId).
-                // For stocks, the key is the ticker symbol (which is our investment.symbol).
                 const combinedPrices: PriceData = { ...cryptoPrices, ...stockPrices };
                 setPrices(combinedPrices);
 
