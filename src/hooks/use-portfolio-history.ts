@@ -25,9 +25,6 @@ export function usePortfolioHistory(investments: Investment[]) {
                 setIsLoading(false);
                 return;
             }
-            
-            // Do not set loading to true on subsequent fetches, only on initial load.
-            // This prevents the UI from flickering when a new investment is added.
 
             // Calculate current total value
             const currentTotalValue = investments.reduce((acc, inv) => {
@@ -40,7 +37,7 @@ export function usePortfolioHistory(investments: Investment[]) {
             const cryptoIds = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.assetId))];
             
             try {
-                const endDate = new Date();
+                const endDate = startOfDay(new Date());
                 const startDate = subDays(endDate, 90);
 
                 const promises = cryptoIds.map(id =>
@@ -56,48 +53,44 @@ export function usePortfolioHistory(investments: Investment[]) {
 
                 const results = await Promise.allSettled(promises);
                 
-                const successfulResults = results
-                    .filter(result => result.status === 'fulfilled' && result.value.prices)
-                    .map(result => (result as PromiseFulfilledResult<{id: string, prices: [number, number][]}>).value);
-                
                 const priceHistoryMap = new Map<string, Map<string, number>>();
 
-                successfulResults.forEach(result => {
-                    const dailyPrices = new Map<string, number>();
-                    result.prices.forEach(([timestamp, price]) => {
-                        dailyPrices.set(format(new Date(timestamp), 'yyyy-MM-dd'), price);
-                    });
-
-                    const filledPrices = new Map<string, number>();
-                    let lastKnownPrice: number | null = null;
-                    for (let i = 0; i <= 90; i++) {
-                        const date = subDays(endDate, 90-i);
-                        const dateStr = format(date, 'yyyy-MM-dd');
-                        if (dailyPrices.has(dateStr)) {
-                            lastKnownPrice = dailyPrices.get(dateStr)!;
-                            filledPrices.set(dateStr, lastKnownPrice);
-                        } else if (lastKnownPrice !== null) {
-                            filledPrices.set(dateStr, lastKnownPrice);
-                        }
+                results.forEach(result => {
+                    if (result.status === 'fulfilled' && result.value.prices) {
+                        const { id, prices: apiPrices } = result.value;
+                        const dailyPrices = new Map<string, number>();
+                        apiPrices.forEach(([timestamp, price]) => {
+                            dailyPrices.set(format(startOfDay(new Date(timestamp)), 'yyyy-MM-dd'), price);
+                        });
+                        priceHistoryMap.set(id, dailyPrices);
                     }
-                    priceHistoryMap.set(result.id, filledPrices);
                 });
 
                 const newChartData: PortfolioDataPoint[] = [];
+                const lastKnownPrices = new Map<string, number>();
+
                 for (let i = 0; i <= 90; i++) {
                     const date = subDays(endDate, 90 - i);
+                    const dayTimestamp = date.getTime();
                     const dateStr = format(date, 'yyyy-MM-dd');
-                    const dayTimestamp = startOfDay(date).getTime();
 
                     let dailyTotal = 0;
+
                     investments.forEach(inv => {
                         if (inv.purchaseDate <= dayTimestamp) {
                             let priceToUse: number;
                             if (inv.assetType === 'crypto') {
                                 const assetPriceHistory = priceHistoryMap.get(inv.assetId);
-                                priceToUse = assetPriceHistory?.get(dateStr) || inv.purchasePrice;
+                                if (assetPriceHistory && assetPriceHistory.has(dateStr)) {
+                                    priceToUse = assetPriceHistory.get(dateStr)!;
+                                    lastKnownPrices.set(inv.id, priceToUse);
+                                } else {
+                                    priceToUse = lastKnownPrices.get(inv.id) || inv.purchasePrice;
+                                }
                             } else {
-                                priceToUse = prices[inv.symbol]?.price || inv.purchasePrice;
+                                // For stocks, use purchase price until today, then use current market price.
+                                const isToday = format(date, 'yyyy-MM-dd') === format(endDate, 'yyyy-MM-dd');
+                                priceToUse = isToday ? (prices[inv.symbol]?.price || inv.purchasePrice) : inv.purchasePrice;
                             }
                             dailyTotal += inv.amount * priceToUse;
                         }
