@@ -1,9 +1,9 @@
 'use server';
 
 /**
- * @fileOverview A Genkit flow for fetching historical stock prices from Alpha Vantage.
+ * @fileOverview A Genkit flow for fetching historical stock prices from Finnhub.
  * 
- * - getStockPriceHistory - A function that takes a stock symbol and returns its daily price history.
+ * - getStockPriceHistory - A function that takes a stock symbol and date range and returns its daily price history.
  */
 
 import { ai } from '@/ai/genkit';
@@ -11,6 +11,8 @@ import { z } from 'zod';
 
 const StockHistoryInputSchema = z.object({
   symbol: z.string().describe('The stock ticker symbol (e.g., "AAPL").'),
+  from: z.number().describe('UNIX timestamp for the start of the date range.'),
+  to: z.number().describe('UNIX timestamp for the end of the date range.'),
 });
 export type StockHistoryInput = z.infer<typeof StockHistoryInputSchema>;
 
@@ -31,44 +33,36 @@ const stockPriceHistoryFlow = ai.defineFlow(
     outputSchema: StockHistoryOutputSchema,
   },
   async (input) => {
-    const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
+    const apiKey = process.env.FINNHUB_API_KEY;
     if (!apiKey) {
-      console.error('Alpha Vantage API key is not set.');
+      console.error('Finnhub API key is not set.');
       return { history: {} };
     }
 
-    // "compact" returns the latest 100 data points. "full" returns up to 20 years.
-    // For our 7, 30, 90 day periods, compact is sufficient and much faster.
-    const outputSize = 'compact'; 
-    const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${input.symbol}&outputsize=${outputSize}&apikey=${apiKey}`;
+    const url = `https://finnhub.io/api/v1/stock/candle?symbol=${input.symbol}&resolution=D&from=${input.from}&to=${input.to}&token=${apiKey}`;
 
     try {
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`Alpha Vantage API request failed with status ${response.status}`);
+        throw new Error(`Finnhub API request failed with status ${response.status}`);
       }
       const data = await response.json();
       
-      const timeSeries = data['Time Series (Daily)'];
-
-      if (timeSeries) {
-        const history: Record<string, number> = {};
-        for (const dateStr in timeSeries) {
-            // '4. close' is the closing price in the Alpha Vantage response
-            const closePrice = parseFloat(timeSeries[dateStr]['4. close']);
-            if (!isNaN(closePrice)) {
-                history[dateStr] = closePrice;
-            }
-        }
-        return { history };
-      }
-      
-      // Handle API limit messages or other errors
-      if (data['Information'] || data['Error Message']) {
-          console.warn(`Alpha Vantage API note for ${input.symbol}: ${data['Information'] || data['Error Message']}`);
+      if (data.s !== 'ok') {
+        // Finnhub can return 200 OK but with an error status in the JSON body
+        console.warn(`Finnhub API returned status '${data.s}' for ${input.symbol}`);
+        return { history: {} };
       }
 
-      return { history: {} };
+      const history: Record<string, number> = {};
+      if (data.t && data.c) {
+          for (let i = 0; i < data.t.length; i++) {
+            const date = new Date(data.t[i] * 1000);
+            const dateStr = date.toISOString().split('T')[0]; // Format to YYYY-MM-DD
+            history[dateStr] = data.c[i];
+          }
+      }
+      return { history };
 
     } catch (error) {
       console.error(`Error fetching stock history for ${input.symbol}:`, error);
