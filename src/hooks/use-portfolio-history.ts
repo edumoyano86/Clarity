@@ -4,13 +4,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { Investment, PortfolioDataPoint, PriceHistory, PriceData } from '@/lib/definitions';
 import { format, subDays, startOfDay, getUnixTime, fromUnixTime, isAfter } from 'date-fns';
 import { getStockPriceHistory } from '@/ai/flows/stock-price-history';
+import { getCryptoPriceHistory } from '@/ai/flows/crypto-price-history';
 
 export type PortfolioPeriod = 7 | 30 | 90;
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
 export function usePortfolioHistory(
-    investments: Investment[] | null, 
+    investments: Investment[] | null,
     periodInDays: PortfolioPeriod = 90,
     currentPrices: PriceData
 ) {
@@ -30,18 +29,24 @@ export function usePortfolioHistory(
                 setIsLoading(false);
                 return;
             }
-             
+
+            // Only start loading if we have investments and current prices are not ready
+            if (Object.keys(currentPrices).length === 0) {
+                 setIsLoading(true);
+                 return; // Wait for current prices to be fetched first
+            }
+            
             setIsLoading(true);
 
             // Calculate current total value using the prices passed as props
             const currentTotalValue = investments.reduce((acc, inv) => {
-                const priceKey = inv.assetType === 'crypto' ? inv.assetId : inv.symbol;
+                const priceKey = inv.symbol;
                 const currentPrice = currentPrices[priceKey]?.price || 0;
                 return acc + (inv.amount * currentPrice);
             }, 0);
             setTotalValue(currentTotalValue);
             
-            const cryptoSymbols = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.assetId))];
+            const cryptoSymbols = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.symbol))];
             const stockSymbols = [...new Set(investments.filter(i => i.assetType === 'stock').map(inv => inv.symbol))];
 
             const endDate = startOfDay(new Date());
@@ -50,56 +55,36 @@ export function usePortfolioHistory(
             const endTimestamp = getUnixTime(endDate);
 
             const allPriceHistory: PriceHistory = new Map();
-
-            // Fetch crypto history using server-side flow (assuming one exists or is created)
-            const cryptoPromises = cryptoSymbols.map(async (symbol) => {
-                // IMPORTANT: This assumes a Genkit flow `getCryptoPriceHistory` exists.
-                // For now, we mock this by calling Finnhub from server, but ideally it's a flow.
-                await delay(350); // Rate limiting
-                const url = `https://finnhub.io/api/v1/crypto/candle?symbol=${symbol}&resolution=D&from=${startTimestamp}&to=${endTimestamp}&token=${process.env.NEXT_PUBLIC_FINNHUB_API_KEY}`;
-                return fetch(url)
-                    .then(res => res.ok ? res.json() : Promise.reject(`Finnhub API failed for ${symbol}`))
-                    .then(data => ({ symbol, data }));
-            });
             
-            // Fetch stock history using the existing Genkit flow
-            const stockPromises = stockSymbols.map(async (symbol) => {
-                await delay(350); // Rate limiting
-                return getStockPriceHistory({ symbol, from: startTimestamp, to: endTimestamp })
-                           .then(data => ({ symbol, history: data.history }));
-            });
-            
-            // Settle all promises
-            const [cryptoResults, stockResults] = await Promise.all([
-                Promise.allSettled(cryptoPromises),
-                Promise.allSettled(stockPromises),
-            ]);
+            const stockPromises = stockSymbols.map(symbol => 
+                getStockPriceHistory({ symbol, from: startTimestamp, to: endTimestamp })
+                    .then(data => ({ symbol, data: data.history }))
+                    .catch(err => {
+                        console.warn(`Could not fetch stock history for ${symbol}:`, err);
+                        return { symbol, data: {} };
+                    })
+            );
 
-            // Process crypto results
-            cryptoResults.forEach(result => {
-                if (result.status === 'fulfilled' && result.value.data?.c) {
-                    const pricesMap = new Map<string, number>();
-                    const { c, t } = result.value.data;
-                    for (let i = 0; i < t.length; i++) {
-                        pricesMap.set(format(fromUnixTime(t[i]), 'yyyy-MM-dd'), c[i]);
-                    }
-                    allPriceHistory.set(result.value.symbol, pricesMap);
-                } else if (result.status === 'rejected') {
-                    console.warn(`Could not fetch crypto history:`, result.reason);
-                }
-            });
+            const cryptoPromises = cryptoSymbols.map(symbol => 
+                getCryptoPriceHistory({ symbol, from: startTimestamp, to: endTimestamp })
+                     .then(data => ({ symbol, data: data.history }))
+                     .catch(err => {
+                        console.warn(`Could not fetch crypto history for ${symbol}:`, err);
+                        return { symbol, data: {} };
+                    })
+            );
 
-            // Process stock results
-            stockResults.forEach(result => {
-                 if (result.status === 'fulfilled' && result.value.history) {
+            const results = await Promise.all([...stockPromises, ...cryptoPromises]);
+
+            // Process all results
+            results.forEach(result => {
+                if (result.data) {
                     const pricesMap = new Map<string, number>();
-                    Object.entries(result.value.history).forEach(([dateStr, price]) => {
+                    Object.entries(result.data).forEach(([dateStr, price]) => {
                         pricesMap.set(dateStr, price);
                     });
-                    allPriceHistory.set(result.value.symbol, pricesMap);
-                 } else if (result.status === 'rejected') {
-                    console.warn(`Could not fetch stock history:`, result.reason);
-                 }
+                    allPriceHistory.set(result.symbol, pricesMap);
+                }
             });
             
             // Fill gaps in price history
@@ -126,16 +111,14 @@ export function usePortfolioHistory(
 
                 investments.forEach(inv => {
                     const purchaseDate = startOfDay(new Date(inv.purchaseDate));
-                    // Check if the investment existed on the current date
                     if (!isAfter(purchaseDate, currentDate)) {
-                        const priceKey = inv.assetType === 'crypto' ? inv.assetId : inv.symbol;
+                        const priceKey = inv.symbol;
                         const historyForAsset = allPriceHistory.get(priceKey);
                         const priceForDay = historyForAsset?.get(currentDateStr);
                         
                         if(priceForDay) {
                            dailyTotal += inv.amount * priceForDay;
                         } else {
-                           // If no price is found for a past day, use the earliest available price as a fallback
                            const earliestPrice = historyForAsset ? Array.from(historyForAsset.values())[0] : 0;
                            dailyTotal += inv.amount * earliestPrice;
                         }
@@ -144,7 +127,6 @@ export function usePortfolioHistory(
                 newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
             }
             
-            // Ensure the last point in the chart is the most up-to-date total value
             if (newChartData.length > 0 && currentTotalValue > 0) {
                  newChartData[newChartData.length - 1].value = currentTotalValue;
             }
@@ -153,17 +135,12 @@ export function usePortfolioHistory(
             setIsLoading(false);
         };
 
-        // Only run if we have investments and current prices are ready
-        if (investments && investments.length > 0 && Object.keys(currentPrices).length > 0) {
-            fetchHistory().catch(error => {
-                console.error("Error fetching portfolio history:", error);
-                setIsLoading(false);
-            });
-        } else if (!investments || investments.length === 0) {
-             setIsLoading(false);
-        }
+        fetchHistory().catch(error => {
+            console.error("Error fetching portfolio history:", error);
+            setIsLoading(false);
+        });
 
-    }, [investmentsKey, periodInDays, currentPrices]); // Rerun when investments, period, or currentPrices change
+    }, [investmentsKey, periodInDays, currentPrices]);
 
     return { portfolioHistory, totalValue, isLoading, priceHistory };
 }

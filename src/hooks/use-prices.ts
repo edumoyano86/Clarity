@@ -11,7 +11,7 @@ export function usePrices(investments: Investment[] | null) {
     const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
     
-    const investmentsKey = useMemo(() => investments?.map(inv => inv.id).join(',') || '', [investments]);
+    const investmentsKey = useMemo(() => investments?.map(inv => `${inv.id}-${inv.symbol}`).join(',') || '', [investments]);
 
     useEffect(() => {
         const fetchPrices = async () => {
@@ -23,7 +23,7 @@ export function usePrices(investments: Investment[] | null) {
             
             setIsLoading(true);
 
-            const cryptoSymbols = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.assetId))];
+            const cryptoSymbols = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.symbol))];
             const stockSymbols = [...new Set(investments.filter(i => i.assetType === 'stock').map(inv => inv.symbol))];
 
             try {

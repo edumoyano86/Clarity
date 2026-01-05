@@ -37,7 +37,7 @@ interface StockSearchResult {
 const InvestmentSchema = z.object({
     id: z.string().optional(),
     assetType: z.enum(['crypto', 'stock'], { required_error: 'Debes seleccionar un tipo de activo.' }),
-    assetId: z.string().min(1, 'Debes seleccionar o ingresar un activo.'), // For stocks, this is the symbol. For crypto, it's the Finnhub symbol.
+    symbol: z.string().min(1, 'Debes seleccionar o ingresar un activo.'),
     amount: z.coerce.number().positive('La cantidad debe ser un número positivo.'),
     purchaseDate: z.date({ required_error: 'La fecha de compra es requerida.' }),
 });
@@ -146,12 +146,12 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             reset({
                 id: investment.id,
                 assetType: investment.assetType,
-                assetId: investment.assetId,
+                symbol: investment.symbol,
                 amount: investment.amount,
                 purchaseDate: new Date(investment.purchaseDate),
             });
             if(investment.assetType === 'crypto') {
-                setSelectedCoin({ symbol: investment.assetId, description: investment.name, displaySymbol: investment.symbol });
+                setSelectedCoin({ symbol: investment.symbol, description: investment.name, displaySymbol: investment.symbol });
                 setCryptoSearchQuery(investment.name);
                 setIsCryptoListVisible(false);
             } else { 
@@ -163,7 +163,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
              reset({
                 id: '',
                 assetType: 'crypto',
-                assetId: '',
+                symbol: '',
                 amount: undefined,
                 purchaseDate: new Date(),
             });
@@ -176,7 +176,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
 
     useEffect(() => {
         // Reset search when asset type changes
-        setValue('assetId', '');
+        setValue('symbol', '');
         setSelectedCoin(null);
         setCryptoSearchQuery('');
         setCryptoSearchResults([]);
@@ -186,28 +186,27 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         setStockSearchQuery('');
         setStockSearchResults([]);
         setIsStockListVisible(true);
-
     }, [assetType, setValue]);
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         setIsLoading(true);
         try {
-            const { id, assetId, assetType, ...investmentData } = data;
+            const { id, symbol, assetType, ...investmentData } = data;
             
             let name = '';
-            let symbol = '';
+            let resolvedSymbol = '';
 
             if (assetType === 'crypto') {
-                if (!selectedCoin || selectedCoin.symbol !== assetId) throw new Error('Por favor selecciona una criptomoneda de la lista.');
+                if (!selectedCoin || selectedCoin.symbol !== symbol) throw new Error('Por favor selecciona una criptomoneda de la lista.');
                 name = selectedCoin.description;
-                symbol = selectedCoin.displaySymbol;
+                resolvedSymbol = selectedCoin.displaySymbol;
             } else { // Stock
-                if (!selectedStock || selectedStock.symbol !== assetId) throw new Error('Por favor selecciona una acción de la lista.');
+                if (!selectedStock || selectedStock.symbol !== symbol) throw new Error('Por favor selecciona una acción de la lista.');
                 name = selectedStock.name;
-                symbol = selectedStock.symbol;
+                resolvedSymbol = selectedStock.symbol;
             }
 
-            const dataToSave = { ...investmentData, assetType, assetId, name, symbol, purchaseDate: investmentData.purchaseDate.getTime() };
+            const dataToSave = { ...investmentData, assetType, name, symbol: resolvedSymbol, purchaseDate: investmentData.purchaseDate.getTime() };
             
             const collectionRef = collection(firestore, 'users', userId, 'investments');
             
@@ -256,7 +255,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             />
 
             <div>
-                <Label htmlFor="assetId">Activo</Label>
+                <Label htmlFor="symbol">Activo</Label>
                 {assetType === 'crypto' ? (
                      <Command shouldFilter={false} className="relative overflow-visible">
                         <CommandInput 
@@ -286,7 +285,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                                             const selected = finnhubCryptoSymbols.find(c => c.symbol.toLowerCase() === currentValue.toLowerCase());
                                             if (selected) {
                                                 setSelectedCoin(selected);
-                                                setValue('assetId', selected.symbol);
+                                                setValue('symbol', selected.symbol);
                                                 setCryptoSearchQuery(selected.description);
                                             }
                                             setIsCryptoListVisible(false);
@@ -327,7 +326,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                                             const selected = stockSearchResults.find(s => s.symbol.toLowerCase() === currentValue.toLowerCase());
                                             if (selected) {
                                                 setSelectedStock(selected);
-                                                setValue('assetId', selected.symbol);
+                                                setValue('symbol', selected.symbol);
                                                 setStockSearchQuery(selected.name);
                                             }
                                             setIsStockListVisible(false);
@@ -343,7 +342,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                         )}
                     </Command>
                 )}
-                {errors.assetId && <p className="text-sm text-destructive">{errors.assetId.message}</p>}
+                {errors.symbol && <p className="text-sm text-destructive">{errors.symbol.message}</p>}
             </div>
             
             <div>
