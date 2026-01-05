@@ -18,6 +18,7 @@ import { PortfolioChart } from './portfolio-chart';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
 import { SellInvestmentDialog } from './sell-investment-dialog';
+import { PortfolioPeriod } from '@/hooks/use-portfolio-history';
 
 interface InvestmentsManagerProps {
     investments: Investment[];
@@ -25,12 +26,14 @@ interface InvestmentsManagerProps {
     portfolioHistory: PortfolioDataPoint[];
     totalValue: number;
     isLoadingHistory: boolean;
+    period: PortfolioPeriod;
+    setPeriod: (period: PortfolioPeriod) => void;
 }
 
 // For simplicity, using a fixed rate. This could be fetched from an API in a future iteration.
 const USD_TO_ARS_RATE = 1050; 
 
-export function InvestmentsManager({ investments, userId, portfolioHistory, totalValue, isLoadingHistory }: InvestmentsManagerProps) {
+export function InvestmentsManager({ investments, userId, portfolioHistory, totalValue, isLoadingHistory, period, setPeriod }: InvestmentsManagerProps) {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [isSellDialogOpen, setIsSellDialogOpen] = useState(false);
@@ -146,6 +149,12 @@ export function InvestmentsManager({ investments, userId, portfolioHistory, tota
         )
     }
 
+    const periodOptions: { label: string; value: PortfolioPeriod }[] = [
+        { label: '7D', value: 7 },
+        { label: '30D', value: 30 },
+        { label: '90D', value: 90 },
+    ];
+
     return (
         <>
             <ManagerPage
@@ -158,7 +167,10 @@ export function InvestmentsManager({ investments, userId, portfolioHistory, tota
                     <PortfolioChart 
                         portfolioHistory={portfolioHistory} 
                         totalValue={totalValue} 
-                        isLoading={isLoadingHistory} 
+                        isLoading={isLoadingHistory}
+                        period={period}
+                        setPeriod={setPeriod}
+                        periodOptions={periodOptions}
                     />
                     <Card>
                         <CardHeader>

@@ -5,7 +5,9 @@ import { Investment, PortfolioDataPoint } from '@/lib/definitions';
 import { usePrices } from './use-prices';
 import { format, subDays, startOfDay, isSameDay } from 'date-fns';
 
-export function usePortfolioHistory(investments: Investment[]) {
+export type PortfolioPeriod = 7 | 30 | 90;
+
+export function usePortfolioHistory(investments: Investment[], periodInDays: PortfolioPeriod = 90) {
     const [portfolioHistory, setPortfolioHistory] = useState<PortfolioDataPoint[]>([]);
     const [totalValue, setTotalValue] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
@@ -31,6 +33,8 @@ export function usePortfolioHistory(investments: Investment[]) {
                 return;
             }
 
+            setIsLoading(true);
+
             // Calculate current total value first
             const currentTotalValue = investments.reduce((acc, inv) => {
                 const priceKey = inv.assetType === 'crypto' ? inv.assetId : inv.symbol;
@@ -43,7 +47,7 @@ export function usePortfolioHistory(investments: Investment[]) {
             
             try {
                 const endDate = startOfDay(new Date());
-                const startDate = subDays(endDate, 90);
+                const startDate = subDays(endDate, periodInDays);
 
                 const promises = cryptoIds.map(id =>
                     fetch(`https://api.coingecko.com/api/v3/coins/${id}/market_chart/range?vs_currency=usd&from=${startDate.getTime() / 1000}&to=${endDate.getTime() / 1000}`)
@@ -79,8 +83,18 @@ export function usePortfolioHistory(investments: Investment[]) {
                     const rawHistory = rawPriceHistoryMap.get(cryptoId);
                     let lastKnownPrice: number | undefined = undefined;
 
-                    for (let i = 0; i <= 90; i++) {
-                        const date = subDays(endDate, 90 - i);
+                    // Find the first available price to backfill if needed
+                    for (let i = 0; i <= periodInDays; i++) {
+                        const date = subDays(endDate, periodInDays - i);
+                        const dateStr = format(date, 'yyyy-MM-dd');
+                        if(rawHistory?.has(dateStr)) {
+                            lastKnownPrice = rawHistory.get(dateStr)!;
+                            break;
+                        }
+                    }
+
+                    for (let i = 0; i <= periodInDays; i++) {
+                        const date = subDays(endDate, periodInDays - i);
                         const dateStr = format(date, 'yyyy-MM-dd');
                         
                         if (rawHistory && rawHistory.has(dateStr)) {
@@ -97,8 +111,8 @@ export function usePortfolioHistory(investments: Investment[]) {
 
                 const newChartData: PortfolioDataPoint[] = [];
 
-                for (let i = 0; i <= 90; i++) {
-                    const date = subDays(endDate, 90 - i);
+                for (let i = 0; i <= periodInDays; i++) {
+                    const date = subDays(endDate, periodInDays - i);
                     const dayTimestamp = date.getTime();
                     const dateStr = format(date, 'yyyy-MM-dd');
 
@@ -138,7 +152,7 @@ export function usePortfolioHistory(investments: Investment[]) {
 
         fetchHistory();
 
-    }, [investmentsKey, isLoadingPrices]); 
+    }, [investmentsKey, isLoadingPrices, periodInDays]); 
 
     return { portfolioHistory, totalValue, isLoading };
 }

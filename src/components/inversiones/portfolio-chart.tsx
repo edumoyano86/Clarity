@@ -7,11 +7,16 @@ import { type ChartConfig, ChartContainer, ChartTooltipContent } from '@/compone
 import { PortfolioDataPoint } from '@/lib/definitions';
 import { Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { Button } from '../ui/button';
+import { PortfolioPeriod } from '@/hooks/use-portfolio-history';
 
 interface PortfolioChartProps {
     portfolioHistory: PortfolioDataPoint[];
     totalValue: number;
     isLoading: boolean;
+    period: PortfolioPeriod;
+    setPeriod: (period: PortfolioPeriod) => void;
+    periodOptions: { label: string; value: PortfolioPeriod }[];
 }
 
 const chartConfig = {
@@ -25,17 +30,34 @@ const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 };
 
-export function PortfolioChart({ portfolioHistory, totalValue, isLoading }: PortfolioChartProps) {
+export function PortfolioChart({ portfolioHistory, totalValue, isLoading, period, setPeriod, periodOptions }: PortfolioChartProps) {
     
     const hasData = portfolioHistory.length > 0 && portfolioHistory.some(d => d.value > 0);
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Evolución del Portafolio</CardTitle>
-                <CardDescription>
-                    Valor total del portafolio en los últimos 90 días. Valor actual: {formatCurrency(totalValue)}
-                </CardDescription>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <CardTitle>Evolución del Portafolio</CardTitle>
+                        <CardDescription>
+                            Valor total del portafolio. Valor actual: {formatCurrency(totalValue)}
+                        </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                         {periodOptions.map(p => (
+                            <Button
+                                key={p.value}
+                                variant={period === p.value ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => setPeriod(p.value)}
+                                disabled={isLoading}
+                            >
+                                {p.label}
+                            </Button>
+                        ))}
+                    </div>
+                </div>
             </CardHeader>
             <CardContent>
                 <ChartContainer config={chartConfig} className="h-[350px] w-full">
@@ -60,7 +82,7 @@ export function PortfolioChart({ portfolioHistory, totalValue, isLoading }: Port
                                     axisLine={false}
                                     tickMargin={8}
                                     tickFormatter={(value) => format(new Date(value), "MMM d")}
-                                    minTickGap={20}
+                                    minTickGap={30}
                                 />
                                 <YAxis
                                     tickLine={false}
@@ -68,6 +90,7 @@ export function PortfolioChart({ portfolioHistory, totalValue, isLoading }: Port
                                     tickMargin={8}
                                     tickFormatter={(value) => formatCurrency(value as number)}
                                     domain={['dataMin', 'dataMax']}
+                                    width={80}
                                 />
                                 <Tooltip
                                     content={<ChartTooltipContent
