@@ -44,23 +44,21 @@ const stockPriceHistoryFlow = ai.defineFlow(
     try {
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`Finnhub API request failed with status ${response.status}`);
+        throw new Error(`Finnhub API request failed for ${input.symbol} with status ${response.status}`);
       }
       const data = await response.json();
       
-      if (data.s !== 'ok') {
-        // Finnhub can return 200 OK but with an error status in the JSON body
+      if (data.s !== 'ok' || !data.t) {
         console.warn(`Finnhub API returned status '${data.s}' for ${input.symbol}`);
         return { history: {} };
       }
 
       const history: Record<string, number> = {};
-      if (data.t && data.c) {
-          for (let i = 0; i < data.t.length; i++) {
-            const date = new Date(data.t[i] * 1000);
-            const dateStr = date.toISOString().split('T')[0]; // Format to YYYY-MM-DD
-            history[dateStr] = data.c[i];
-          }
+      for (let i = 0; i < data.t.length; i++) {
+        const date = new Date(data.t[i] * 1000);
+        // Ensure date is processed in UTC to avoid timezone shifts
+        const utcDateStr = date.toISOString().split('T')[0];
+        history[utcDateStr] = data.c[i];
       }
       return { history };
 

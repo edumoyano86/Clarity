@@ -11,7 +11,7 @@ export function usePrices(investments: Investment[] | null) {
     const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
     
-    const investmentsKey = useMemo(() => investments?.map(inv => inv.assetId).join(',') || '', [investments]);
+    const investmentsKey = useMemo(() => investments?.map(inv => `${inv.id}-${inv.amount}`).join(',') || '', [investments]);
 
     useEffect(() => {
         const fetchPrices = async () => {
@@ -42,13 +42,14 @@ export function usePrices(investments: Investment[] | null) {
                     description: 'No se pudieron obtener algunas cotizaciones de los activos.',
                     variant: 'destructive'
                 });
+                setPrices({});
             } finally {
                 setIsLoading(false);
             }
         };
 
         fetchPrices();
-    }, [investmentsKey, toast]); // Removed 'investments' from dependency array to rely only on the key
+    }, [investmentsKey]);
 
     return { prices, isLoading };
 }
