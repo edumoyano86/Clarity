@@ -13,7 +13,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useFirestore } from '@/firebase';
 import { deleteDoc, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { usePrices } from '@/hooks/use-prices';
 import { PortfolioChart } from './portfolio-chart';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
@@ -26,22 +25,32 @@ interface InvestmentsManagerProps {
     userId: string;
     portfolioHistory: PortfolioDataPoint[];
     totalValue: number;
-    isLoadingHistory: boolean;
+    isLoading: boolean;
+    prices: PriceData;
+    priceHistory: PriceHistory;
     period: PortfolioPeriod;
     setPeriod: (period: PortfolioPeriod) => void;
-    priceHistory: PriceHistory;
 }
 
 const USD_TO_ARS_RATE = 1050; 
 
-export function InvestmentsManager({ investments, userId, portfolioHistory, totalValue, isLoadingHistory, period, setPeriod, priceHistory }: InvestmentsManagerProps) {
+export function InvestmentsManager({ 
+    investments, 
+    userId, 
+    portfolioHistory, 
+    totalValue, 
+    isLoading,
+    prices,
+    priceHistory,
+    period, 
+    setPeriod 
+}: InvestmentsManagerProps) {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [isSellDialogOpen, setIsSellDialogOpen] = useState(false);
     const [selectedInvestment, setSelectedInvestment] = useState<Investment | undefined>(undefined);
     const [investmentToSell, setInvestmentToSell] = useState<Investment | undefined>(undefined);
     const [investmentToDelete, setInvestmentToDelete] = useState<Investment | null>(null);
-    const { prices, isLoading: isLoadingPrices } = usePrices(investments);
     const [showInArs, setShowInArs] = useState(false);
 
     const firestore = useFirestore();
@@ -115,10 +124,8 @@ export function InvestmentsManager({ investments, userId, portfolioHistory, tota
         
         const currentPrice = prices[priceKey]?.price;
         const currentValue = currentPrice ? investment.amount * currentPrice : null;
-        const pnl = currentValue !== null ? currentValue - purchaseValue : null;
+        const pnl = currentValue !== null && purchaseValue > 0 ? currentValue - purchaseValue : null;
         const pnlPercent = pnl !== null && purchaseValue > 0 ? (pnl / purchaseValue) * 100 : null;
-
-        const isLoadingRow = isLoadingPrices || isLoadingHistory;
 
         return (
             <TableRow key={investment.id}>
@@ -127,13 +134,13 @@ export function InvestmentsManager({ investments, userId, portfolioHistory, tota
                     <div className='text-sm text-muted-foreground'>{investment.symbol.toUpperCase()}</div>
                 </TableCell>
                 <TableCell>{investment.amount}</TableCell>
-                <TableCell>{isLoadingRow ? <Loader2 className="h-4 w-4 animate-spin" /> : formatCurrency(purchasePrice)}</TableCell>
-                <TableCell>{isLoadingRow ? <Loader2 className="h-4 w-4 animate-spin" /> : formatCurrency(purchaseValue)}</TableCell>
+                <TableCell>{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : formatCurrency(purchasePrice)}</TableCell>
+                <TableCell>{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : formatCurrency(purchaseValue)}</TableCell>
                 <TableCell>
-                    {isLoadingRow ? <Loader2 className="h-4 w-4 animate-spin" /> : currentValue !== null ? formatCurrency(currentValue) : '-'}
+                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : currentValue !== null ? formatCurrency(currentValue) : '-'}
                 </TableCell>
                 <TableCell>
-                    {isLoadingRow ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
                         pnl !== null && pnlPercent !== null ? (
                             <div className={`flex items-center gap-1 font-medium ${pnl >= 0 ? 'text-green-600' : 'text-destructive'}`}>
                                 {pnl >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
@@ -175,7 +182,7 @@ export function InvestmentsManager({ investments, userId, portfolioHistory, tota
                     <PortfolioChart 
                         portfolioHistory={portfolioHistory} 
                         totalValue={totalValue} 
-                        isLoading={isLoadingHistory}
+                        isLoading={isLoading}
                         period={period}
                         setPeriod={setPeriod}
                         periodOptions={periodOptions}
@@ -208,12 +215,18 @@ export function InvestmentsManager({ investments, userId, portfolioHistory, tota
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {investments.length > 0 ? (
+                                    {isLoading ? (
+                                        <TableRow>
+                                            <TableCell colSpan={7} className="text-center h-24">
+                                                Cargando datos de inversiones...
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : investments.length > 0 ? (
                                         sortedInvestments.map(renderPortfolioRow)
                                     ) : (
                                         <TableRow>
                                             <TableCell colSpan={7} className="text-center h-24">
-                                                {isLoadingHistory ? 'Cargando...' : 'No tienes inversiones registradas.'}
+                                                No tienes inversiones registradas.
                                             </TableCell>
                                         </TableRow>
                                     )}

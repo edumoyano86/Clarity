@@ -6,6 +6,7 @@ import { InvestmentsManager } from "@/components/inversiones/investments-manager
 import { collection, orderBy, query } from "firebase/firestore";
 import { usePortfolioHistory, type PortfolioPeriod } from "@/hooks/use-portfolio-history";
 import { useState } from "react";
+import { usePrices } from "@/hooks/use-prices";
 
 export default function InversionesPage() {
     const firestore = useFirestore();
@@ -18,7 +19,10 @@ export default function InversionesPage() {
     }, [firestore, user]);
 
     const { data: investments, isLoading: loadingInvestments } = useCollection<Investment>(investmentsQuery);
-    const { portfolioHistory, totalValue, isLoading: isLoadingHistory, priceHistory } = usePortfolioHistory(investments || [], period);
+    const { prices, isLoading: isLoadingPrices } = usePrices(investments);
+    const { portfolioHistory, totalValue, isLoading: isLoadingHistory, priceHistory } = usePortfolioHistory(investments, period, prices);
+
+    const isLoading = isUserLoading || loadingInvestments || isLoadingPrices || isLoadingHistory;
 
     if (isUserLoading || !user) {
         return <p>Cargando inversiones...</p>
@@ -29,9 +33,10 @@ export default function InversionesPage() {
         userId={user.uid}
         portfolioHistory={portfolioHistory}
         totalValue={totalValue}
-        isLoadingHistory={loadingInvestments || isLoadingHistory}
+        isLoading={isLoading}
+        prices={prices}
+        priceHistory={priceHistory}
         period={period}
         setPeriod={setPeriod}
-        priceHistory={priceHistory}
         />;
 }

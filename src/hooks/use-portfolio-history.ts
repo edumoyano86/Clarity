@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Investment, PortfolioDataPoint, PriceHistory } from '@/lib/definitions';
-import { usePrices } from './use-prices';
+import { Investment, PortfolioDataPoint, PriceHistory, PriceData } from '@/lib/definitions';
 import { format, subDays, startOfDay, getUnixTime, fromUnixTime, isAfter } from 'date-fns';
 import { getStockPriceHistory } from '@/ai/flows/stock-price-history';
 
@@ -10,12 +9,15 @@ export type PortfolioPeriod = 7 | 30 | 90;
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-export function usePortfolioHistory(investments: Investment[], periodInDays: PortfolioPeriod = 90) {
+export function usePortfolioHistory(
+    investments: Investment[] | null, 
+    periodInDays: PortfolioPeriod = 90,
+    currentPrices: PriceData
+) {
     const [portfolioHistory, setPortfolioHistory] = useState<PortfolioDataPoint[]>([]);
     const [priceHistory, setPriceHistory] = useState<PriceHistory>(new Map());
     const [totalValue, setTotalValue] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
-    const { prices, isLoading: isLoadingPrices } = usePrices(investments || []);
 
     const investmentsKey = useMemo(() => investments?.map(i => `${i.id}-${i.amount}`).join(',') || '', [investments]);
 
@@ -31,14 +33,10 @@ export function usePortfolioHistory(investments: Investment[], periodInDays: Por
              
             setIsLoading(true);
 
-            // This should only run when prices are loaded
-            if (isLoadingPrices) {
-                return;
-            }
-
+            // Calculate current total value using the prices passed from the page
             const currentTotalValue = investments.reduce((acc, inv) => {
                 const priceKey = inv.assetType === 'crypto' ? inv.assetId : inv.symbol;
-                const currentPrice = prices[priceKey]?.price || 0;
+                const currentPrice = currentPrices[priceKey]?.price || 0;
                 return acc + (inv.amount * currentPrice);
             }, 0);
             setTotalValue(currentTotalValue);
@@ -97,19 +95,10 @@ export function usePortfolioHistory(investments: Investment[], periodInDays: Por
             });
             
             // --- Fill Price Gaps ---
-            for (const pricesMap of allPriceHistory.values()) {
+            for (const [symbol, pricesMap] of allPriceHistory.entries()) {
                 let lastKnownPrice: number | undefined = undefined;
-                // Find first available price for initial fallback
-                for (let i = 0; i <= periodInDays; i++) {
-                    const currentDate = startOfDay(subDays(endDate, periodInDays - i));
-                    const currentDateStr = format(currentDate, 'yyyy-MM-dd');
-                    if (pricesMap.has(currentDateStr)) {
-                        lastKnownPrice = pricesMap.get(currentDateStr);
-                        break;
-                    }
-                }
-
-                 for (let i = 0; i <= periodInDays; i++) {
+                // Iterate forwards from the start date to fill gaps
+                for (let i = periodInDays; i >= 0; i--) {
                     const currentDate = startOfDay(subDays(endDate, i));
                     const currentDateStr = format(currentDate, 'yyyy-MM-dd');
                     if (pricesMap.has(currentDateStr)) {
@@ -147,6 +136,8 @@ export function usePortfolioHistory(investments: Investment[], periodInDays: Por
             const lastDataPoint = newChartData[newChartData.length - 1];
             if(lastDataPoint && startOfDay(new Date(lastDataPoint.date)).getTime() === startOfDay(new Date()).getTime()) {
                 lastDataPoint.value = currentTotalValue;
+            } else if(newChartData.length > 0) {
+                 newChartData[newChartData.length-1].value = currentTotalValue;
             } else {
                  newChartData.push({ date: new Date().getTime(), value: currentTotalValue });
             }
@@ -160,7 +151,7 @@ export function usePortfolioHistory(investments: Investment[], periodInDays: Por
             setIsLoading(false);
         });
 
-    }, [investmentsKey, isLoadingPrices, periodInDays]);
+    }, [investmentsKey, periodInDays, currentPrices]); // Depend on currentPrices to re-evaluate when they load
 
-    return { portfolioHistory, totalValue, isLoading: isLoading || isLoadingPrices, priceHistory };
+    return { portfolioHistory, totalValue, isLoading, priceHistory };
 }

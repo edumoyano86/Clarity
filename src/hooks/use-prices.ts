@@ -11,7 +11,8 @@ export function usePrices(investments: Investment[] | null) {
     const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
     
-    const investmentsKey = investments?.map(inv => `${inv.id}-${inv.assetId}`).join(',') || '';
+    // Create a key based on the asset IDs to track changes
+    const investmentsKey = investments?.map(inv => inv.assetId).join(',') || '';
 
     useEffect(() => {
         const fetchPrices = async () => {
@@ -28,6 +29,7 @@ export function usePrices(investments: Investment[] | null) {
             const stockSymbols = [...new Set(investments.filter(i => i.assetType === 'stock').map(inv => inv.symbol))];
 
             try {
+                // Fetch all prices in parallel
                 const [cryptoPrices, stockPrices] = await Promise.all([
                     cryptoSymbols.length > 0 ? getCryptoPrices({ symbols: cryptoSymbols }) : Promise.resolve({}),
                     stockSymbols.length > 0 ? getStockPrices({ symbols: stockSymbols }) : Promise.resolve({}),
