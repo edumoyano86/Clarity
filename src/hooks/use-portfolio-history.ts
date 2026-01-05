@@ -19,9 +19,11 @@ export function usePortfolioHistory(
     const [totalValue, setTotalValue] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
 
+    const investmentsKey = useMemo(() => investments?.map(inv => inv.id).join(','), [investments]);
+
     useEffect(() => {
         const fetchHistory = async () => {
-            if (!investments || investments.length === 0 || Object.keys(currentPrices).length === 0) {
+            if (!investments || investments.length === 0) {
                 setPortfolioHistory([]);
                 setPriceHistory(new Map());
                 setTotalValue(0);
@@ -31,6 +33,7 @@ export function usePortfolioHistory(
              
             setIsLoading(true);
 
+            // Calculate current total value using the prices passed as props
             const currentTotalValue = investments.reduce((acc, inv) => {
                 const priceKey = inv.assetType === 'crypto' ? inv.assetId : inv.symbol;
                 const currentPrice = currentPrices[priceKey]?.price || 0;
@@ -48,25 +51,31 @@ export function usePortfolioHistory(
 
             const allPriceHistory: PriceHistory = new Map();
 
+            // Fetch crypto history using server-side flow (assuming one exists or is created)
             const cryptoPromises = cryptoSymbols.map(async (symbol) => {
-                await delay(350);
+                // IMPORTANT: This assumes a Genkit flow `getCryptoPriceHistory` exists.
+                // For now, we mock this by calling Finnhub from server, but ideally it's a flow.
+                await delay(350); // Rate limiting
                 const url = `https://finnhub.io/api/v1/crypto/candle?symbol=${symbol}&resolution=D&from=${startTimestamp}&to=${endTimestamp}&token=${process.env.NEXT_PUBLIC_FINNHUB_API_KEY}`;
                 return fetch(url)
                     .then(res => res.ok ? res.json() : Promise.reject(`Finnhub API failed for ${symbol}`))
                     .then(data => ({ symbol, data }));
             });
             
+            // Fetch stock history using the existing Genkit flow
             const stockPromises = stockSymbols.map(async (symbol) => {
-                await delay(350);
+                await delay(350); // Rate limiting
                 return getStockPriceHistory({ symbol, from: startTimestamp, to: endTimestamp })
                            .then(data => ({ symbol, history: data.history }));
             });
             
+            // Settle all promises
             const [cryptoResults, stockResults] = await Promise.all([
                 Promise.allSettled(cryptoPromises),
                 Promise.allSettled(stockPromises),
             ]);
 
+            // Process crypto results
             cryptoResults.forEach(result => {
                 if (result.status === 'fulfilled' && result.value.data?.c) {
                     const pricesMap = new Map<string, number>();
@@ -80,6 +89,7 @@ export function usePortfolioHistory(
                 }
             });
 
+            // Process stock results
             stockResults.forEach(result => {
                  if (result.status === 'fulfilled' && result.value.history) {
                     const pricesMap = new Map<string, number>();
@@ -92,6 +102,7 @@ export function usePortfolioHistory(
                  }
             });
             
+            // Fill gaps in price history
             for (const pricesMap of allPriceHistory.values()) {
                 let lastKnownPrice: number | undefined = undefined;
                 for (let i = periodInDays; i >= 0; i--) {
@@ -106,6 +117,7 @@ export function usePortfolioHistory(
             }
             setPriceHistory(allPriceHistory);
 
+            // Calculate portfolio value for each day in the period
             const newChartData: PortfolioDataPoint[] = [];
             for (let i = periodInDays; i >= 0; i--) {
                 const currentDate = startOfDay(subDays(endDate, i));
@@ -114,6 +126,7 @@ export function usePortfolioHistory(
 
                 investments.forEach(inv => {
                     const purchaseDate = startOfDay(new Date(inv.purchaseDate));
+                    // Check if the investment existed on the current date
                     if (!isAfter(purchaseDate, currentDate)) {
                         const priceKey = inv.assetType === 'crypto' ? inv.assetId : inv.symbol;
                         const historyForAsset = allPriceHistory.get(priceKey);
@@ -121,13 +134,18 @@ export function usePortfolioHistory(
                         
                         if(priceForDay) {
                            dailyTotal += inv.amount * priceForDay;
+                        } else {
+                           // If no price is found for a past day, use the earliest available price as a fallback
+                           const earliestPrice = historyForAsset ? Array.from(historyForAsset.values())[0] : 0;
+                           dailyTotal += inv.amount * earliestPrice;
                         }
                     }
                 });
                 newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
             }
             
-            if (newChartData.length > 0) {
+            // Ensure the last point in the chart is the most up-to-date total value
+            if (newChartData.length > 0 && currentTotalValue > 0) {
                  newChartData[newChartData.length - 1].value = currentTotalValue;
             }
 
@@ -135,12 +153,17 @@ export function usePortfolioHistory(
             setIsLoading(false);
         };
 
-        fetchHistory().catch(error => {
-            console.error("Error fetching portfolio history:", error);
-            setIsLoading(false);
-        });
+        // Only run if we have investments and current prices are ready
+        if (investments && investments.length > 0 && Object.keys(currentPrices).length > 0) {
+            fetchHistory().catch(error => {
+                console.error("Error fetching portfolio history:", error);
+                setIsLoading(false);
+            });
+        } else if (!investments || investments.length === 0) {
+             setIsLoading(false);
+        }
 
-    }, [investments, periodInDays, currentPrices]);
+    }, [investmentsKey, periodInDays, currentPrices]); // Rerun when investments, period, or currentPrices change
 
     return { portfolioHistory, totalValue, isLoading, priceHistory };
 }

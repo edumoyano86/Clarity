@@ -11,7 +11,7 @@ export function usePrices(investments: Investment[] | null) {
     const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
     
-    const investmentsKey = useMemo(() => investments?.map(inv => `${inv.id}-${inv.amount}`).join(',') || '', [investments]);
+    const investmentsKey = useMemo(() => investments?.map(inv => inv.id).join(',') || '', [investments]);
 
     useEffect(() => {
         const fetchPrices = async () => {
@@ -27,12 +27,12 @@ export function usePrices(investments: Investment[] | null) {
             const stockSymbols = [...new Set(investments.filter(i => i.assetType === 'stock').map(inv => inv.symbol))];
 
             try {
-                const [cryptoPrices, stockPrices] = await Promise.all([
+                const [cryptoPricesResult, stockPricesResult] = await Promise.all([
                     cryptoSymbols.length > 0 ? getCryptoPrices({ symbols: cryptoSymbols }) : Promise.resolve({}),
                     stockSymbols.length > 0 ? getStockPrices({ symbols: stockSymbols }) : Promise.resolve({}),
                 ]);
                 
-                const combinedPrices: PriceData = { ...cryptoPrices, ...stockPrices };
+                const combinedPrices: PriceData = { ...cryptoPricesResult, ...stockPricesResult };
                 setPrices(combinedPrices);
 
             } catch (error) {
@@ -49,7 +49,8 @@ export function usePrices(investments: Investment[] | null) {
         };
 
         fetchPrices();
-    }, [investmentsKey]);
+    // Depend on the memoized key of investments to refetch when they change.
+    }, [investmentsKey, toast]);
 
     return { prices, isLoading };
 }
