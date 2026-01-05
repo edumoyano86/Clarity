@@ -5,7 +5,6 @@ import { Investment, PortfolioDataPoint, PriceHistory } from '@/lib/definitions'
 import { usePrices } from './use-prices';
 import { format, subDays, startOfDay, getUnixTime, fromUnixTime, isAfter } from 'date-fns';
 import { getStockPriceHistory } from '@/ai/flows/stock-price-history';
-import { getCryptoPrices } from '@/ai/flows/crypto-prices';
 
 export type PortfolioPeriod = 7 | 30 | 90;
 
@@ -21,17 +20,18 @@ export function usePortfolioHistory(investments: Investment[], periodInDays: Por
 
     useEffect(() => {
         const fetchHistory = async () => {
-            if (!investments || isLoadingPrices) {
-                if (!investments || investments.length === 0) {
+            if (!investments) {
+                 if (investments === null || investments.length === 0) {
                     setPortfolioHistory([]);
                     setTotalValue(0);
                     setIsLoading(false);
                 }
                 return;
             }
+             if (isLoadingPrices) return;
+             
             setIsLoading(true);
 
-            // Calculate current total value
             const currentTotalValue = investments.reduce((acc, inv) => {
                 const priceKey = inv.assetType === 'crypto' ? inv.assetId : inv.symbol;
                 const currentPrice = prices[priceKey]?.price || inv.purchasePrice;
@@ -39,7 +39,7 @@ export function usePortfolioHistory(investments: Investment[], periodInDays: Por
             }, 0);
             setTotalValue(currentTotalValue);
             
-            const cryptoIds = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.assetId))];
+            const cryptoSymbols = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.assetId))];
             const stockSymbols = [...new Set(investments.filter(i => i.assetType === 'stock').map(inv => inv.symbol))];
 
             const endDate = startOfDay(new Date());
@@ -49,30 +49,32 @@ export function usePortfolioHistory(investments: Investment[], periodInDays: Por
 
             const allPriceHistory: PriceHistory = new Map();
 
-            // --- Fetch Crypto History ---
-            if (cryptoIds.length > 0) {
-                const resolution = periodInDays <= 30 ? 'hourly' : 'daily';
-                const cryptoPromises = cryptoIds.map(id =>
-                    fetch(`https://api.coingecko.com/api/v3/coins/${id}/market_chart/range?vs_currency=usd&from=${startTimestamp}&to=${endTimestamp}&precision=2`)
-                        .then(res => res.ok ? res.json() : Promise.reject(`CoinGecko API failed for ${id}`))
-                        .then(data => ({ id, prices: data.prices as [number, number][] }))
-                );
-                const cryptoResults = await Promise.allSettled(cryptoPromises);
-                cryptoResults.forEach(result => {
-                    if (result.status === 'fulfilled' && result.value.prices) {
-                        const pricesMap = new Map<string, number>();
-                         result.value.prices.forEach(([ts, price]) => {
-                            pricesMap.set(format(startOfDay(fromUnixTime(ts/1000)), 'yyyy-MM-dd'), price);
-                        });
-                        allPriceHistory.set(result.value.id, pricesMap);
+            // --- Fetch Crypto History from Finnhub ---
+            const cryptoPromises = cryptoSymbols.map(async (symbol) => {
+                await delay(350); // Rate limit
+                const resolution = periodInDays <= 7 ? '60' : 'D';
+                return fetch(`https://finnhub.io/api/v1/crypto/candle?symbol=${symbol}&resolution=${resolution}&from=${startTimestamp}&to=${endTimestamp}&token=${process.env.NEXT_PUBLIC_FINNHUB_API_KEY}`)
+                    .then(res => res.ok ? res.json() : Promise.reject(`Finnhub API failed for ${symbol}`))
+                    .then(data => ({ symbol, data }));
+            });
+            
+            const cryptoResults = await Promise.allSettled(cryptoPromises);
+            cryptoResults.forEach(result => {
+                if (result.status === 'fulfilled' && result.value.data.c) {
+                    const pricesMap = new Map<string, number>();
+                    const { c, t } = result.value.data;
+                    for (let i = 0; i < t.length; i++) {
+                        pricesMap.set(format(startOfDay(fromUnixTime(t[i])), 'yyyy-MM-dd'), c[i]);
                     }
-                });
-            }
+                    allPriceHistory.set(result.value.symbol, pricesMap);
+                } else if (result.status === 'rejected') {
+                    console.warn(`Could not fetch crypto history:`, result.reason);
+                }
+            });
 
             // --- Fetch Stock History ---
             const stockPromises = stockSymbols.map(async (symbol) => {
-                // Finnhub free tier has a rate limit (e.g., 60 calls/min). Add delay.
-                await delay(1100); // ~55 calls per minute
+                await delay(350); // Rate limit
                 return getStockPriceHistory({ symbol, from: startTimestamp, to: endTimestamp })
                            .then(data => ({ symbol, history: data.history }));
             });
@@ -84,56 +86,43 @@ export function usePortfolioHistory(investments: Investment[], periodInDays: Por
                         pricesMap.set(dateStr, price);
                     });
                     allPriceHistory.set(result.value.symbol, pricesMap);
+                 } else if (result.status === 'rejected') {
+                    console.warn(`Could not fetch stock history:`, result.reason);
                  }
             });
 
 
             // --- Calculate Portfolio Value Over Time ---
             const newChartData: PortfolioDataPoint[] = [];
-            const lastKnownPrices: { [key: string]: number } = {};
-
-            // Initialize last known prices with current prices
-            for (const inv of investments) {
-                 const priceKey = inv.assetType === 'crypto' ? inv.assetId : inv.symbol;
-                 lastKnownPrices[priceKey] = prices[priceKey]?.price || inv.purchasePrice;
-            }
-
+            
             for (let i = 0; i <= periodInDays; i++) {
                 const currentDate = subDays(endDate, periodInDays - i);
                 const currentDateStr = format(currentDate, 'yyyy-MM-dd');
-                const currentTimestamp = currentDate.getTime();
                 let dailyTotal = 0;
 
                 investments.forEach(inv => {
                     if (isAfter(currentDate, startOfDay(new Date(inv.purchaseDate))) || format(currentDate, 'yyyy-MM-dd') === format(new Date(inv.purchaseDate), 'yyyy-MM-dd')) {
                         const priceKey = inv.assetType === 'crypto' ? inv.assetId : inv.symbol;
                         const historyForAsset = allPriceHistory.get(priceKey);
-                        
-                        let priceToUse = lastKnownPrices[priceKey]; // Start with the most recent known price
+                        let priceToUse = inv.purchasePrice;
 
-                        if (historyForAsset && historyForAsset.has(currentDateStr)) {
-                            priceToUse = historyForAsset.get(currentDateStr)!;
-                            lastKnownPrices[priceKey] = priceToUse; // Update last known price
-                        } else if (historyForAsset) {
-                           // If no price for today, try to find the most recent one before today
-                           let found = false;
-                           for (let j = 1; j <= i; j++) {
-                               const prevDateStr = format(subDays(currentDate, j), 'yyyy-MM-dd');
-                               if (historyForAsset.has(prevDateStr)) {
-                                   priceToUse = historyForAsset.get(prevDateStr)!;
-                                   lastKnownPrices[priceKey] = priceToUse;
-                                   found = true;
+                        if (historyForAsset) {
+                           let priceFound = false;
+                           for(let j = 0; j <= i; j++) {
+                               const pastDateStr = format(subDays(currentDate, j), 'yyyy-MM-dd');
+                               if (historyForAsset.has(pastDateStr)) {
+                                   priceToUse = historyForAsset.get(pastDateStr)!;
+                                   priceFound = true;
                                    break;
                                }
                            }
-                           if (!found) {
-                               priceToUse = inv.purchasePrice; // Ultimate fallback
-                           }
-                        } else {
-                            priceToUse = inv.purchasePrice; // Fallback if no history at all
+                            if (!priceFound) {
+                                // If no past data found at all, use purchase price as ultimate fallback
+                                priceToUse = inv.purchasePrice;
+                            }
                         }
                         
-                        // Override with today's price for the last point
+                        // For the very last point (today), always use the most current price fetched by usePrices
                         if (i === periodInDays) {
                            priceToUse = prices[priceKey]?.price || priceToUse;
                         }
@@ -141,15 +130,15 @@ export function usePortfolioHistory(investments: Investment[], periodInDays: Por
                         dailyTotal += inv.amount * priceToUse;
                     }
                 });
-                newChartData.push({ date: currentTimestamp, value: dailyTotal });
+                newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
             }
 
             setPortfolioHistory(newChartData);
-            setIsLoading(false);
         };
 
         fetchHistory().catch(error => {
             console.error("Error fetching portfolio history:", error);
+        }).finally(() => {
             setIsLoading(false);
         });
 

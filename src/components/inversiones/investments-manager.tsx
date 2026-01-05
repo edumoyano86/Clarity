@@ -94,8 +94,10 @@ export function InvestmentsManager({ investments, userId, portfolioHistory, tota
     const sortedInvestments = useMemo(() => {
         if (!investments) return [];
         return [...investments].sort((a, b) => {
-            const aPrice = prices[a.assetType === 'crypto' ? a.assetId : a.symbol]?.price || 0;
-            const bPrice = prices[b.assetType === 'crypto' ? b.assetId : b.symbol]?.price || 0;
+            const priceKeyA = a.assetType === 'crypto' ? a.assetId : a.symbol;
+            const priceKeyB = b.assetType === 'crypto' ? b.assetId : b.symbol;
+            const aPrice = prices[priceKeyA]?.price || 0;
+            const bPrice = prices[priceKeyB]?.price || 0;
             const aValue = a.amount * aPrice;
             const bValue = b.amount * bPrice;
             return bValue - aValue;

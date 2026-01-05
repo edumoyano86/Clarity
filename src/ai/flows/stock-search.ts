@@ -1,7 +1,7 @@
 'use server';
 
 /**
- * @fileOverview A Genkit flow for searching stock symbols using the Alpha Vantage API.
+ * @fileOverview A Genkit flow for searching stock symbols using the Finnhub API.
  * 
  * - searchStocks - A function that takes a search query and returns a list of matching stocks.
  */
@@ -36,9 +36,9 @@ const stockSearchFlow = ai.defineFlow(
     outputSchema: StockSearchOutputSchema,
   },
   async (input) => {
-    const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
+    const apiKey = process.env.FINNHUB_API_KEY;
     if (!apiKey) {
-      console.error('Alpha Vantage API key is not set.');
+      console.error('Finnhub API key is not set.');
       return { results: [] };
     }
 
@@ -46,21 +46,22 @@ const stockSearchFlow = ai.defineFlow(
       return { results: [] };
     }
 
-    const url = `https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${input.query}&apikey=${apiKey}`;
+    const url = `https://finnhub.io/api/v1/search?q=${input.query}&token=${apiKey}`;
 
     try {
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`Alpha Vantage API request failed with status ${response.status}`);
+        throw new Error(`Finnhub API request failed with status ${response.status}`);
       }
       const data = await response.json();
 
-      // The API returns an object with a "bestMatches" array
-      if (data.bestMatches && Array.isArray(data.bestMatches)) {
-        const results = data.bestMatches.map((match: any) => ({
-          symbol: match['1. symbol'],
-          name: match['2. name'],
-        }));
+      if (data.result && Array.isArray(data.result)) {
+        const results = data.result
+          .filter((match: any) => !match.symbol.includes('.') && !match.symbol.includes(':')) // Filter out non-common stocks
+          .map((match: any) => ({
+            symbol: match.symbol,
+            name: match.description,
+          }));
         return { results };
       }
       

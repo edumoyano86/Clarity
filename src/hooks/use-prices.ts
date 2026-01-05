@@ -11,8 +11,7 @@ export function usePrices(investments: Investment[] | null) {
     const [isLoading, setIsLoading] = useState(true);
     const { toast } = useToast();
     
-    // Create a stable dependency key from the investments array
-    const investmentsKey = investments?.map(inv => inv.id).join(',') || '';
+    const investmentsKey = investments?.map(inv => `${inv.id}-${inv.assetId}`).join(',') || '';
 
     useEffect(() => {
         const fetchPrices = async () => {
@@ -24,15 +23,18 @@ export function usePrices(investments: Investment[] | null) {
             
             setIsLoading(true);
 
-            const cryptoIds = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.assetId))];
+            // Finnhub uses symbols for both. For crypto, `assetId` is the finnhub symbol. For stocks, `symbol` is the ticker.
+            const cryptoSymbols = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.assetId))];
             const stockSymbols = [...new Set(investments.filter(i => i.assetType === 'stock').map(inv => inv.symbol))];
 
             try {
                 const [cryptoPrices, stockPrices] = await Promise.all([
-                    cryptoIds.length > 0 ? getCryptoPrices({ assetIds: cryptoIds }) : Promise.resolve({}),
+                    cryptoSymbols.length > 0 ? getCryptoPrices({ symbols: cryptoSymbols }) : Promise.resolve({}),
                     stockSymbols.length > 0 ? getStockPrices({ symbols: stockSymbols }) : Promise.resolve({}),
                 ]);
                 
+                // When mapping crypto prices, the key is the Finnhub symbol (which is our assetId).
+                // For stocks, the key is the ticker symbol (which is our investment.symbol).
                 const combinedPrices: PriceData = { ...cryptoPrices, ...stockPrices };
                 setPrices(combinedPrices);
 
@@ -49,7 +51,7 @@ export function usePrices(investments: Investment[] | null) {
         };
 
         fetchPrices();
-    }, [investmentsKey, toast]); // Use the stable key as a dependency
+    }, [investmentsKey, toast]); 
 
     return { prices, isLoading };
 }

@@ -44,7 +44,7 @@ export type Note = {
 export type Investment = {
     id: string;
     assetType: 'crypto' | 'stock';
-    assetId: string; // coingecko id for crypto, ticker for stock
+    assetId: string; // Finnhub symbol for crypto (e.g. BINANCE:BTCUSDT), Ticker for stock (e.g. AAPL)
     name: string;
     symbol: string; // Ticker symbol (BTC, AAPL)
     amount: number;

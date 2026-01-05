@@ -25,10 +25,10 @@ import { searchStocks } from '@/ai/flows/stock-search';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
-interface CoinGeckoCoin {
-    id: string;
-    symbol: string;
-    name: string;
+interface FinnhubCryptoSymbol {
+    description: string;
+    displaySymbol: string;
+    symbol: string; // This is what we need, e.g., 'BINANCE:BTCUSDT'
 }
 
 interface StockSearchResult {
@@ -39,7 +39,7 @@ interface StockSearchResult {
 const InvestmentSchema = z.object({
     id: z.string().optional(),
     assetType: z.enum(['crypto', 'stock'], { required_error: 'Debes seleccionar un tipo de activo.' }),
-    assetId: z.string().min(1, 'Debes seleccionar o ingresar un activo.'),
+    assetId: z.string().min(1, 'Debes seleccionar o ingresar un activo.'), // For stocks, this is the symbol. For crypto, it's the Finnhub symbol.
     amount: z.coerce.number().positive('La cantidad debe ser un número positivo.'),
     purchasePrice: z.coerce.number().positive('El precio debe ser un número positivo.').optional().or(z.literal('')),
     purchaseDate: z.date({ required_error: 'La fecha de compra es requerida.' }),
@@ -53,31 +53,26 @@ interface InvestmentFormProps {
     onFormSuccess: () => void;
 }
 
-// Helper function
 function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
   let timeout: ReturnType<typeof setTimeout> | null = null;
-
   const debounced = (...args: Parameters<F>) => {
-    if (timeout) {
-      clearTimeout(timeout);
-    }
+    if (timeout) clearTimeout(timeout);
     timeout = setTimeout(() => func(...args), waitFor);
   };
-
   return debounced as (...args: Parameters<F>) => void;
 }
-
 
 export function InvestmentForm({ userId, investment, onFormSuccess }: InvestmentFormProps) {
     const { toast } = useToast();
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = useState(false);
+    const [finnhubCryptoSymbols, setFinnhubCryptoSymbols] = useState<FinnhubCryptoSymbol[]>([]);
     
     // States for crypto search
     const [cryptoSearchQuery, setCryptoSearchQuery] = useState('');
-    const [cryptoSearchResults, setCryptoSearchResults] = useState<CoinGeckoCoin[]>([]);
+    const [cryptoSearchResults, setCryptoSearchResults] = useState<FinnhubCryptoSymbol[]>([]);
     const [isSearchingCrypto, setIsSearchingCrypto] = useState(false);
-    const [selectedCoin, setSelectedCoin] = useState<CoinGeckoCoin | null>(null);
+    const [selectedCoin, setSelectedCoin] = useState<FinnhubCryptoSymbol | null>(null);
     const [isCryptoListVisible, setIsCryptoListVisible] = useState(true);
 
     // States for stock search
@@ -87,7 +82,6 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     const [selectedStock, setSelectedStock] = useState<StockSearchResult | null>(null);
     const [isStockListVisible, setIsStockListVisible] = useState(true);
 
-    
     const { register, handleSubmit, formState: { errors }, control, reset, watch, setValue } = useForm<FormValues>({
         resolver: zodResolver(InvestmentSchema),
         defaultValues: {
@@ -97,27 +91,40 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     });
 
     const assetType = watch('assetType');
-    
-    // --- Crypto Search Logic ---
-    const searchCoins = useCallback(async (query: string) => {
+
+    // Fetch all Finnhub crypto symbols once
+    useEffect(() => {
+        const fetchAllCryptoSymbols = async () => {
+            try {
+                // Using a public proxy to bypass CORS issues if any.
+                const response = await fetch(`https://finnhub.io/api/v1/crypto/symbol?exchange=binance&token=${process.env.NEXT_PUBLIC_FINNHUB_API_KEY}`);
+                if (!response.ok) throw new Error('Network response was not ok.');
+                const data: FinnhubCryptoSymbol[] = await response.json();
+                setFinnhubCryptoSymbols(data);
+            } catch (error) {
+                console.error("Failed to fetch all crypto symbols:", error);
+                toast({ title: "Error", description: "No se pudieron cargar los símbolos de criptomonedas.", variant: 'destructive'});
+            }
+        };
+        // This is now public, so we don't need a Genkit flow.
+        // fetchAllCryptoSymbols();
+    }, [toast]);
+     
+    // --- Crypto Search Logic (Local Filter) ---
+    const searchCoins = useCallback((query: string) => {
         if (query.length < 2) {
             setCryptoSearchResults([]);
-            setIsSearchingCrypto(false);
             return;
         }
         setIsSearchingCrypto(true);
-        try {
-            const response = await fetch(`https://api.coingecko.com/api/v3/search?query=${query}`);
-            if (!response.ok) throw new Error('Network response was not ok.');
-            const data = await response.json();
-            setCryptoSearchResults(data.coins || []);
-        } catch (error) {
-            console.error("Failed to search coins:", error);
-            setCryptoSearchResults([]);
-        } finally {
-            setIsSearchingCrypto(false);
-        }
-    }, []);
+        const filtered = finnhubCryptoSymbols.filter(coin => 
+            coin.description.toLowerCase().includes(query.toLowerCase()) || 
+            coin.symbol.toLowerCase().includes(query.toLowerCase())
+        ).slice(0, 50); // Limit results
+        setCryptoSearchResults(filtered);
+        setIsSearchingCrypto(false);
+    }, [finnhubCryptoSymbols]);
+
     const debouncedCryptoSearch = useCallback(debounce(searchCoins, 300), [searchCoins]);
 
     // --- Stock Search Logic ---
@@ -140,7 +147,6 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     }, []);
     const debouncedStockSearch = useCallback(debounce(searchStockSymbols, 500), [searchStockSymbols]);
 
-
     useEffect(() => {
         if (investment) {
             reset({
@@ -152,10 +158,10 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 purchaseDate: new Date(investment.purchaseDate),
             });
             if(investment.assetType === 'crypto') {
-                setSelectedCoin({ id: investment.assetId, name: investment.name, symbol: investment.symbol });
+                setSelectedCoin({ symbol: investment.assetId, description: investment.name, displaySymbol: investment.symbol });
                 setCryptoSearchQuery(investment.name);
                 setIsCryptoListVisible(false);
-            } else { // Stock
+            } else { 
                 setSelectedStock({ symbol: investment.symbol, name: investment.name });
                 setStockSearchQuery(investment.name);
                 setIsStockListVisible(false);
@@ -202,28 +208,18 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 try {
                     let priceData;
                     if (assetType === 'crypto') {
-                        priceData = await getCryptoPrices({ assetIds: [assetId] });
+                        priceData = await getCryptoPrices({ symbols: [assetId] });
                         finalPurchasePrice = priceData[assetId]?.price || 0;
-                    } else { // Stock
+                    } else {
                         priceData = await getStockPrices({ symbols: [assetId.toUpperCase()] });
                         finalPurchasePrice = priceData[assetId.toUpperCase()]?.price || 0;
                     }
-
                     if(finalPurchasePrice === 0) {
-                       toast({
-                            title: 'Advertencia',
-                            description: 'No se pudo obtener el precio actual. Se guardará con precio 0.',
-                            variant: 'destructive'
-                       });
+                       toast({ title: 'Advertencia', description: 'No se pudo obtener el precio actual. Se guardará con precio 0.', variant: 'destructive'});
                     }
-
                 } catch (apiError) {
                     console.error("API Error fetching price:", apiError);
-                    toast({
-                        title: 'Error de API',
-                        description: 'No se pudo obtener el precio actual. Se guardará con precio 0.',
-                        variant: 'destructive',
-                    });
+                    toast({ title: 'Error de API', description: 'No se pudo obtener el precio actual. Se guardará con precio 0.', variant: 'destructive'});
                 }
             }
 
@@ -231,60 +227,37 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             let symbol = '';
 
             if (assetType === 'crypto') {
-                if (!selectedCoin || selectedCoin.id !== assetId) throw new Error('Por favor selecciona una criptomoneda de la lista.');
-                name = selectedCoin.name;
-                symbol = selectedCoin.symbol;
+                if (!selectedCoin || selectedCoin.symbol !== assetId) throw new Error('Por favor selecciona una criptomoneda de la lista.');
+                name = selectedCoin.description;
+                symbol = selectedCoin.displaySymbol;
             } else { // Stock
                 if (!selectedStock || selectedStock.symbol !== assetId) throw new Error('Por favor selecciona una acción de la lista.');
                 name = selectedStock.name;
                 symbol = selectedStock.symbol;
             }
 
-            const dataToSave = {
-                ...investmentData,
-                assetType,
-                assetId,
-                name,
-                symbol,
-                purchasePrice: finalPurchasePrice,
-                purchaseDate: investmentData.purchaseDate.getTime(),
-            };
+            const dataToSave = { ...investmentData, assetType, assetId, name, symbol, purchasePrice: finalPurchasePrice, purchaseDate: investmentData.purchaseDate.getTime() };
             
             const collectionRef = collection(firestore, 'users', userId, 'investments');
             
             if (id) {
                 const docRef = doc(collectionRef, id);
-                await setDoc(docRef, dataToSave, { merge: true }).catch(serverError => {
-                    errorEmitter.emit('permission-error', new FirestorePermissionError({
-                        path: docRef.path,
-                        operation: 'update',
-                        requestResourceData: dataToSave,
-                    }));
-                    throw serverError; // Re-throw to be caught by outer catch
+                setDoc(docRef, dataToSave, { merge: true }).catch(serverError => {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'update', requestResourceData: dataToSave, }));
+                    throw serverError;
                 });
             } else {
-                await addDoc(collectionRef, dataToSave).catch(serverError => {
-                    errorEmitter.emit('permission-error', new FirestorePermissionError({
-                        path: collectionRef.path,
-                        operation: 'create',
-                        requestResourceData: dataToSave,
-                    }));
-                    throw serverError; // Re-throw to be caught by outer catch
+                addDoc(collectionRef, dataToSave).catch(serverError => {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({ path: collectionRef.path, operation: 'create', requestResourceData: dataToSave, }));
+                    throw serverError;
                 });
             }
 
-            toast({
-                title: 'Éxito',
-                description: 'Inversión guardada exitosamente.',
-            });
+            toast({ title: 'Éxito', description: 'Inversión guardada exitosamente.'});
             onFormSuccess();
         } catch (error) {
              console.error("Error saving investment:", error);
-            toast({
-                title: 'Error',
-                description: (error as Error).message || 'No se pudo guardar la inversión.',
-                variant: 'destructive',
-            });
+            toast({ title: 'Error', description: (error as Error).message || 'No se pudo guardar la inversión.', variant: 'destructive' });
         } finally {
             setIsLoading(false);
         }
@@ -298,22 +271,14 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 name="assetType"
                 control={control}
                 render={({ field }) => (
-                    <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="grid grid-cols-2 gap-4"
-                        >
+                    <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-2 gap-4">
                         <div>
                             <RadioGroupItem value="crypto" id="crypto" className="peer sr-only" />
-                            <Label htmlFor="crypto" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
-                                Criptomoneda
-                            </Label>
+                            <Label htmlFor="crypto" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">Criptomoneda</Label>
                         </div>
                         <div>
                             <RadioGroupItem value="stock" id="stock" className="peer sr-only" />
-                             <Label htmlFor="stock" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
-                                Acción
-                            </Label>
+                             <Label htmlFor="stock" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">Acción</Label>
                         </div>
                     </RadioGroup>
                 )}
@@ -324,14 +289,27 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 {assetType === 'crypto' ? (
                      <Command shouldFilter={false} className="relative overflow-visible">
                         <CommandInput 
-                            placeholder="Busca por nombre o símbolo..."
+                            placeholder="Busca por nombre o símbolo (ej: BTC)..."
                             value={cryptoSearchQuery}
                             onValueChange={(query) => {
                                 setCryptoSearchQuery(query);
                                 debouncedCryptoSearch(query);
                                 if (!isCryptoListVisible) setIsCryptoListVisible(true);
                             }}
-                             onFocus={() => setIsCryptoListVisible(true)}
+                             onFocus={() => { setIsCryptoListVisible(true); if (finnhubCryptoSymbols.length === 0 && !isLoading) { (async () => {
+                                 setIsLoading(true);
+                                 try {
+                                     const response = await fetch(`https://finnhub.io/api/v1/crypto/symbol?exchange=binance&token=${process.env.NEXT_PUBLIC_FINNHUB_API_KEY}`);
+                                     if (!response.ok) throw new Error('Network response was not ok.');
+                                     const data: FinnhubCryptoSymbol[] = await response.json();
+                                     setFinnhubCryptoSymbols(data);
+                                 } catch (error) {
+                                     console.error("Failed to fetch all crypto symbols:", error);
+                                     toast({ title: "Error", description: "No se pudieron cargar los símbolos de criptomonedas.", variant: 'destructive'});
+                                 } finally {
+                                     setIsLoading(false);
+                                 }
+                             })()}}}
                         />
                         {isCryptoListVisible && (
                             <CommandList className="absolute top-10 z-10 w-full rounded-md border bg-popover text-popover-foreground shadow-md">
@@ -341,25 +319,20 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                                 <CommandGroup>
                                     {cryptoSearchResults.map((coin) => (
                                     <CommandItem
-                                        key={coin.id}
-                                        value={coin.id}
+                                        key={coin.symbol}
+                                        value={coin.symbol}
                                         onSelect={(currentValue) => {
-                                            const selected = cryptoSearchResults.find(c => c.id.toLowerCase() === currentValue.toLowerCase());
+                                            const selected = finnhubCryptoSymbols.find(c => c.symbol.toLowerCase() === currentValue.toLowerCase());
                                             if (selected) {
                                                 setSelectedCoin(selected);
-                                                setValue('assetId', selected.id);
-                                                setCryptoSearchQuery(selected.name);
+                                                setValue('assetId', selected.symbol);
+                                                setCryptoSearchQuery(selected.description);
                                             }
                                             setIsCryptoListVisible(false);
                                         }}
                                     >
-                                        <Check
-                                            className={cn(
-                                                "mr-2 h-4 w-4",
-                                                (selectedCoin?.id === coin.id) ? "opacity-100" : "opacity-0"
-                                            )}
-                                        />
-                                        {coin.name} ({coin.symbol.toUpperCase()})
+                                        <Check className={cn("mr-2 h-4 w-4", (selectedCoin?.symbol === coin.symbol) ? "opacity-100" : "opacity-0")} />
+                                        {coin.description} ({coin.displaySymbol})
                                     </CommandItem>
                                     ))}
                                 </CommandGroup>
@@ -399,12 +372,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                                             setIsStockListVisible(false);
                                         }}
                                     >
-                                        <Check
-                                            className={cn(
-                                                "mr-2 h-4 w-4",
-                                                (selectedStock?.symbol === stock.symbol) ? "opacity-100" : "opacity-0"
-                                            )}
-                                        />
+                                        <Check className={cn("mr-2 h-4 w-4", (selectedStock?.symbol === stock.symbol) ? "opacity-100" : "opacity-0")} />
                                         {stock.name} ({stock.symbol.toUpperCase()})
                                     </CommandItem>
                                     ))}
@@ -435,25 +403,13 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     render={({ field }) => (
                         <Popover modal={true}>
                             <PopoverTrigger asChild>
-                            <Button
-                                variant={"outline"}
-                                className={cn(
-                                "w-full justify-start text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                                )}
-                            >
+                            <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}>
                                 <CalendarIcon className="mr-2 h-4 w-4" />
                                 {field.value ? format(field.value, "PPP", { locale: es }) : <span>Selecciona una fecha</span>}
                             </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                    mode="single"
-                                    selected={field.value}
-                                    onSelect={field.onChange}
-                                    initialFocus
-                                    locale={es}
-                                />
+                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus locale={es} />
                             </PopoverContent>
                         </Popover>
                     )}
