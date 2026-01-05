@@ -40,7 +40,7 @@ const cryptoPricesFlow = ai.defineFlow(
       return {};
     }
 
-    const apiKey = process.env.FINNHUB_API_KEY;
+    const apiKey = process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
     if (!apiKey) {
       console.error('Finnhub API key is not set.');
       return {};
