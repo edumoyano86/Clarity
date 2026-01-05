@@ -110,6 +110,11 @@ export function usePortfolioHistory(
                          break;
                      }
                 }
+                if (lastKnownPrice === undefined && pricesMap.size > 0) {
+                    // Fallback to the most recent price in the map if no price is found in the period
+                    lastKnownPrice = Array.from(pricesMap.values()).pop();
+                }
+
                 // Iterate forwards from the start date to fill gaps
                 for (let i = periodInDays; i >= 0; i--) {
                     const currentDate = startOfDay(subDays(endDate, i));
@@ -159,7 +164,7 @@ export function usePortfolioHistory(
             setIsLoading(false);
         });
 
-    }, [investmentsKey, periodInDays]);
+    }, [investmentsKey, periodInDays, currentPrices]); // Depend on currentPrices
 
     return { portfolioHistory, totalValue, isLoading, priceHistory };
 }

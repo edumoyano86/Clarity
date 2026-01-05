@@ -23,6 +23,8 @@ export async function getStockPrices(input: StockPricesInput): Promise<PricesOut
   return stockPricesFlow(input);
 }
 
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 const stockPricesFlow = ai.defineFlow(
   {
     name: 'stockPricesFlow',
@@ -50,9 +52,11 @@ const stockPricesFlow = ai.defineFlow(
         }
         const data = await response.json();
         // 'c' is the current price in the Finnhub response
-        if (typeof data.c === 'number') {
+        if (typeof data.c === 'number' && data.c > 0) {
             results[symbol] = { price: data.c };
         }
+         // To avoid rate limiting on free tier
+        await delay(350);
       } catch (error) {
         console.error(`Error fetching stock price for ${symbol}:`, error);
       }

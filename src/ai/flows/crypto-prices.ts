@@ -27,6 +27,7 @@ export async function getCryptoPrices(input: CryptoPricesInput): Promise<PricesO
   return cryptoPricesFlow(input);
 }
 
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // The Genkit flow definition
 const cryptoPricesFlow = ai.defineFlow(
@@ -60,11 +61,11 @@ const cryptoPricesFlow = ai.defineFlow(
         }
         const data = await response.json();
         // 'c' is the current price in the Finnhub response
-        if (typeof data.c === 'number') {
+        if (typeof data.c === 'number' && data.c > 0) {
             results[symbol] = { price: data.c };
         }
         // To avoid rate limiting on free tier
-        await new Promise(resolve => setTimeout(resolve, 350));
+        await delay(350);
       } catch (error) {
         console.error(`Error fetching crypto price for ${symbol}:`, error);
       }
