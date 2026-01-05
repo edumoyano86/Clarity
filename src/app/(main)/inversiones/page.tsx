@@ -22,10 +22,10 @@ export default function InversionesPage() {
     const { prices, isLoading: isLoadingPrices } = usePrices(investments);
     const { portfolioHistory, totalValue, isLoading: isLoadingHistory, priceHistory } = usePortfolioHistory(investments, period, prices);
 
-    const isLoading = isUserLoading || loadingInvestments || isLoadingPrices || isLoadingHistory;
+    const isLoading = isUserLoading || loadingInvestments || (investments && investments.length > 0 && (isLoadingPrices || isLoadingHistory));
 
     if (isUserLoading || !user) {
-        return <p>Cargando inversiones...</p>
+        return <div className="flex h-full w-full items-center justify-center"><p>Cargando usuario...</p></div>
     }
 
     return <InvestmentsManager 

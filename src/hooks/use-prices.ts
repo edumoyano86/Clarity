@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Investment, PriceData } from '@/lib/definitions';
 import { getCryptoPrices } from '@/ai/flows/crypto-prices';
 import { getStockPrices } from '@/ai/flows/stock-prices';
@@ -11,8 +11,7 @@ export function usePrices(investments: Investment[] | null) {
     const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
     
-    // Create a key based on the asset IDs to track changes
-    const investmentsKey = investments?.map(inv => inv.assetId).join(',') || '';
+    const investmentsKey = useMemo(() => investments?.map(inv => inv.assetId).join(',') || '', [investments]);
 
     useEffect(() => {
         const fetchPrices = async () => {
@@ -24,12 +23,10 @@ export function usePrices(investments: Investment[] | null) {
             
             setIsLoading(true);
 
-            // Finnhub uses symbols for both. For crypto, `assetId` is the finnhub symbol. For stocks, `symbol` is the ticker.
             const cryptoSymbols = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.assetId))];
             const stockSymbols = [...new Set(investments.filter(i => i.assetType === 'stock').map(inv => inv.symbol))];
 
             try {
-                // Fetch all prices in parallel
                 const [cryptoPrices, stockPrices] = await Promise.all([
                     cryptoSymbols.length > 0 ? getCryptoPrices({ symbols: cryptoSymbols }) : Promise.resolve({}),
                     stockSymbols.length > 0 ? getStockPrices({ symbols: stockSymbols }) : Promise.resolve({}),
@@ -51,7 +48,7 @@ export function usePrices(investments: Investment[] | null) {
         };
 
         fetchPrices();
-    }, [investmentsKey, toast]); 
+    }, [investmentsKey, toast]); // Removed 'investments' from dependency array to rely only on the key
 
     return { prices, isLoading };
 }

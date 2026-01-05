@@ -33,7 +33,7 @@ export function usePortfolioHistory(
              
             setIsLoading(true);
 
-            // Calculate current total value using the prices passed from the page
+            // Calculate current total value as soon as currentPrices are available
             const currentTotalValue = investments.reduce((acc, inv) => {
                 const priceKey = inv.assetType === 'crypto' ? inv.assetId : inv.symbol;
                 const currentPrice = currentPrices[priceKey]?.price || 0;
@@ -61,7 +61,18 @@ export function usePortfolioHistory(
                     .then(data => ({ symbol, data }));
             });
             
-            const cryptoResults = await Promise.allSettled(cryptoPromises);
+            // --- Fetch Stock History ---
+            const stockPromises = stockSymbols.map(async (symbol) => {
+                await delay(350); // Rate limit
+                return getStockPriceHistory({ symbol, from: startTimestamp, to: endTimestamp })
+                           .then(data => ({ symbol, history: data.history }));
+            });
+            
+            const [cryptoResults, stockResults] = await Promise.all([
+                Promise.allSettled(cryptoPromises),
+                Promise.allSettled(stockPromises),
+            ]);
+
             cryptoResults.forEach(result => {
                 if (result.status === 'fulfilled' && result.value.data.c) {
                     const pricesMap = new Map<string, number>();
@@ -75,13 +86,6 @@ export function usePortfolioHistory(
                 }
             });
 
-            // --- Fetch Stock History ---
-            const stockPromises = stockSymbols.map(async (symbol) => {
-                await delay(350); // Rate limit
-                return getStockPriceHistory({ symbol, from: startTimestamp, to: endTimestamp })
-                           .then(data => ({ symbol, history: data.history }));
-            });
-            const stockResults = await Promise.allSettled(stockPromises);
             stockResults.forEach(result => {
                  if (result.status === 'fulfilled' && result.value.history) {
                     const pricesMap = new Map<string, number>();
@@ -95,8 +99,17 @@ export function usePortfolioHistory(
             });
             
             // --- Fill Price Gaps ---
-            for (const [symbol, pricesMap] of allPriceHistory.entries()) {
+            for (const pricesMap of allPriceHistory.values()) {
                 let lastKnownPrice: number | undefined = undefined;
+                // Iterate backwards from today to find the first price
+                for (let i = 0; i <= periodInDays; i++) {
+                     const currentDate = startOfDay(subDays(endDate, i));
+                     const currentDateStr = format(currentDate, 'yyyy-MM-dd');
+                     if (pricesMap.has(currentDateStr)) {
+                         lastKnownPrice = pricesMap.get(currentDateStr);
+                         break;
+                     }
+                }
                 // Iterate forwards from the start date to fill gaps
                 for (let i = periodInDays; i >= 0; i--) {
                     const currentDate = startOfDay(subDays(endDate, i));
@@ -132,14 +145,9 @@ export function usePortfolioHistory(
                 newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
             }
             
-            // Ensure the last point is today's most current value
-            const lastDataPoint = newChartData[newChartData.length - 1];
-            if(lastDataPoint && startOfDay(new Date(lastDataPoint.date)).getTime() === startOfDay(new Date()).getTime()) {
-                lastDataPoint.value = currentTotalValue;
-            } else if(newChartData.length > 0) {
-                 newChartData[newChartData.length-1].value = currentTotalValue;
-            } else {
-                 newChartData.push({ date: new Date().getTime(), value: currentTotalValue });
+            // Ensure the last point is today's most current value if available
+            if (newChartData.length > 0 && currentTotalValue > 0) {
+                 newChartData[newChartData.length - 1].value = currentTotalValue;
             }
 
             setPortfolioHistory(newChartData);
@@ -151,7 +159,7 @@ export function usePortfolioHistory(
             setIsLoading(false);
         });
 
-    }, [investmentsKey, periodInDays, currentPrices]); // Depend on currentPrices to re-evaluate when they load
+    }, [investmentsKey, periodInDays]);
 
     return { portfolioHistory, totalValue, isLoading, priceHistory };
 }
