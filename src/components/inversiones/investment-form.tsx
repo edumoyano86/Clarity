@@ -20,10 +20,11 @@ import { Investment } from '@/lib/definitions';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { searchStocks } from '@/ai/flows/stock-search';
+import { searchCryptos } from '@/ai/flows/crypto-search';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
-interface StockSearchResult {
+interface SearchResult {
     symbol: string;
     name: string;
 }
@@ -60,9 +61,9 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     
     // States for asset search
     const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<StockSearchResult[]>([]);
+    const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
     const [isSearching, setIsSearching] = useState(false);
-    const [selectedAsset, setSelectedAsset] = useState<StockSearchResult | null>(null);
+    const [selectedAsset, setSelectedAsset] = useState<SearchResult | null>(null);
     const [isListVisible, setIsListVisible] = useState(true);
 
     const { register, handleSubmit, formState: { errors }, control, reset, watch, setValue } = useForm<FormValues>({
@@ -83,18 +84,13 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         }
         setIsSearching(true);
         try {
-            // Finnhub's search can find both stocks and cryptos
-            const response = await searchStocks({ query });
-            const filteredResults = response.results.filter(r => {
-                if (assetType === 'crypto') {
-                    // For crypto, symbol often contains ':'
-                    return r.symbol.includes(':');
-                } else {
-                    // For stocks, filter out symbols containing '.' or ':'
-                    return !r.symbol.includes('.') && !r.symbol.includes(':');
-                }
-            })
-            setSearchResults(filteredResults || []);
+            let response;
+            if (assetType === 'crypto') {
+                response = await searchCryptos({ query });
+            } else {
+                response = await searchStocks({ query });
+            }
+            setSearchResults(response.results || []);
         } catch (error) {
             console.error("Failed to search assets:", error);
             setSearchResults([]);
@@ -102,7 +98,8 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             setIsSearching(false);
         }
     }, [assetType]);
-    const debouncedSearch = useCallback(debounce(searchAssets, 500), [searchAssets]);
+
+    const debouncedSearch = useCallback(debounce(searchAssets, 300), [searchAssets]);
 
     useEffect(() => {
         if (investment) {
@@ -149,8 +146,8 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
 
             const dataToSave = { 
                 ...investmentData, 
-                name: selectedAsset.name, // Use the name from the selected asset
-                symbol: selectedAsset.symbol, // Use the symbol from the selected asset
+                name: selectedAsset.name,
+                symbol: selectedAsset.symbol,
                 purchaseDate: investmentData.purchaseDate.getTime() 
             };
             
