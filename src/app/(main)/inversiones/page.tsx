@@ -20,8 +20,16 @@ export default function InversionesPage() {
 
     const { data: investments, isLoading: loadingInvestments } = useCollection<Investment>(investmentsQuery);
     const { prices, isLoading: isLoadingPrices } = usePrices(investments);
-    const { portfolioHistory, totalValue, isLoading: isLoadingHistory, priceHistory } = usePortfolioHistory(investments, period, prices);
+    const { portfolioHistory, isLoading: isLoadingHistory, priceHistory } = usePortfolioHistory(investments, period);
 
+    const totalValue = useMemo(() => {
+        if (!investments || Object.keys(prices).length === 0) return 0;
+        return investments.reduce((acc, inv) => {
+            const currentPrice = prices[inv.symbol]?.price || 0;
+            return acc + (inv.amount * currentPrice);
+        }, 0);
+    }, [investments, prices]);
+    
     const isLoading = isUserLoading || loadingInvestments || (!!investments && investments.length > 0 && (isLoadingPrices || isLoadingHistory));
 
     if (isUserLoading || !user) {

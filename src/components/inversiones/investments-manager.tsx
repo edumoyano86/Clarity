@@ -118,12 +118,14 @@ export function InvestmentsManager({
     const renderPortfolioRow = (investment: Investment) => {
         const priceKey = investment.symbol;
         
+        // Find the historical price for the purchase date
         const purchaseDateStr = format(startOfDay(new Date(investment.purchaseDate)), 'yyyy-MM-dd');
         const purchasePrice = priceHistory.get(priceKey)?.get(purchaseDateStr) || 0;
         const purchaseValue = investment.amount * purchasePrice;
         
         const currentPrice = prices[priceKey]?.price;
         const currentValue = currentPrice ? investment.amount * currentPrice : null;
+        
         const pnl = currentValue !== null && purchaseValue > 0 ? currentValue - purchaseValue : null;
         const pnlPercent = pnl !== null && purchaseValue > 0 ? (pnl / purchaseValue) * 100 : null;
 

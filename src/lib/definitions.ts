@@ -63,5 +63,5 @@ export type PortfolioDataPoint = {
     value: number;
 };
 
-// Map<assetId or symbol, Map<date string 'yyyy-MM-dd', price>>
+// Map<asset symbol, Map<date string 'yyyy-MM-dd', price>>
 export type PriceHistory = Map<string, Map<string, number>>;
