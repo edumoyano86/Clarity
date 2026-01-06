@@ -5,7 +5,7 @@ import { Investment } from "@/lib/definitions";
 import { InvestmentsManager } from "@/components/inversiones/investments-manager";
 import { collection, orderBy, query } from "firebase/firestore";
 import { usePortfolioHistory, type PortfolioPeriod } from "@/hooks/use-portfolio-history";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { usePrices } from "@/hooks/use-prices";
 
 export default function InversionesPage() {
