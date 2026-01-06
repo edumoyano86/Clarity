@@ -23,12 +23,6 @@ import { searchStocks } from '@/ai/flows/stock-search';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
-interface FinnhubCryptoSymbol {
-    description: string;
-    displaySymbol: string;
-    symbol: string; // This is what we need, e.g., 'BINANCE:BTCUSDT'
-}
-
 interface StockSearchResult {
     symbol: string;
     name: string;
@@ -63,21 +57,13 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     const { toast } = useToast();
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = useState(false);
-    const [finnhubCryptoSymbols, setFinnhubCryptoSymbols] = useState<FinnhubCryptoSymbol[]>([]);
     
-    // States for crypto search
-    const [cryptoSearchQuery, setCryptoSearchQuery] = useState('');
-    const [cryptoSearchResults, setCryptoSearchResults] = useState<FinnhubCryptoSymbol[]>([]);
-    const [isSearchingCrypto, setIsSearchingCrypto] = useState(false);
-    const [selectedCoin, setSelectedCoin] = useState<FinnhubCryptoSymbol | null>(null);
-    const [isCryptoListVisible, setIsCryptoListVisible] = useState(true);
-
-    // States for stock search
-    const [stockSearchQuery, setStockSearchQuery] = useState('');
-    const [stockSearchResults, setStockSearchResults] = useState<StockSearchResult[]>([]);
-    const [isSearchingStock, setIsSearchingStock] = useState(false);
-    const [selectedStock, setSelectedStock] = useState<StockSearchResult | null>(null);
-    const [isStockListVisible, setIsStockListVisible] = useState(true);
+    // States for asset search
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<StockSearchResult[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [selectedAsset, setSelectedAsset] = useState<StockSearchResult | null>(null);
+    const [isListVisible, setIsListVisible] = useState(true);
 
     const { register, handleSubmit, formState: { errors }, control, reset, watch, setValue } = useForm<FormValues>({
         resolver: zodResolver(InvestmentSchema),
@@ -88,58 +74,35 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
 
     const assetType = watch('assetType');
 
-    const fetchAllCryptoSymbols = useCallback(async () => {
-        if (finnhubCryptoSymbols.length > 0) return; // Don't fetch if already loaded
-        setIsLoading(true);
-        try {
-            const response = await fetch(`https://finnhub.io/api/v1/crypto/symbol?exchange=binance&token=${process.env.NEXT_PUBLIC_FINNHUB_API_KEY}`);
-            if (!response.ok) throw new Error('Network response was not ok.');
-            const data: FinnhubCryptoSymbol[] = await response.json();
-            setFinnhubCryptoSymbols(data);
-        } catch (error) {
-            console.error("Failed to fetch all crypto symbols:", error);
-            toast({ title: "Error", description: "No se pudieron cargar los símbolos de criptomonedas.", variant: 'destructive'});
-        } finally {
-            setIsLoading(false);
-        }
-    }, [finnhubCryptoSymbols.length, toast]);
-     
-    // --- Crypto Search Logic (Local Filter) ---
-    const searchCoins = useCallback((query: string) => {
-        if (query.length < 2) {
-            setCryptoSearchResults([]);
+    // --- Asset Search Logic ---
+    const searchAssets = useCallback(async (query: string) => {
+        if (query.length < 1) {
+            setSearchResults([]);
+            setIsSearching(false);
             return;
         }
-        setIsSearchingCrypto(true);
-        const filtered = finnhubCryptoSymbols.filter(coin => 
-            coin.description.toLowerCase().includes(query.toLowerCase()) || 
-            coin.symbol.toLowerCase().includes(query.toLowerCase())
-        ).slice(0, 50); // Limit results
-        setCryptoSearchResults(filtered);
-        setIsSearchingCrypto(false);
-    }, [finnhubCryptoSymbols]);
-
-    const debouncedCryptoSearch = useCallback(debounce(searchCoins, 300), [searchCoins]);
-
-    // --- Stock Search Logic ---
-    const searchStockSymbols = useCallback(async (query: string) => {
-        if (query.length < 2) {
-            setStockSearchResults([]);
-            setIsSearchingStock(false);
-            return;
-        }
-        setIsSearchingStock(true);
+        setIsSearching(true);
         try {
+            // Finnhub's search can find both stocks and cryptos
             const response = await searchStocks({ query });
-            setStockSearchResults(response.results || []);
+            const filteredResults = response.results.filter(r => {
+                if (assetType === 'crypto') {
+                    // For crypto, symbol often contains ':'
+                    return r.symbol.includes(':');
+                } else {
+                    // For stocks, filter out symbols containing '.' or ':'
+                    return !r.symbol.includes('.') && !r.symbol.includes(':');
+                }
+            })
+            setSearchResults(filteredResults || []);
         } catch (error) {
-            console.error("Failed to search stocks:", error);
-            setStockSearchResults([]);
+            console.error("Failed to search assets:", error);
+            setSearchResults([]);
         } finally {
-            setIsSearchingStock(false);
+            setIsSearching(false);
         }
-    }, []);
-    const debouncedStockSearch = useCallback(debounce(searchStockSymbols, 500), [searchStockSymbols]);
+    }, [assetType]);
+    const debouncedSearch = useCallback(debounce(searchAssets, 500), [searchAssets]);
 
     useEffect(() => {
         if (investment) {
@@ -150,15 +113,9 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 amount: investment.amount,
                 purchaseDate: new Date(investment.purchaseDate),
             });
-            if(investment.assetType === 'crypto') {
-                setSelectedCoin({ symbol: investment.symbol, description: investment.name, displaySymbol: investment.symbol });
-                setCryptoSearchQuery(investment.name);
-                setIsCryptoListVisible(false);
-            } else { 
-                setSelectedStock({ symbol: investment.symbol, name: investment.name });
-                setStockSearchQuery(investment.name);
-                setIsStockListVisible(false);
-            }
+            setSelectedAsset({ symbol: investment.symbol, name: investment.name });
+            setSearchQuery(investment.name);
+            setIsListVisible(false);
         } else {
              reset({
                 id: '',
@@ -167,46 +124,35 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 amount: undefined,
                 purchaseDate: new Date(),
             });
-            setSelectedCoin(null);
-            setCryptoSearchQuery('');
-            setSelectedStock(null);
-            setStockSearchQuery('');
+            setSelectedAsset(null);
+            setSearchQuery('');
         }
     }, [investment, reset]);
 
     useEffect(() => {
         // Reset search when asset type changes
         setValue('symbol', '');
-        setSelectedCoin(null);
-        setCryptoSearchQuery('');
-        setCryptoSearchResults([]);
-        setIsCryptoListVisible(true);
-
-        setSelectedStock(null);
-        setStockSearchQuery('');
-        setStockSearchResults([]);
-        setIsStockListVisible(true);
+        setSelectedAsset(null);
+        setSearchQuery('');
+        setSearchResults([]);
+        setIsListVisible(true);
     }, [assetType, setValue]);
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         setIsLoading(true);
         try {
-            const { id, symbol, assetType, ...investmentData } = data;
+            const { id, ...investmentData } = data;
             
-            let name = '';
-            let resolvedSymbol = '';
-
-            if (assetType === 'crypto') {
-                if (!selectedCoin || selectedCoin.symbol !== symbol) throw new Error('Por favor selecciona una criptomoneda de la lista.');
-                name = selectedCoin.description;
-                resolvedSymbol = selectedCoin.displaySymbol;
-            } else { // Stock
-                if (!selectedStock || selectedStock.symbol !== symbol) throw new Error('Por favor selecciona una acción de la lista.');
-                name = selectedStock.name;
-                resolvedSymbol = selectedStock.symbol;
+            if (!selectedAsset || selectedAsset.symbol !== data.symbol) {
+                throw new Error('Por favor selecciona un activo de la lista.');
             }
 
-            const dataToSave = { ...investmentData, assetType, name, symbol: resolvedSymbol, purchaseDate: investmentData.purchaseDate.getTime() };
+            const dataToSave = { 
+                ...investmentData, 
+                name: selectedAsset.name, // Use the name from the selected asset
+                symbol: selectedAsset.symbol, // Use the symbol from the selected asset
+                purchaseDate: investmentData.purchaseDate.getTime() 
+            };
             
             const collectionRef = collection(firestore, 'users', userId, 'investments');
             
@@ -256,92 +202,46 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
 
             <div>
                 <Label htmlFor="symbol">Activo</Label>
-                {assetType === 'crypto' ? (
-                     <Command shouldFilter={false} className="relative overflow-visible">
-                        <CommandInput 
-                            placeholder="Busca por nombre o símbolo (ej: BTC)..."
-                            value={cryptoSearchQuery}
-                            onValueChange={(query) => {
-                                setCryptoSearchQuery(query);
-                                debouncedCryptoSearch(query);
-                                if (!isCryptoListVisible) setIsCryptoListVisible(true);
-                            }}
-                             onFocus={() => { 
-                                setIsCryptoListVisible(true); 
-                                fetchAllCryptoSymbols();
-                             }}
-                        />
-                        {isCryptoListVisible && (
-                            <CommandList className="absolute top-10 z-10 w-full rounded-md border bg-popover text-popover-foreground shadow-md">
-                                {(isLoading || isSearchingCrypto) && <CommandEmpty>Buscando...</CommandEmpty>}
-                                {!isLoading && !isSearchingCrypto && cryptoSearchResults.length === 0 && cryptoSearchQuery.length > 1 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}
-                                {cryptoSearchResults.length > 0 && (
-                                <CommandGroup>
-                                    {cryptoSearchResults.map((coin) => (
-                                    <CommandItem
-                                        key={coin.symbol}
-                                        value={coin.symbol}
-                                        onSelect={(currentValue) => {
-                                            const selected = finnhubCryptoSymbols.find(c => c.symbol.toLowerCase() === currentValue.toLowerCase());
-                                            if (selected) {
-                                                setSelectedCoin(selected);
-                                                setValue('symbol', selected.symbol);
-                                                setCryptoSearchQuery(selected.description);
-                                            }
-                                            setIsCryptoListVisible(false);
-                                        }}
-                                    >
-                                        <Check className={cn("mr-2 h-4 w-4", (selectedCoin?.symbol === coin.symbol) ? "opacity-100" : "opacity-0")} />
-                                        {coin.description} ({coin.displaySymbol})
-                                    </CommandItem>
-                                    ))}
-                                </CommandGroup>
-                                )}
-                            </CommandList>
-                        )}
-                    </Command>
-                ) : ( // Stock Search
-                     <Command shouldFilter={false} className="relative overflow-visible">
-                        <CommandInput 
-                            placeholder="Busca por nombre o símbolo..."
-                            value={stockSearchQuery}
-                            onValueChange={(query) => {
-                                setStockSearchQuery(query);
-                                debouncedStockSearch(query);
-                                if (!isStockListVisible) setIsStockListVisible(true);
-                            }}
-                             onFocus={() => setIsStockListVisible(true)}
-                        />
-                        {isStockListVisible && (
-                            <CommandList className="absolute top-10 z-10 w-full rounded-md border bg-popover text-popover-foreground shadow-md">
-                                {isSearchingStock && <CommandEmpty>Buscando...</CommandEmpty>}
-                                {!isSearchingStock && stockSearchResults.length === 0 && stockSearchQuery.length > 1 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}
-                                {stockSearchResults.length > 0 && (
-                                <CommandGroup>
-                                    {stockSearchResults.map((stock) => (
-                                    <CommandItem
-                                        key={stock.symbol}
-                                        value={stock.symbol}
-                                        onSelect={(currentValue) => {
-                                            const selected = stockSearchResults.find(s => s.symbol.toLowerCase() === currentValue.toLowerCase());
-                                            if (selected) {
-                                                setSelectedStock(selected);
-                                                setValue('symbol', selected.symbol);
-                                                setStockSearchQuery(selected.name);
-                                            }
-                                            setIsStockListVisible(false);
-                                        }}
-                                    >
-                                        <Check className={cn("mr-2 h-4 w-4", (selectedStock?.symbol === stock.symbol) ? "opacity-100" : "opacity-0")} />
-                                        {stock.name} ({stock.symbol.toUpperCase()})
-                                    </CommandItem>
-                                    ))}
-                                </CommandGroup>
-                                )}
-                            </CommandList>
-                        )}
-                    </Command>
-                )}
+                <Command shouldFilter={false} className="relative overflow-visible">
+                    <CommandInput 
+                        placeholder={assetType === 'crypto' ? "Busca cripto (ej: BTC)..." : "Busca acción (ej: AAPL)..."}
+                        value={searchQuery}
+                        onValueChange={(query) => {
+                            setSearchQuery(query);
+                            debouncedSearch(query);
+                            if (!isListVisible) setIsListVisible(true);
+                        }}
+                            onFocus={() => setIsListVisible(true)}
+                    />
+                    {isListVisible && (
+                        <CommandList className="absolute top-10 z-10 w-full rounded-md border bg-popover text-popover-foreground shadow-md">
+                            {isSearching && <CommandEmpty>Buscando...</CommandEmpty>}
+                            {!isSearching && searchResults.length === 0 && searchQuery.length > 1 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}
+                            {searchResults.length > 0 && (
+                            <CommandGroup>
+                                {searchResults.map((asset) => (
+                                <CommandItem
+                                    key={asset.symbol}
+                                    value={asset.symbol}
+                                    onSelect={(currentValue) => {
+                                        const selected = searchResults.find(s => s.symbol.toLowerCase() === currentValue.toLowerCase());
+                                        if (selected) {
+                                            setSelectedAsset(selected);
+                                            setValue('symbol', selected.symbol);
+                                            setSearchQuery(selected.name);
+                                        }
+                                        setIsListVisible(false);
+                                    }}
+                                >
+                                    <Check className={cn("mr-2 h-4 w-4", (selectedAsset?.symbol === asset.symbol) ? "opacity-100" : "opacity-0")} />
+                                    {asset.name} ({asset.symbol.toUpperCase()})
+                                </CommandItem>
+                                ))}
+                            </CommandGroup>
+                            )}
+                        </CommandList>
+                    )}
+                </Command>
                 {errors.symbol && <p className="text-sm text-destructive">{errors.symbol.message}</p>}
             </div>
             

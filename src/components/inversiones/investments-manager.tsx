@@ -133,7 +133,7 @@ export function InvestmentsManager({
                     <div className='font-medium'>{investment.name}</div>
                     <div className='text-sm text-muted-foreground'>{investment.symbol.toUpperCase()}</div>
                 </TableCell>
-                <TableCell>{investment.amount}</TableCell>
+                <TableCell>{investment.amount.toFixed(4)}</TableCell>
                 <TableCell>{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : formatCurrency(purchasePrice)}</TableCell>
                 <TableCell>{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : formatCurrency(purchaseValue)}</TableCell>
                 <TableCell>
@@ -215,10 +215,13 @@ export function InvestmentsManager({
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {isLoading ? (
+                                    {isLoading && investments.length > 0 ? (
                                         <TableRow>
                                             <TableCell colSpan={7} className="text-center h-24">
-                                                Cargando datos de inversiones...
+                                                <div className="flex justify-center items-center">
+                                                    <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+                                                    Cargando datos de mercado...
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     ) : investments.length > 0 ? (

@@ -18,7 +18,7 @@ export function usePortfolioHistory(
     const [totalValue, setTotalValue] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
 
-    const investmentsKey = useMemo(() => investments?.map(inv => inv.id).join(','), [investments]);
+    const investmentsKey = useMemo(() => investments?.map(inv => `${inv.id}-${inv.symbol}`).join(','), [investments]);
 
     useEffect(() => {
         const fetchHistory = async () => {
@@ -30,12 +30,7 @@ export function usePortfolioHistory(
                 return;
             }
 
-            // Only start loading if we have investments and current prices are not ready
-            if (Object.keys(currentPrices).length === 0) {
-                 setIsLoading(true);
-                 return; // Wait for current prices to be fetched first
-            }
-            
+            // Start loading only when we have investments to process
             setIsLoading(true);
 
             // Calculate current total value using the prices passed as props
@@ -88,16 +83,30 @@ export function usePortfolioHistory(
             });
             
             // Fill gaps in price history
-            for (const pricesMap of allPriceHistory.values()) {
+            for (const [symbol, pricesMap] of allPriceHistory.entries()) {
                 let lastKnownPrice: number | undefined = undefined;
+                 // First pass: from past to present to fill forward
                 for (let i = periodInDays; i >= 0; i--) {
                     const currentDate = startOfDay(subDays(endDate, i));
                     const currentDateStr = format(currentDate, 'yyyy-MM-dd');
-                    if (pricesMap.has(currentDateStr)) {
+                    if (pricesMap.has(currentDateStr) && pricesMap.get(currentDateStr)! > 0) {
                         lastKnownPrice = pricesMap.get(currentDateStr);
                     } else if (lastKnownPrice !== undefined) {
                         pricesMap.set(currentDateStr, lastKnownPrice);
                     }
+                }
+                 // Second pass: from present to past to fill backward for initial days
+                lastKnownPrice = currentPrices[symbol]?.price || Array.from(pricesMap.values()).find(p => p > 0);
+                 for (let i = 0; i <= periodInDays; i++) {
+                    const currentDate = startOfDay(subDays(endDate, i));
+                    const currentDateStr = format(currentDate, 'yyyy-MM-dd');
+                     if (!pricesMap.has(currentDateStr) || pricesMap.get(currentDateStr)! <= 0) {
+                        if (lastKnownPrice !== undefined) {
+                            pricesMap.set(currentDateStr, lastKnownPrice);
+                        }
+                    } else {
+                         lastKnownPrice = pricesMap.get(currentDateStr);
+                     }
                 }
             }
             setPriceHistory(allPriceHistory);
@@ -114,14 +123,9 @@ export function usePortfolioHistory(
                     if (!isAfter(purchaseDate, currentDate)) {
                         const priceKey = inv.symbol;
                         const historyForAsset = allPriceHistory.get(priceKey);
-                        const priceForDay = historyForAsset?.get(currentDateStr);
+                        const priceForDay = historyForAsset?.get(currentDateStr) || 0;
                         
-                        if(priceForDay) {
-                           dailyTotal += inv.amount * priceForDay;
-                        } else {
-                           const earliestPrice = historyForAsset ? Array.from(historyForAsset.values())[0] : 0;
-                           dailyTotal += inv.amount * earliestPrice;
-                        }
+                        dailyTotal += inv.amount * priceForDay;
                     }
                 });
                 newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
@@ -135,10 +139,21 @@ export function usePortfolioHistory(
             setIsLoading(false);
         };
 
-        fetchHistory().catch(error => {
-            console.error("Error fetching portfolio history:", error);
-            setIsLoading(false);
-        });
+        // Only run if there are investments and currentPrices are available.
+        if (investments && Object.keys(currentPrices).length > 0) {
+             fetchHistory().catch(error => {
+                console.error("Error fetching portfolio history:", error);
+                setIsLoading(false);
+            });
+        } else if (!investments || investments.length === 0) {
+            // No investments, so we are not loading.
+             setIsLoading(false);
+             setPortfolioHistory([]);
+             setTotalValue(0);
+             setPriceHistory(new Map());
+        }
+        // if investments exist but prices are not there, usePrices is loading, so we wait.
+        // The isLoading state from this hook will be true by default.
 
     }, [investmentsKey, periodInDays, currentPrices]);
 
