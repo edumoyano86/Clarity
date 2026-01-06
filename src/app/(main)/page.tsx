@@ -12,7 +12,7 @@ import { collection, query, where, orderBy, limit } from "firebase/firestore";
 import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear, startOfToday } from 'date-fns';
 import { PortfolioChart } from "@/components/inversiones/portfolio-chart";
 import { BalanceChart } from "@/components/dashboard/balance-chart";
-import { usePortfolioHistory } from "@/hooks/use-portfolio-history";
+import { usePortfolioHistory, type PortfolioPeriod as PortfolioHistoryPeriod } from "@/hooks/use-portfolio-history";
 
 type Periodo = 'mes_actual' | 'mes_pasado' | 'ultimos_3_meses' | 'ano_actual';
 
@@ -28,6 +28,8 @@ export default function DashboardPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const [periodo, setPeriodo] = useState<Periodo>('mes_actual');
+  const [portfolioPeriod, setPortfolioPeriod] = useState<PortfolioHistoryPeriod>(90);
+
 
   const transactionsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -46,7 +48,7 @@ export default function DashboardPage() {
     return query(collection(firestore, 'users', user.uid, 'investments'), orderBy('purchaseDate', 'asc'));
   }, [firestore, user]);
   const { data: investments, isLoading: loadingInvestments } = useCollection<Investment>(investmentsQuery);
-  const { portfolioHistory, totalValue, isLoading: isLoadingHistory } = usePortfolioHistory(investments || []);
+  const { portfolioHistory, totalValue, isLoading: isLoadingHistory } = usePortfolioHistory(investments || [], portfolioPeriod);
 
 
   const accountsQuery = useMemoFirebase(() => {
@@ -208,7 +210,14 @@ export default function DashboardPage() {
             periodoLabel={getPeriodoLabel(periodo)}
           />
           <div className="grid gap-8 md:grid-cols-2">
-            <PortfolioChart portfolioHistory={portfolioHistory} totalValue={totalValue} isLoading={isLoadingHistory} />
+            <PortfolioChart 
+              portfolioHistory={portfolioHistory} 
+              totalValue={totalValue} 
+              isLoading={isLoadingHistory}
+              period={portfolioPeriod}
+              setPeriod={setPortfolioPeriod}
+              periodOptions={[]} 
+            />
             <BalanceChart ingresos={dashboardData.totalIngresos} gastos={dashboardData.totalGastos} />
           </div>
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
