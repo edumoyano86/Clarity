@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Investment, PriceData } from '@/lib/definitions';
-import { getCryptoPrices } from '@/ai/flows/crypto-prices';
 import { getStockPrices } from '@/ai/flows/stock-prices';
 import { useToast } from './use-toast';
 
@@ -23,17 +22,16 @@ export function usePrices(investments: Investment[] | null) {
             
             setIsLoading(true);
 
-            const cryptoSymbols = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.symbol))];
-            const stockSymbols = [...new Set(investments.filter(i => i.assetType === 'stock').map(inv => inv.symbol))];
+            // Finnhub can get crypto prices via the stock quote endpoint if the symbol is correct (e.g., BINANCE:BTCUSDT)
+            const allSymbols = [...new Set(investments.map(inv => inv.symbol))];
 
             try {
-                const [cryptoPricesResult, stockPricesResult] = await Promise.all([
-                    cryptoSymbols.length > 0 ? getCryptoPrices({ symbols: cryptoSymbols }) : Promise.resolve({}),
-                    stockSymbols.length > 0 ? getStockPrices({ symbols: stockSymbols }) : Promise.resolve({}),
-                ]);
-                
-                const combinedPrices: PriceData = { ...cryptoPricesResult, ...stockPricesResult };
-                setPrices(combinedPrices);
+                if (allSymbols.length > 0) {
+                    const pricesResult = await getStockPrices({ symbols: allSymbols });
+                    setPrices(pricesResult);
+                } else {
+                    setPrices({});
+                }
 
             } catch (error) {
                 console.error("Failed to fetch asset prices:", error);
