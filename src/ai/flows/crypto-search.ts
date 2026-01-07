@@ -8,7 +8,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { flow } from 'genkit';
 
 let allCryptoSymbols: { symbol: string; name: string }[] = [];
 let lastFetchTimestamp = 0;
@@ -33,7 +32,7 @@ export async function searchCryptos(input: CryptoSearchInput): Promise<CryptoSea
   return cryptoSearchFlow(input);
 }
 
-const cryptoSearchFlow = flow(
+const cryptoSearchFlow = ai.defineFlow(
   {
     name: 'cryptoSearchFlow',
     inputSchema: CryptoSearchInputSchema,
