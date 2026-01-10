@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Investment, PriceData } from '@/lib/definitions';
+import { getCryptoPrices } from '@/ai/flows/crypto-prices';
 import { getStockPrices } from '@/ai/flows/stock-prices';
 import { useToast } from './use-toast';
 
@@ -22,16 +23,22 @@ export function usePrices(investments: Investment[] | null) {
             
             setIsLoading(true);
 
-            // Finnhub's /quote endpoint can fetch both stocks and crypto prices
-            const allSymbols = [...new Set(investments.map(inv => inv.symbol))];
+            const cryptoIds = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.symbol))];
+            const stockSymbols = [...new Set(investments.filter(i => i.assetType === 'stock').map(inv => inv.symbol))];
 
             try {
-                if (allSymbols.length > 0) {
-                    const pricesResult = await getStockPrices({ symbols: allSymbols });
-                    setPrices(pricesResult);
-                } else {
-                    setPrices({});
+                const pricePromises = [];
+
+                if (cryptoIds.length > 0) {
+                    pricePromises.push(getCryptoPrices({ ids: cryptoIds }));
                 }
+                if (stockSymbols.length > 0) {
+                    pricePromises.push(getStockPrices({ symbols: stockSymbols }));
+                }
+                
+                const results = await Promise.all(pricePromises);
+                const combinedPrices = Object.assign({}, ...results);
+                setPrices(combinedPrices);
 
             } catch (error) {
                 console.error("Failed to fetch asset prices:", error);

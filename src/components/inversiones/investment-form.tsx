@@ -20,6 +20,7 @@ import { Investment } from '@/lib/definitions';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { searchStocks } from '@/ai/flows/stock-search';
+import { searchCryptos } from '@/ai/flows/crypto-search';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -27,6 +28,14 @@ interface SearchResult {
     symbol: string;
     name: string;
 }
+
+// For CoinGecko, the unique identifier is `id`
+interface CryptoSearchResult {
+    id: string;
+    symbol: string;
+    name: string;
+}
+
 
 const InvestmentSchema = z.object({
     id: z.string().optional(),
@@ -60,9 +69,10 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     const [isLoading, setIsLoading] = useState(false);
     
     const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+    const [stockResults, setStockResults] = useState<SearchResult[]>([]);
+    const [cryptoResults, setCryptoResults] = useState<CryptoSearchResult[]>([]);
     const [isSearching, setIsSearching] = useState(false);
-    const [selectedAsset, setSelectedAsset] = useState<SearchResult | null>(null);
+    const [selectedAsset, setSelectedAsset] = useState<SearchResult | CryptoSearchResult | null>(null);
     const [isListVisible, setIsListVisible] = useState(true);
 
     const { register, handleSubmit, formState: { errors }, control, reset, watch, setValue } = useForm<FormValues>({
@@ -76,29 +86,26 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
 
     const searchAssets = useCallback(async (query: string) => {
         if (query.length < 1) {
-            setSearchResults([]);
+            setStockResults([]);
+            setCryptoResults([]);
             setIsSearching(false);
             return;
         }
         setIsSearching(true);
         try {
-            // Unified search for both stocks and crypto
-            const response = await searchStocks({ query });
-            
-            // Filter results based on the selected assetType
-            let filteredResults = response.results || [];
-            if (assetType === 'crypto') {
-                // For crypto, symbols often contain a colon, like 'BINANCE:BTCUSDT'
-                filteredResults = filteredResults.filter(r => r.symbol.includes(':'));
+            if (assetType === 'stock') {
+                const response = await searchStocks({ query });
+                setStockResults(response.results.filter(r => !r.symbol.includes(':') && !r.symbol.includes('.')) || []);
+                setCryptoResults([]);
             } else {
-                // For stocks, filter out anything that looks like a crypto or has weird characters
-                filteredResults = filteredResults.filter(r => !r.symbol.includes(':') && !r.symbol.includes('.'));
+                const response = await searchCryptos({ query });
+                setCryptoResults(response.results || []);
+                setStockResults([]);
             }
-            setSearchResults(filteredResults);
-
         } catch (error) {
             console.error("Failed to search assets:", error);
-            setSearchResults([]);
+            setStockResults([]);
+            setCryptoResults([]);
         } finally {
             setIsSearching(false);
         }
@@ -116,7 +123,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 amount: investment.amount,
                 purchaseDate: new Date(investment.purchaseDate),
             });
-            setSelectedAsset({ symbol: investment.symbol, name: investment.name });
+            setSelectedAsset({ symbol: investment.symbol, name: investment.name, ...(investment.assetType === 'crypto' && { id: investment.symbol}) });
             setSearchQuery(investment.name);
             setIsListVisible(false);
         } else {
@@ -138,7 +145,8 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         setValue('name', '');
         setSelectedAsset(null);
         setSearchQuery('');
-        setSearchResults([]);
+        setStockResults([]);
+        setCryptoResults([]);
         setIsListVisible(true);
     }, [assetType, setValue]);
 
@@ -147,7 +155,9 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         try {
             const { id, ...investmentData } = data;
             
-            if (!selectedAsset || selectedAsset.symbol !== data.symbol) {
+            const selectedSymbol = assetType === 'crypto' ? (selectedAsset as CryptoSearchResult)?.id : selectedAsset?.symbol;
+
+            if (!selectedAsset || selectedSymbol !== data.symbol) {
                  toast({ title: 'Error', description: 'Por favor selecciona un activo válido de la lista.', variant: 'destructive' });
                  setIsLoading(false);
                  return;
@@ -155,7 +165,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
 
             const dataToSave = { 
                 assetType: investmentData.assetType,
-                symbol: investmentData.symbol,
+                symbol: investmentData.symbol, // For crypto this is the ID, for stocks the ticker
                 name: investmentData.name,
                 amount: investmentData.amount,
                 purchaseDate: investmentData.purchaseDate.getTime() 
@@ -186,6 +196,46 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         }
     };
 
+    const renderResults = () => {
+        if (assetType === 'stock') {
+            return stockResults.map((asset) => (
+                <CommandItem
+                    key={asset.symbol}
+                    value={asset.symbol}
+                    onSelect={() => {
+                        setSelectedAsset(asset);
+                        setValue('symbol', asset.symbol);
+                        setValue('name', asset.name);
+                        setSearchQuery(asset.name);
+                        setIsListVisible(false);
+                    }}
+                >
+                    <Check className={cn("mr-2 h-4 w-4", (selectedAsset?.symbol === asset.symbol) ? "opacity-100" : "opacity-0")} />
+                    {asset.name} ({asset.symbol.toUpperCase()})
+                </CommandItem>
+            ))
+        }
+        if (assetType === 'crypto') {
+            return cryptoResults.map((asset) => (
+                 <CommandItem
+                    key={asset.id}
+                    value={asset.id} // Use the id for the value
+                    onSelect={() => {
+                        setSelectedAsset(asset);
+                        setValue('symbol', asset.id); // Store CoinGecko ID in symbol field
+                        setValue('name', asset.name);
+                        setSearchQuery(asset.name);
+                        setIsListVisible(false);
+                    }}
+                >
+                    <Check className={cn("mr-2 h-4 w-4", ((selectedAsset as CryptoSearchResult)?.id === asset.id) ? "opacity-100" : "opacity-0")} />
+                    {asset.name} ({asset.symbol.toUpperCase()})
+                </CommandItem>
+            ))
+        }
+        return null;
+    }
+
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <input type="hidden" {...register('id')} />
@@ -211,7 +261,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 <Label htmlFor="symbol">Activo</Label>
                 <Command shouldFilter={false} className="relative overflow-visible">
                     <CommandInput 
-                        placeholder={assetType === 'crypto' ? "Busca cripto (ej: BTC)..." : "Busca acción (ej: AAPL)..."}
+                        placeholder={assetType === 'crypto' ? "Busca cripto (ej: bitcoin)..." : "Busca acción (ej: AAPL)..."}
                         value={searchQuery}
                         onValueChange={(query) => {
                             setSearchQuery(query);
@@ -223,29 +273,11 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     {isListVisible && (
                         <CommandList className="absolute top-10 z-10 w-full rounded-md border bg-popover text-popover-foreground shadow-md">
                             {isSearching && <CommandEmpty>Buscando...</CommandEmpty>}
-                            {!isSearching && searchResults.length === 0 && searchQuery.length > 1 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}
-                            {searchResults.length > 0 && (
-                            <CommandGroup>
-                                {searchResults.map((asset) => (
-                                <CommandItem
-                                    key={asset.symbol}
-                                    value={asset.symbol}
-                                    onSelect={(currentValue) => {
-                                        const selected = searchResults.find(s => s.symbol.toLowerCase() === currentValue.toLowerCase());
-                                        if (selected) {
-                                            setSelectedAsset(selected);
-                                            setValue('symbol', selected.symbol);
-                                            setValue('name', selected.name);
-                                            setSearchQuery(selected.name);
-                                        }
-                                        setIsListVisible(false);
-                                    }}
-                                >
-                                    <Check className={cn("mr-2 h-4 w-4", (selectedAsset?.symbol === asset.symbol) ? "opacity-100" : "opacity-0")} />
-                                    {asset.name} ({asset.symbol.toUpperCase()})
-                                </CommandItem>
-                                ))}
-                            </CommandGroup>
+                            {!isSearching && stockResults.length === 0 && cryptoResults.length === 0 && searchQuery.length > 1 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}
+                            {(stockResults.length > 0 || cryptoResults.length > 0) && (
+                                <CommandGroup>
+                                    {renderResults()}
+                                </CommandGroup>
                             )}
                         </CommandList>
                     )}

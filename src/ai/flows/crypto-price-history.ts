@@ -1,16 +1,17 @@
 'use server';
 
 /**
- * @fileOverview A Genkit flow for fetching historical crypto prices from Finnhub.
+ * @fileOverview A Genkit flow for fetching historical crypto prices from CoinGecko.
  * 
- * - getCryptoPriceHistory - A function that takes a crypto symbol and date range and returns its daily price history.
+ * - getCryptoPriceHistory - A function that takes a crypto ID and date range and returns its daily price history.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
+import { format } from 'date-fns';
 
 const CryptoHistoryInputSchema = z.object({
-  symbol: z.string().describe('The Finnhub crypto symbol (e.g., "BINANCE:BTCUSDT").'),
+  id: z.string().describe('The CoinGecko coin ID (e.g., "bitcoin").'),
   from: z.number().describe('UNIX timestamp for the start of the date range.'),
   to: z.number().describe('UNIX timestamp for the end of the date range.'),
 });
@@ -32,36 +33,32 @@ const cryptoPriceHistoryFlow = ai.defineFlow(
     outputSchema: CryptoHistoryOutputSchema,
   },
   async (input) => {
-    const apiKey = process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
-    if (!apiKey) {
-      console.error('Finnhub API key is not set.');
-      return { history: {} };
-    }
-
-    const url = `https://finnhub.io/api/v1/crypto/candle?symbol=${input.symbol}&resolution=D&from=${input.from}&to=${input.to}&token=${apiKey}`;
+    // CoinGecko's free API is rate-limited, but should be fine for this server-side use.
+    // No API key needed for this public endpoint.
+    const url = `https://api.coingecko.com/api/v3/coins/${input.id}/market_chart/range?vs_currency=usd&from=${input.from}&to=${input.to}&precision=2`;
 
     try {
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`Finnhub API request failed for ${input.symbol} with status ${response.status}`);
+        throw new Error(`CoinGecko API request failed for ${input.id} with status ${response.status}`);
       }
       const data = await response.json();
       
-      if (data.s !== 'ok' || !data.t) {
-        console.warn(`Finnhub API returned status '${data.s}' for ${input.symbol}. This might mean no data is available for the given range.`);
+      if (!data.prices || data.prices.length === 0) {
+        console.warn(`CoinGecko API returned no price data for ${input.id}`);
         return { history: {} };
       }
 
       const history: Record<string, number> = {};
-      for (let i = 0; i < data.t.length; i++) {
-        const date = new Date(data.t[i] * 1000);
-        const utcDateStr = date.toISOString().split('T')[0];
-        history[utcDateStr] = data.c[i];
+      for (const [timestamp, price] of data.prices) {
+        const date = new Date(timestamp);
+        const utcDateStr = format(date, 'yyyy-MM-dd');
+        history[utcDateStr] = price;
       }
       return { history };
 
     } catch (error) {
-      console.error(`Error fetching crypto history for ${input.symbol}:`, error);
+      console.error(`Error fetching crypto history for ${input.id}:`, error);
       return { history: {} };
     }
   }

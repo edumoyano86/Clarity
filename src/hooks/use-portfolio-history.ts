@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Investment, PortfolioDataPoint, PriceHistory } from '@/lib/definitions';
-import { format, subDays, startOfDay, getUnixTime, isAfter, isBefore, addDays } from 'date-fns';
+import { format, subDays, startOfDay, getUnixTime, isAfter } from 'date-fns';
 import { getStockPriceHistory } from '@/ai/flows/stock-price-history';
 import { getCryptoPriceHistory } from '@/ai/flows/crypto-price-history';
 
@@ -29,8 +29,8 @@ export function usePortfolioHistory(
 
             setIsLoading(true);
             
-            const cryptoSymbols = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.symbol))];
-            const stockSymbols = [...new Set(investments.filter(i => i.assetType === 'stock').map(inv => inv.symbol))];
+            const cryptoAssets = investments.filter(i => i.assetType === 'crypto');
+            const stockAssets = investments.filter(i => i.assetType === 'stock');
 
             const endDate = startOfDay(new Date());
             const startDate = subDays(endDate, periodInDays);
@@ -39,21 +39,21 @@ export function usePortfolioHistory(
 
             const allPriceHistory: PriceHistory = new Map();
             
-            const stockPromises = stockSymbols.map(symbol => 
-                getStockPriceHistory({ symbol, from: startTimestamp, to: endTimestamp })
-                    .then(data => ({ symbol, data: data.history }))
+            const stockPromises = stockAssets.map(asset => 
+                getStockPriceHistory({ symbol: asset.symbol, from: startTimestamp, to: endTimestamp })
+                    .then(data => ({ symbol: asset.symbol, data: data.history }))
                     .catch(err => {
-                        console.warn(`Could not fetch stock history for ${symbol}:`, err);
-                        return { symbol, data: {} };
+                        console.warn(`Could not fetch stock history for ${asset.symbol}:`, err);
+                        return { symbol: asset.symbol, data: {} };
                     })
             );
 
-            const cryptoPromises = cryptoSymbols.map(symbol => 
-                getCryptoPriceHistory({ symbol, from: startTimestamp, to: endTimestamp })
-                     .then(data => ({ symbol, data: data.history }))
+            const cryptoPromises = cryptoAssets.map(asset => 
+                getCryptoPriceHistory({ id: asset.symbol, from: startTimestamp, to: endTimestamp })
+                     .then(data => ({ symbol: asset.symbol, data: data.history }))
                      .catch(err => {
-                        console.warn(`Could not fetch crypto history for ${symbol}:`, err);
-                        return { symbol, data: {} };
+                        console.warn(`Could not fetch crypto history for ${asset.symbol}:`, err);
+                        return { symbol: asset.symbol, data: {} };
                     })
             );
 
@@ -70,13 +70,16 @@ export function usePortfolioHistory(
             });
             
             // Fill in missing weekend/holiday data by carrying forward the last known price
-            for (const [symbol, pricesMap] of allPriceHistory.entries()) {
+            for (const pricesMap of allPriceHistory.values()) {
                 let lastKnownPrice: number | undefined = undefined;
+                // Iterate backwards from today
                 for (let i = 0; i <= periodInDays; i++) {
                     const currentDate = startOfDay(subDays(endDate, i));
                     const currentDateStr = format(currentDate, 'yyyy-MM-dd');
-                    if (pricesMap.has(currentDateStr) && pricesMap.get(currentDateStr)! > 0) {
-                        lastKnownPrice = pricesMap.get(currentDateStr);
+                    
+                    const currentPrice = pricesMap.get(currentDateStr);
+                    if (currentPrice !== undefined && currentPrice > 0) {
+                        lastKnownPrice = currentPrice;
                     } else if (lastKnownPrice !== undefined) {
                         pricesMap.set(currentDateStr, lastKnownPrice);
                     }
