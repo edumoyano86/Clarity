@@ -43,17 +43,17 @@ export type Note = {
 };
 
 export type Investment = {
-    id: string;
+    id: string; // For Crypto: coingecko id, For Stock: same as symbol
     assetType: 'crypto' | 'stock';
     name: string;
-    symbol: string; // Finnhub symbol (e.g., AAPL, BINANCE:BTCUSDT)
+    symbol: string; // For Crypto: e.g. BTC, For Stock: e.g. AAPL
     amount: number;
     purchaseDate: number; // timestamp
 };
 
 // For Price APIs
 export type PriceData = {
-  [symbol: string]: {
+  [symbolOrId: string]: {
     price: number;
   };
 };
@@ -63,5 +63,5 @@ export type PortfolioDataPoint = {
     value: number;
 };
 
-// Map<asset symbol, Map<date string 'yyyy-MM-dd', price>>
+// Map<asset id/symbol, Map<date string 'yyyy-MM-dd', price>>
 export type PriceHistory = Map<string, Map<string, number>>;

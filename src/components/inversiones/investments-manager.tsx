@@ -104,8 +104,8 @@ export function InvestmentsManager({
     const sortedInvestments = useMemo(() => {
         if (!investments) return [];
         return [...investments].sort((a, b) => {
-            const priceKeyA = a.symbol;
-            const priceKeyB = b.symbol;
+            const priceKeyA = a.assetType === 'crypto' ? a.id : a.symbol;
+            const priceKeyB = b.assetType === 'crypto' ? b.id : b.symbol;
             const aPrice = prices[priceKeyA]?.price || 0;
             const bPrice = prices[priceKeyB]?.price || 0;
             const aValue = a.amount * aPrice;
@@ -116,7 +116,7 @@ export function InvestmentsManager({
 
 
     const renderPortfolioRow = (investment: Investment) => {
-        const priceKey = investment.symbol;
+        const priceKey = investment.assetType === 'crypto' ? investment.id : investment.symbol;
         
         // Find the historical price for the purchase date
         const purchaseDateStr = format(startOfDay(new Date(investment.purchaseDate)), 'yyyy-MM-dd');

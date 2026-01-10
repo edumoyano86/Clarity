@@ -29,7 +29,6 @@ interface SearchResult {
     name: string;
 }
 
-// For CoinGecko, the unique identifier is `id`
 interface CryptoSearchResult {
     id: string;
     symbol: string;
@@ -38,7 +37,7 @@ interface CryptoSearchResult {
 
 
 const InvestmentSchema = z.object({
-    id: z.string().optional(),
+    id: z.string().min(1, 'Debes seleccionar un activo válido de la lista.'),
     assetType: z.enum(['crypto', 'stock'], { required_error: 'Debes seleccionar un tipo de activo.' }),
     symbol: z.string().min(1, 'Debes seleccionar o ingresar un activo.'),
     name: z.string().min(1, 'El nombre del activo es requerido'),
@@ -123,7 +122,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 amount: investment.amount,
                 purchaseDate: new Date(investment.purchaseDate),
             });
-            setSelectedAsset({ symbol: investment.symbol, name: investment.name, ...(investment.assetType === 'crypto' && { id: investment.symbol}) });
+            setSelectedAsset({ id: investment.id, symbol: investment.symbol, name: investment.name });
             setSearchQuery(investment.name);
             setIsListVisible(false);
         } else {
@@ -141,6 +140,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     }, [investment, reset]);
 
     useEffect(() => {
+        setValue('id', '');
         setValue('symbol', '');
         setValue('name', '');
         setSelectedAsset(null);
@@ -153,19 +153,18 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         setIsLoading(true);
         try {
-            const { id, ...investmentData } = data;
+            const { ...investmentData } = data;
             
-            const selectedSymbol = assetType === 'crypto' ? (selectedAsset as CryptoSearchResult)?.id : selectedAsset?.symbol;
-
-            if (!selectedAsset || selectedSymbol !== data.symbol) {
+            if (!selectedAsset) {
                  toast({ title: 'Error', description: 'Por favor selecciona un activo válido de la lista.', variant: 'destructive' });
                  setIsLoading(false);
                  return;
             }
 
             const dataToSave = { 
+                id: investmentData.id,
                 assetType: investmentData.assetType,
-                symbol: investmentData.symbol, // For crypto this is the ID, for stocks the ticker
+                symbol: investmentData.symbol,
                 name: investmentData.name,
                 amount: investmentData.amount,
                 purchaseDate: investmentData.purchaseDate.getTime() 
@@ -173,15 +172,16 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             
             const collectionRef = collection(firestore, 'users', userId, 'investments');
             
-            if (id) {
-                const docRef = doc(collectionRef, id);
+            if (investment?.id) { // If editing, use the original investment ID to find the doc
+                const docRef = doc(collectionRef, investment.id);
                 setDoc(docRef, dataToSave, { merge: true }).catch(serverError => {
                     errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'update', requestResourceData: dataToSave, }));
                     throw serverError;
                 });
-            } else {
-                addDoc(collectionRef, dataToSave).catch(serverError => {
-                    errorEmitter.emit('permission-error', new FirestorePermissionError({ path: collectionRef.path, operation: 'create', requestResourceData: dataToSave, }));
+            } else { // If new, add a new doc (Firestore will generate ID)
+                const docRef = doc(collectionRef, dataToSave.id); // Use the asset ID as the document ID
+                setDoc(docRef, dataToSave).catch(serverError => {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: dataToSave, }));
                     throw serverError;
                 });
             }
@@ -204,6 +204,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     value={asset.symbol}
                     onSelect={() => {
                         setSelectedAsset(asset);
+                        setValue('id', asset.symbol);
                         setValue('symbol', asset.symbol);
                         setValue('name', asset.name);
                         setSearchQuery(asset.name);
@@ -219,10 +220,11 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             return cryptoResults.map((asset) => (
                  <CommandItem
                     key={asset.id}
-                    value={asset.id} // Use the id for the value
+                    value={asset.id} 
                     onSelect={() => {
                         setSelectedAsset(asset);
-                        setValue('symbol', asset.id); // Store CoinGecko ID in symbol field
+                        setValue('id', asset.id); 
+                        setValue('symbol', asset.symbol);
                         setValue('name', asset.name);
                         setSearchQuery(asset.name);
                         setIsListVisible(false);
@@ -238,8 +240,8 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
 
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <input type="hidden" {...register('id')} />
-
+            
+            {!investment && ( // Don't allow changing type when editing
             <Controller
                 name="assetType"
                 control={control}
@@ -256,6 +258,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     </RadioGroup>
                 )}
             />
+            )}
 
             <div>
                 <Label htmlFor="symbol">Activo</Label>
@@ -269,8 +272,9 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                             if (!isListVisible) setIsListVisible(true);
                         }}
                         onFocus={() => setIsListVisible(true)}
+                        disabled={!!investment}
                     />
-                    {isListVisible && (
+                    {isListVisible && !investment && (
                         <CommandList className="absolute top-10 z-10 w-full rounded-md border bg-popover text-popover-foreground shadow-md">
                             {isSearching && <CommandEmpty>Buscando...</CommandEmpty>}
                             {!isSearching && stockResults.length === 0 && cryptoResults.length === 0 && searchQuery.length > 1 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}
@@ -282,6 +286,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                         </CommandList>
                     )}
                 </Command>
+                {errors.id && <p className="text-sm text-destructive">{errors.id.message}</p>}
                 {errors.symbol && <p className="text-sm text-destructive">{errors.symbol.message}</p>}
                  {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
             </div>
@@ -306,7 +311,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                             </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0">
-                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus locale={es} />
+                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus locale={es} disabled={!!investment}/>
                             </PopoverContent>
                         </Popover>
                     )}

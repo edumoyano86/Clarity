@@ -23,7 +23,7 @@ export function usePrices(investments: Investment[] | null) {
             
             setIsLoading(true);
 
-            const cryptoIds = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.symbol))];
+            const cryptoIds = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.id))];
             const stockSymbols = [...new Set(investments.filter(i => i.assetType === 'stock').map(inv => inv.symbol))];
 
             try {
