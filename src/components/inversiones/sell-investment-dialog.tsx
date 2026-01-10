@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useFirestore } from '@/firebase';
 import { collection, addDoc, doc, runTransaction } from 'firebase/firestore';
-import { Investment } from '@/lib/definitions';
+import { Investment, PriceData } from '@/lib/definitions';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 
 const formatNumber = (amount: number) => {
@@ -34,20 +34,34 @@ interface SellInvestmentDialogProps {
     onOpenChange: (isOpen: boolean) => void;
     investment: Investment;
     userId: string;
+    prices: PriceData;
     onSuccess: () => void;
 }
 
-export function SellInvestmentDialog({ isOpen, onOpenChange, investment, userId, onSuccess }: SellInvestmentDialogProps) {
+export function SellInvestmentDialog({ isOpen, onOpenChange, investment, userId, prices, onSuccess }: SellInvestmentDialogProps) {
     const { toast } = useToast();
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = useState(false);
 
     const schema = SellInvestmentSchema(investment.amount);
     type FormValues = z.infer<typeof schema>;
+    
+    const priceKey = investment.assetType === 'crypto' ? (investment.coinGeckoId || investment.id) : investment.symbol;
+    const currentPrice = prices[priceKey]?.price;
 
     const { register, handleSubmit, formState: { errors }, reset, watch } = useForm<FormValues>({
         resolver: zodResolver(schema),
+        defaultValues: {
+            sellPrice: currentPrice || undefined,
+        }
     });
+
+    // Update default price if it loads after the dialog is opened
+    useEffect(() => {
+        if(isOpen && currentPrice) {
+            reset({sellPrice: currentPrice});
+        }
+    }, [isOpen, currentPrice, reset]);
 
     const sellAmount = watch('amount');
     const sellPrice = watch('sellPrice');
@@ -112,7 +126,7 @@ export function SellInvestmentDialog({ isOpen, onOpenChange, investment, userId,
                 <DialogHeader>
                     <DialogTitle>Vender {investment.name} ({investment.symbol})</DialogTitle>
                     <DialogDescription>
-                        Cantidad disponible: {formatNumber(investment.amount)}
+                        Cantidad disponible: {formatNumber(investment.amount)}. Precio actual: {currentPrice ? formatCurrency(currentPrice) : 'Cargando...'}
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

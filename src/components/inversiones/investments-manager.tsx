@@ -104,8 +104,8 @@ export function InvestmentsManager({
     const sortedInvestments = useMemo(() => {
         if (!investments) return [];
         return [...investments].sort((a, b) => {
-            const priceKeyA = a.assetType === 'crypto' ? a.coinGeckoId! : a.symbol;
-            const priceKeyB = b.assetType === 'crypto' ? b.coinGeckoId! : b.symbol;
+            const priceKeyA = a.assetType === 'crypto' ? a.coinGeckoId || a.id : a.symbol;
+            const priceKeyB = b.assetType === 'crypto' ? b.coinGeckoId || b.id : b.symbol;
             const aPrice = prices[priceKeyA]?.price || 0;
             const bPrice = prices[priceKeyB]?.price || 0;
             const aValue = a.amount * aPrice;
@@ -141,7 +141,7 @@ export function InvestmentsManager({
             );
         }
         
-        const priceKey = investment.assetType === 'crypto' ? investment.coinGeckoId! : investment.symbol;
+        const priceKey = investment.assetType === 'crypto' ? (investment.coinGeckoId || investment.id) : investment.symbol;
         
         // Find the historical price for the purchase date
         const purchaseDateStr = format(startOfDay(new Date(investment.purchaseDate)), 'yyyy-MM-dd');
@@ -285,6 +285,7 @@ export function InvestmentsManager({
                     onOpenChange={setIsSellDialogOpen}
                     investment={investmentToSell}
                     userId={userId}
+                    prices={prices}
                     onSuccess={() => {
                         setIsSellDialogOpen(false);
                         setInvestmentToSell(undefined);

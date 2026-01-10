@@ -11,7 +11,11 @@ export function usePrices(investments: Investment[] | null) {
     const [isLoading, setIsLoading] = useState(true);
     const { toast } = useToast();
     
-    const investmentsKey = useMemo(() => investments?.map(inv => inv.id).join(',') || '', [investments]);
+    // Create a key that is stable and reflects the assets that need pricing
+    const investmentsKey = useMemo(() => {
+        if (!investments) return '';
+        return investments.map(inv => inv.id).sort().join(',');
+    }, [investments]);
 
     useEffect(() => {
         const fetchPrices = async () => {
@@ -25,8 +29,9 @@ export function usePrices(investments: Investment[] | null) {
 
             const cryptoAssets = investments.filter(i => i.assetType === 'crypto');
             const stockAssets = investments.filter(i => i.assetType === 'stock');
-
-            const cryptoIds = [...new Set(cryptoAssets.map(inv => inv.coinGeckoId).filter(Boolean) as string[])];
+            
+            // Use coinGeckoId if available, otherwise fall back to the investment's id (for older data)
+            const cryptoIds = [...new Set(cryptoAssets.map(inv => inv.coinGeckoId || inv.id).filter(Boolean) as string[])];
             const stockSymbols = [...new Set(stockAssets.map(inv => inv.symbol))];
 
             try {
@@ -39,7 +44,12 @@ export function usePrices(investments: Investment[] | null) {
                 }
                 
                 const results = await Promise.all(promises);
-                const combinedPrices = Object.assign({}, ...results);
+                
+                // Merge results from different APIs
+                const combinedPrices = results.reduce((acc, current) => {
+                    return { ...acc, ...current };
+                }, {});
+
                 setPrices(combinedPrices);
 
             } catch (error) {
@@ -56,7 +66,7 @@ export function usePrices(investments: Investment[] | null) {
         };
 
         fetchPrices();
-    }, [investmentsKey, toast]);
+    }, [investmentsKey, toast]); // Depend on the stable key
 
     return { prices, isLoading };
 }
