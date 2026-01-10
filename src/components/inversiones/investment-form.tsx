@@ -20,7 +20,6 @@ import { Investment } from '@/lib/definitions';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { searchStocks } from '@/ai/flows/stock-search';
-import { searchCryptos } from '@/ai/flows/crypto-search';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -60,7 +59,6 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = useState(false);
     
-    // States for asset search
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
     const [isSearching, setIsSearching] = useState(false);
@@ -76,7 +74,6 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
 
     const assetType = watch('assetType');
 
-    // --- Asset Search Logic ---
     const searchAssets = useCallback(async (query: string) => {
         if (query.length < 1) {
             setSearchResults([]);
@@ -85,11 +82,20 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         }
         setIsSearching(true);
         try {
-            const response = assetType === 'crypto'
-              ? await searchCryptos({ query })
-              : await searchStocks({ query });
+            // Unified search for both stocks and crypto
+            const response = await searchStocks({ query });
+            
+            // Filter results based on the selected assetType
+            let filteredResults = response.results || [];
+            if (assetType === 'crypto') {
+                // For crypto, symbols often contain a colon, like 'BINANCE:BTCUSDT'
+                filteredResults = filteredResults.filter(r => r.symbol.includes(':'));
+            } else {
+                // For stocks, filter out anything that looks like a crypto or has weird characters
+                filteredResults = filteredResults.filter(r => !r.symbol.includes(':') && !r.symbol.includes('.'));
+            }
+            setSearchResults(filteredResults);
 
-            setSearchResults(response.results || []);
         } catch (error) {
             console.error("Failed to search assets:", error);
             setSearchResults([]);
@@ -128,7 +134,6 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     }, [investment, reset]);
 
     useEffect(() => {
-        // Reset search when asset type changes
         setValue('symbol', '');
         setValue('name', '');
         setSelectedAsset(null);
@@ -143,7 +148,9 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             const { id, ...investmentData } = data;
             
             if (!selectedAsset || selectedAsset.symbol !== data.symbol) {
-                throw new Error('Por favor selecciona un activo de la lista.');
+                 toast({ title: 'Error', description: 'Por favor selecciona un activo válido de la lista.', variant: 'destructive' });
+                 setIsLoading(false);
+                 return;
             }
 
             const dataToSave = { 

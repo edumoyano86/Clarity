@@ -1,16 +1,16 @@
 'use server';
 
 /**
- * @fileOverview A Genkit flow for searching stock symbols using the Finnhub API.
+ * @fileOverview A Genkit flow for searching stock and crypto symbols using the Finnhub API.
  * 
- * - searchStocks - A function that takes a search query and returns a list of matching stocks.
+ * - searchStocks - A function that takes a search query and returns a list of matching assets.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
 const StockSearchInputSchema = z.object({
-  query: z.string().describe('The search keywords (e.g., "Apple", "TSLA").'),
+  query: z.string().describe('The search keywords (e.g., "Apple", "BTC").'),
 });
 export type StockSearchInput = z.infer<typeof StockSearchInputSchema>;
 
@@ -57,7 +57,6 @@ const stockSearchFlow = ai.defineFlow(
 
       if (data.result && Array.isArray(data.result)) {
         const results = data.result
-          .filter((match: any) => !match.symbol.includes('.') && !match.symbol.includes(':')) // Filter out non-common stocks
           .map((match: any) => ({
             symbol: match.symbol,
             name: match.description,
