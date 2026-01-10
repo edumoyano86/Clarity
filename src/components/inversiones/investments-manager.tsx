@@ -104,8 +104,8 @@ export function InvestmentsManager({
     const sortedInvestments = useMemo(() => {
         if (!investments) return [];
         return [...investments].sort((a, b) => {
-            const aPrice = prices[a.symbol]?.price || 0;
-            const bPrice = prices[b.symbol]?.price || 0;
+            const aPrice = prices[a.id]?.price || 0;
+            const bPrice = prices[b.id]?.price || 0;
             const aValue = a.amount * aPrice;
             const bValue = b.amount * bPrice;
             return bValue - aValue;
@@ -114,7 +114,18 @@ export function InvestmentsManager({
 
 
     const renderPortfolioRow = (investment: Investment) => {
-        const priceKey = investment.symbol;
+        const priceKey = investment.id;
+
+        // Date validation
+        if (isNaN(investment.purchaseDate) || !investment.purchaseDate) {
+             return (
+                <TableRow key={investment.id}>
+                    <TableCell colSpan={7} className="text-destructive">
+                        Error: La fecha de compra de {investment.name} es inválida. Por favor, edítala.
+                    </TableCell>
+                </TableRow>
+            );
+        }
         
         // Find the historical price for the purchase date
         const purchaseDateStr = format(startOfDay(new Date(investment.purchaseDate)), 'yyyy-MM-dd');
@@ -215,7 +226,7 @@ export function InvestmentsManager({
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {isLoading && investments.length > 0 ? (
+                                    {isLoading ? (
                                         <TableRow>
                                             <TableCell colSpan={7} className="text-center h-24">
                                                 <div className="flex justify-center items-center">

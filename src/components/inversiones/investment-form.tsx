@@ -123,7 +123,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 purchaseDate: new Date(investment.purchaseDate),
                 coinGeckoId: investment.coinGeckoId,
             });
-            setSelectedAsset({ symbol: investment.symbol, name: investment.name });
+            setSelectedAsset({ symbol: investment.symbol, name: investment.name, id: investment.coinGeckoId || '' });
             setSearchQuery(investment.name);
             setIsListVisible(false);
         } else {
@@ -164,10 +164,16 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             
             const collectionRef = collection(firestore, 'users', userId, 'investments');
             
-            const docRef = doc(collectionRef, data.id);
-            setDoc(docRef, data, { merge: true }).catch(serverError => {
+            const dataToSave: Omit<Investment, 'id'> & { id: string } = {
+                ...data,
+                purchaseDate: data.purchaseDate.getTime(),
+            };
+
+            const docRef = doc(collectionRef, dataToSave.id);
+
+            setDoc(docRef, dataToSave, { merge: true }).catch(serverError => {
                 const operation = investment ? 'update' : 'create';
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation, requestResourceData: data, }));
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation, requestResourceData: dataToSave, }));
                 throw serverError;
             });
 
@@ -189,8 +195,9 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     value={asset.name}
                     onSelect={() => {
                         setSelectedAsset(asset);
-                        setValue('id', asset.symbol);
-                        setValue('symbol', asset.symbol);
+                        const upperCaseSymbol = asset.symbol.toUpperCase();
+                        setValue('id', upperCaseSymbol);
+                        setValue('symbol', upperCaseSymbol);
                         setValue('name', asset.name);
                         setValue('coinGeckoId', ''); // Not a crypto
                         setSearchQuery(asset.name);
@@ -210,7 +217,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     onSelect={() => {
                         setSelectedAsset(asset);
                         const upperCaseSymbol = asset.symbol.toUpperCase();
-                        setValue('id', upperCaseSymbol); // Use uppercase symbol as main ID
+                        setValue('id', upperCaseSymbol); 
                         setValue('symbol', upperCaseSymbol);
                         setValue('name', asset.name);
                         setValue('coinGeckoId', asset.id); // Store coingecko id separately
