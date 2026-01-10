@@ -46,14 +46,14 @@ export type Investment = {
     id: string;
     assetType: 'crypto' | 'stock';
     name: string;
-    symbol: string; // Finnhub symbol for crypto (e.g. BINANCE:BTCUSDT), Ticker for stock (e.g. AAPL)
+    symbol: string; // Finnhub symbol (e.g., AAPL, BINANCE:BTCUSDT)
     amount: number;
     purchaseDate: number; // timestamp
 };
 
 // For Price APIs
 export type PriceData = {
-  [id: string]: {
+  [symbol: string]: {
     price: number;
   };
 };

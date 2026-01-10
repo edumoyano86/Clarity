@@ -48,7 +48,7 @@ const cryptoPriceHistoryFlow = ai.defineFlow(
       const data = await response.json();
       
       if (data.s !== 'ok' || !data.t) {
-        console.warn(`Finnhub API returned status '${data.s}' for ${input.symbol}`);
+        console.warn(`Finnhub API returned status '${data.s}' for ${input.symbol}. This might mean no data is available for the given range.`);
         return { history: {} };
       }
 

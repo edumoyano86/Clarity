@@ -3,7 +3,6 @@ config();
 
 import '@/ai/flows/savings-suggestions.ts';
 import '@/ai/flows/budget-alerts.ts';
-// import '@/ai/flows/crypto-prices.ts'; // No longer needed
 import '@/ai/flows/stock-prices.ts';
 import '@/ai/flows/stock-search.ts';
 import '@/ai/flows/crypto-search.ts';

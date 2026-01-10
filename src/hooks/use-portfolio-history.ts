@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Investment, PortfolioDataPoint, PriceHistory, PriceData } from '@/lib/definitions';
-import { format, subDays, startOfDay, getUnixTime, isAfter } from 'date-fns';
+import { Investment, PortfolioDataPoint, PriceHistory } from '@/lib/definitions';
+import { format, subDays, startOfDay, getUnixTime, isAfter, isBefore, addDays } from 'date-fns';
 import { getStockPriceHistory } from '@/ai/flows/stock-price-history';
 import { getCryptoPriceHistory } from '@/ai/flows/crypto-price-history';
 
@@ -69,6 +69,7 @@ export function usePortfolioHistory(
                 }
             });
             
+            // Fill in missing weekend/holiday data by carrying forward the last known price
             for (const [symbol, pricesMap] of allPriceHistory.entries()) {
                 let lastKnownPrice: number | undefined = undefined;
                 for (let i = 0; i <= periodInDays; i++) {
@@ -92,8 +93,7 @@ export function usePortfolioHistory(
                 investments.forEach(inv => {
                     const purchaseDate = startOfDay(new Date(inv.purchaseDate));
                     if (!isAfter(purchaseDate, currentDate)) {
-                        const priceKey = inv.symbol;
-                        const historyForAsset = allPriceHistory.get(priceKey);
+                        const historyForAsset = allPriceHistory.get(inv.symbol);
                         const priceForDay = historyForAsset?.get(currentDateStr);
                         
                         if (priceForDay) {

@@ -33,6 +33,7 @@ const InvestmentSchema = z.object({
     id: z.string().optional(),
     assetType: z.enum(['crypto', 'stock'], { required_error: 'Debes seleccionar un tipo de activo.' }),
     symbol: z.string().min(1, 'Debes seleccionar o ingresar un activo.'),
+    name: z.string().min(1, 'El nombre del activo es requerido'),
     amount: z.coerce.number().positive('La cantidad debe ser un número positivo.'),
     purchaseDate: z.date({ required_error: 'La fecha de compra es requerida.' }),
 });
@@ -84,12 +85,10 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         }
         setIsSearching(true);
         try {
-            let response;
-            if (assetType === 'crypto') {
-                response = await searchCryptos({ query });
-            } else {
-                response = await searchStocks({ query });
-            }
+            const response = assetType === 'crypto'
+              ? await searchCryptos({ query })
+              : await searchStocks({ query });
+
             setSearchResults(response.results || []);
         } catch (error) {
             console.error("Failed to search assets:", error);
@@ -107,6 +106,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 id: investment.id,
                 assetType: investment.assetType,
                 symbol: investment.symbol,
+                name: investment.name,
                 amount: investment.amount,
                 purchaseDate: new Date(investment.purchaseDate),
             });
@@ -118,6 +118,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 id: '',
                 assetType: 'crypto',
                 symbol: '',
+                name: '',
                 amount: undefined,
                 purchaseDate: new Date(),
             });
@@ -129,6 +130,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     useEffect(() => {
         // Reset search when asset type changes
         setValue('symbol', '');
+        setValue('name', '');
         setSelectedAsset(null);
         setSearchQuery('');
         setSearchResults([]);
@@ -145,9 +147,10 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             }
 
             const dataToSave = { 
-                ...investmentData, 
-                name: selectedAsset.name,
-                symbol: selectedAsset.symbol,
+                assetType: investmentData.assetType,
+                symbol: investmentData.symbol,
+                name: investmentData.name,
+                amount: investmentData.amount,
                 purchaseDate: investmentData.purchaseDate.getTime() 
             };
             
@@ -208,7 +211,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                             debouncedSearch(query);
                             if (!isListVisible) setIsListVisible(true);
                         }}
-                            onFocus={() => setIsListVisible(true)}
+                        onFocus={() => setIsListVisible(true)}
                     />
                     {isListVisible && (
                         <CommandList className="absolute top-10 z-10 w-full rounded-md border bg-popover text-popover-foreground shadow-md">
@@ -225,6 +228,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                                         if (selected) {
                                             setSelectedAsset(selected);
                                             setValue('symbol', selected.symbol);
+                                            setValue('name', selected.name);
                                             setSearchQuery(selected.name);
                                         }
                                         setIsListVisible(false);
@@ -240,6 +244,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     )}
                 </Command>
                 {errors.symbol && <p className="text-sm text-destructive">{errors.symbol.message}</p>}
+                 {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
             </div>
             
             <div>

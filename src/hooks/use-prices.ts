@@ -22,7 +22,7 @@ export function usePrices(investments: Investment[] | null) {
             
             setIsLoading(true);
 
-            // Finnhub can get crypto prices via the stock quote endpoint if the symbol is correct (e.g., BINANCE:BTCUSDT)
+            // Finnhub's /quote endpoint can fetch both stocks and crypto prices
             const allSymbols = [...new Set(investments.map(inv => inv.symbol))];
 
             try {
