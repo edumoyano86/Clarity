@@ -104,8 +104,10 @@ export function InvestmentsManager({
     const sortedInvestments = useMemo(() => {
         if (!investments) return [];
         return [...investments].sort((a, b) => {
-            const aPrice = prices[a.id]?.price || 0;
-            const bPrice = prices[b.id]?.price || 0;
+            const priceKeyA = a.assetType === 'crypto' ? a.coinGeckoId : a.symbol;
+            const priceKeyB = b.assetType === 'crypto' ? b.coinGeckoId : b.symbol;
+            const aPrice = prices[priceKeyA!]?.price || 0;
+            const bPrice = prices[priceKeyB!]?.price || 0;
             const aValue = a.amount * aPrice;
             const bValue = b.amount * bPrice;
             return bValue - aValue;
@@ -114,25 +116,39 @@ export function InvestmentsManager({
 
 
     const renderPortfolioRow = (investment: Investment) => {
-        const priceKey = investment.id;
+        // Robust date validation
+        const isDateInvalid = typeof investment.purchaseDate !== 'number' || isNaN(investment.purchaseDate) || investment.purchaseDate <= 0;
 
-        // Date validation
-        if (isNaN(investment.purchaseDate) || !investment.purchaseDate) {
-             return (
+        if (isDateInvalid) {
+            return (
                 <TableRow key={investment.id}>
-                    <TableCell colSpan={7} className="text-destructive">
-                        Error: La fecha de compra de {investment.name} es inválida. Por favor, edítala.
+                    <TableCell>
+                        <div className='font-medium'>{investment.name}</div>
+                        <div className='text-sm text-muted-foreground'>{investment.symbol}</div>
+                    </TableCell>
+                    <TableCell colSpan={5} className="text-destructive text-center font-medium">
+                        Fecha de compra inválida.
+                    </TableCell>
+                    <TableCell className='text-right space-x-0'>
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenForm(investment)} title="Editar">
+                            <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenAlert(investment)} title="Eliminar">
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
                     </TableCell>
                 </TableRow>
             );
         }
         
+        const priceKey = investment.assetType === 'crypto' ? investment.coinGeckoId : investment.symbol;
+        
         // Find the historical price for the purchase date
         const purchaseDateStr = format(startOfDay(new Date(investment.purchaseDate)), 'yyyy-MM-dd');
-        const purchasePrice = priceHistory.get(priceKey)?.get(purchaseDateStr) || 0;
+        const purchasePrice = priceHistory.get(priceKey!)?.get(purchaseDateStr) || 0;
         const purchaseValue = investment.amount * purchasePrice;
         
-        const currentPrice = prices[priceKey]?.price;
+        const currentPrice = prices[priceKey!]?.price;
         const currentValue = currentPrice ? investment.amount * currentPrice : null;
         
         const pnl = currentValue !== null && purchaseValue > 0 ? currentValue - purchaseValue : null;
@@ -142,7 +158,7 @@ export function InvestmentsManager({
             <TableRow key={investment.id}>
                 <TableCell>
                     <div className='font-medium'>{investment.name}</div>
-                    <div className='text-sm text-muted-foreground'>{investment.symbol.toUpperCase()}</div>
+                    <div className='text-sm text-muted-foreground'>{investment.symbol}</div>
                 </TableCell>
                 <TableCell>{investment.amount.toFixed(4)}</TableCell>
                 <TableCell>{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : formatCurrency(purchasePrice)}</TableCell>
