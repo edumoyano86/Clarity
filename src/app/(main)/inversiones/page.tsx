@@ -25,8 +25,8 @@ export default function InversionesPage() {
     const totalValue = useMemo(() => {
         if (!investments || Object.keys(prices).length === 0) return 0;
         return investments.reduce((acc, inv) => {
-            const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
-            const currentPrice = prices[priceKey!]?.price || 0;
+            const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId! : inv.symbol;
+            const currentPrice = prices[priceKey]?.price || 0;
             return acc + (inv.amount * currentPrice);
         }, 0);
     }, [investments, prices]);

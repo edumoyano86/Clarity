@@ -28,9 +28,8 @@ export function usePortfolioHistory(
             }
 
             setIsLoading(true);
-            setPriceHistory(new Map());
             
-            const cryptoAssets = investments.filter(i => i.assetType === 'crypto');
+            const cryptoAssets = investments.filter(i => i.assetType === 'crypto' && i.coinGeckoId);
             const stockAssets = investments.filter(i => i.assetType === 'stock');
 
             const endDate = startOfDay(new Date());
@@ -42,20 +41,19 @@ export function usePortfolioHistory(
             
             const stockPromises = stockAssets.map(asset => 
                 getStockPriceHistory({ symbol: asset.symbol, from: startTimestamp, to: endTimestamp })
-                    .then(data => ({ symbol: asset.symbol, data: data.history }))
+                    .then(data => ({ id: asset.symbol, data: data.history }))
                     .catch(err => {
                         console.warn(`Could not fetch stock history for ${asset.symbol}:`, err);
-                        return { symbol: asset.symbol, data: {} };
+                        return { id: asset.symbol, data: {} };
                     })
             );
 
             const cryptoPromises = cryptoAssets.map(asset => {
-                if (!asset.coinGeckoId) return Promise.resolve({ symbol: asset.symbol, data: {} });
-                return getCryptoPriceHistory({ id: asset.coinGeckoId, from: startTimestamp, to: endTimestamp })
-                     .then(data => ({ symbol: asset.symbol, data: data.history }))
+                return getCryptoPriceHistory({ id: asset.coinGeckoId!, from: startTimestamp, to: endTimestamp })
+                     .then(data => ({ id: asset.coinGeckoId!, data: data.history }))
                      .catch(err => {
                         console.warn(`Could not fetch crypto history for ${asset.symbol}:`, err);
-                        return { symbol: asset.symbol, data: {} };
+                        return { id: asset.coinGeckoId!, data: {} };
                     });
             });
 
@@ -67,12 +65,12 @@ export function usePortfolioHistory(
                     Object.entries(result.data).forEach(([dateStr, price]) => {
                         pricesMap.set(dateStr, price);
                     });
-                    allPriceHistory.set(result.symbol, pricesMap);
+                    allPriceHistory.set(result.id, pricesMap);
                 }
             });
             
             // Fill in missing weekend/holiday data by carrying forward the last known price
-            for (const [symbol, pricesMap] of allPriceHistory.entries()) {
+            for (const [id, pricesMap] of allPriceHistory.entries()) {
                 let lastKnownPrice: number | undefined = undefined;
                 // Get the oldest available price to backfill
                 const sortedPrices = Array.from(pricesMap.entries()).sort((a,b) => new Date(a[0]).getTime() - new Date(b[0]).getTime());
@@ -92,7 +90,7 @@ export function usePortfolioHistory(
                         pricesMap.set(currentDateStr, sortedPrices[0][1]);
                     }
                 }
-                allPriceHistory.set(symbol, pricesMap);
+                allPriceHistory.set(id, pricesMap);
             }
             
             setPriceHistory(allPriceHistory);
@@ -106,7 +104,8 @@ export function usePortfolioHistory(
                 investments.forEach(inv => {
                     const purchaseDate = startOfDay(new Date(inv.purchaseDate));
                     if (!isAfter(purchaseDate, currentDate)) {
-                        const historyForAsset = allPriceHistory.get(inv.symbol);
+                        const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId! : inv.symbol;
+                        const historyForAsset = allPriceHistory.get(priceKey);
                         const priceForDay = historyForAsset?.get(currentDateStr);
                         
                         if (priceForDay) {

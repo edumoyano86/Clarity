@@ -24,7 +24,7 @@ import { searchCryptos } from '@/ai/flows/crypto-search';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
-interface SearchResult {
+interface StockSearchResult {
     symbol: string;
     name: string;
 }
@@ -68,10 +68,10 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     const [isLoading, setIsLoading] = useState(false);
     
     const [searchQuery, setSearchQuery] = useState('');
-    const [stockResults, setStockResults] = useState<SearchResult[]>([]);
+    const [stockResults, setStockResults] = useState<StockSearchResult[]>([]);
     const [cryptoResults, setCryptoResults] = useState<CryptoSearchResult[]>([]);
     const [isSearching, setIsSearching] = useState(false);
-    const [selectedAsset, setSelectedAsset] = useState<SearchResult | CryptoSearchResult | null>(null);
+    const [selectedAsset, setSelectedAsset] = useState<StockSearchResult | CryptoSearchResult | null>(null);
     const [isListVisible, setIsListVisible] = useState(true);
 
     const { register, handleSubmit, formState: { errors }, control, reset, watch, setValue } = useForm<FormValues>({
@@ -156,7 +156,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         setIsLoading(true);
         try {
-            if (!selectedAsset) {
+            if (!selectedAsset && !investment) {
                  toast({ title: 'Error', description: 'Por favor selecciona un activo válido de la lista.', variant: 'destructive' });
                  setIsLoading(false);
                  return;
@@ -166,6 +166,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             
             const dataToSave: Omit<Investment, 'id'> & { id: string } = {
                 ...data,
+                id: investment ? investment.id : data.id, // Keep original ID on edit
                 purchaseDate: data.purchaseDate.getTime(),
             };
 
@@ -194,8 +195,8 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     key={asset.symbol}
                     value={asset.name}
                     onSelect={() => {
-                        setSelectedAsset(asset);
                         const upperCaseSymbol = asset.symbol.toUpperCase();
+                        setSelectedAsset({ ...asset, id: upperCaseSymbol });
                         setValue('id', upperCaseSymbol);
                         setValue('symbol', upperCaseSymbol);
                         setValue('name', asset.name);
@@ -215,9 +216,9 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     key={asset.id}
                     value={asset.name} 
                     onSelect={() => {
-                        setSelectedAsset(asset);
                         const upperCaseSymbol = asset.symbol.toUpperCase();
-                        setValue('id', upperCaseSymbol); 
+                        setSelectedAsset(asset);
+                        setValue('id', asset.id); // Set ID to CoinGecko ID
                         setValue('symbol', upperCaseSymbol);
                         setValue('name', asset.name);
                         setValue('coinGeckoId', asset.id); // Store coingecko id separately
@@ -305,7 +306,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                             </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0">
-                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus locale={es} disabled={!!investment}/>
+                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus locale={es}/>
                             </PopoverContent>
                         </Popover>
                     )}

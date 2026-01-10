@@ -32,19 +32,7 @@ export function usePrices(investments: Investment[] | null) {
             try {
                 const promises = [];
                 if (cryptoIds.length > 0) {
-                    promises.push(
-                        getCryptoPrices({ ids: cryptoIds }).then(cryptoPrices => {
-                            // Remap keys from coingeckoId to symbol
-                            const remapped: PriceData = {};
-                            for (const id in cryptoPrices) {
-                                const investment = cryptoAssets.find(inv => inv.coinGeckoId === id);
-                                if (investment) {
-                                    remapped[investment.symbol] = cryptoPrices[id];
-                                }
-                            }
-                            return remapped;
-                        })
-                    );
+                    promises.push(getCryptoPrices({ ids: cryptoIds }));
                 }
                 if (stockSymbols.length > 0) {
                     promises.push(getStockPrices({ symbols: stockSymbols }));

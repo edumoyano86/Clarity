@@ -104,10 +104,10 @@ export function InvestmentsManager({
     const sortedInvestments = useMemo(() => {
         if (!investments) return [];
         return [...investments].sort((a, b) => {
-            const priceKeyA = a.assetType === 'crypto' ? a.coinGeckoId : a.symbol;
-            const priceKeyB = b.assetType === 'crypto' ? b.coinGeckoId : b.symbol;
-            const aPrice = prices[priceKeyA!]?.price || 0;
-            const bPrice = prices[priceKeyB!]?.price || 0;
+            const priceKeyA = a.assetType === 'crypto' ? a.coinGeckoId! : a.symbol;
+            const priceKeyB = b.assetType === 'crypto' ? b.coinGeckoId! : b.symbol;
+            const aPrice = prices[priceKeyA]?.price || 0;
+            const bPrice = prices[priceKeyB]?.price || 0;
             const aValue = a.amount * aPrice;
             const bValue = b.amount * bPrice;
             return bValue - aValue;
@@ -127,7 +127,7 @@ export function InvestmentsManager({
                         <div className='text-sm text-muted-foreground'>{investment.symbol}</div>
                     </TableCell>
                     <TableCell colSpan={5} className="text-destructive text-center font-medium">
-                        Fecha de compra inválida.
+                        Fecha de compra inválida. Por favor, edita la inversión.
                     </TableCell>
                     <TableCell className='text-right space-x-0'>
                         <Button variant="ghost" size="icon" onClick={() => handleOpenForm(investment)} title="Editar">
@@ -141,14 +141,14 @@ export function InvestmentsManager({
             );
         }
         
-        const priceKey = investment.assetType === 'crypto' ? investment.coinGeckoId : investment.symbol;
+        const priceKey = investment.assetType === 'crypto' ? investment.coinGeckoId! : investment.symbol;
         
         // Find the historical price for the purchase date
         const purchaseDateStr = format(startOfDay(new Date(investment.purchaseDate)), 'yyyy-MM-dd');
-        const purchasePrice = priceHistory.get(priceKey!)?.get(purchaseDateStr) || 0;
+        const purchasePrice = priceHistory.get(priceKey)?.get(purchaseDateStr) || 0;
         const purchaseValue = investment.amount * purchasePrice;
         
-        const currentPrice = prices[priceKey!]?.price;
+        const currentPrice = prices[priceKey]?.price;
         const currentValue = currentPrice ? investment.amount * currentPrice : null;
         
         const pnl = currentValue !== null && purchaseValue > 0 ? currentValue - purchaseValue : null;
