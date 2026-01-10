@@ -30,19 +30,19 @@ interface SearchResult {
 }
 
 interface CryptoSearchResult {
-    id: string;
-    symbol: string;
+    id: string; // coingecko id
+    symbol: string; // e.g. btc
     name: string;
 }
-
 
 const InvestmentSchema = z.object({
     id: z.string().min(1, 'Debes seleccionar un activo válido de la lista.'),
     assetType: z.enum(['crypto', 'stock'], { required_error: 'Debes seleccionar un tipo de activo.' }),
-    symbol: z.string().min(1, 'Debes seleccionar o ingresar un activo.'),
+    symbol: z.string().min(1, 'Debes seleccionar un activo.'),
     name: z.string().min(1, 'El nombre del activo es requerido'),
     amount: z.coerce.number().positive('La cantidad debe ser un número positivo.'),
     purchaseDate: z.date({ required_error: 'La fecha de compra es requerida.' }),
+    coinGeckoId: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof InvestmentSchema>;
@@ -121,8 +121,9 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 name: investment.name,
                 amount: investment.amount,
                 purchaseDate: new Date(investment.purchaseDate),
+                coinGeckoId: investment.coinGeckoId,
             });
-            setSelectedAsset({ id: investment.id, symbol: investment.symbol, name: investment.name });
+            setSelectedAsset({ symbol: investment.symbol, name: investment.name });
             setSearchQuery(investment.name);
             setIsListVisible(false);
         } else {
@@ -133,6 +134,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 name: '',
                 amount: undefined,
                 purchaseDate: new Date(),
+                coinGeckoId: '',
             });
             setSelectedAsset(null);
             setSearchQuery('');
@@ -143,6 +145,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         setValue('id', '');
         setValue('symbol', '');
         setValue('name', '');
+        setValue('coinGeckoId', '');
         setSelectedAsset(null);
         setSearchQuery('');
         setStockResults([]);
@@ -153,38 +156,20 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         setIsLoading(true);
         try {
-            const { ...investmentData } = data;
-            
             if (!selectedAsset) {
                  toast({ title: 'Error', description: 'Por favor selecciona un activo válido de la lista.', variant: 'destructive' });
                  setIsLoading(false);
                  return;
             }
-
-            const dataToSave = { 
-                id: investmentData.id,
-                assetType: investmentData.assetType,
-                symbol: investmentData.symbol,
-                name: investmentData.name,
-                amount: investmentData.amount,
-                purchaseDate: investmentData.purchaseDate.getTime() 
-            };
             
             const collectionRef = collection(firestore, 'users', userId, 'investments');
             
-            if (investment?.id) { // If editing, use the original investment ID to find the doc
-                const docRef = doc(collectionRef, investment.id);
-                setDoc(docRef, dataToSave, { merge: true }).catch(serverError => {
-                    errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'update', requestResourceData: dataToSave, }));
-                    throw serverError;
-                });
-            } else { // If new, add a new doc (Firestore will generate ID)
-                const docRef = doc(collectionRef, dataToSave.id); // Use the asset ID as the document ID
-                setDoc(docRef, dataToSave).catch(serverError => {
-                    errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: dataToSave, }));
-                    throw serverError;
-                });
-            }
+            const docRef = doc(collectionRef, data.id);
+            setDoc(docRef, data, { merge: true }).catch(serverError => {
+                const operation = investment ? 'update' : 'create';
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation, requestResourceData: data, }));
+                throw serverError;
+            });
 
             toast({ title: 'Éxito', description: 'Inversión guardada exitosamente.'});
             onFormSuccess();
@@ -201,12 +186,13 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             return stockResults.map((asset) => (
                 <CommandItem
                     key={asset.symbol}
-                    value={asset.symbol}
+                    value={asset.name}
                     onSelect={() => {
                         setSelectedAsset(asset);
                         setValue('id', asset.symbol);
                         setValue('symbol', asset.symbol);
                         setValue('name', asset.name);
+                        setValue('coinGeckoId', ''); // Not a crypto
                         setSearchQuery(asset.name);
                         setIsListVisible(false);
                     }}
@@ -220,12 +206,14 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             return cryptoResults.map((asset) => (
                  <CommandItem
                     key={asset.id}
-                    value={asset.id} 
+                    value={asset.name} 
                     onSelect={() => {
                         setSelectedAsset(asset);
-                        setValue('id', asset.id); 
-                        setValue('symbol', asset.symbol);
+                        const upperCaseSymbol = asset.symbol.toUpperCase();
+                        setValue('id', upperCaseSymbol); // Use uppercase symbol as main ID
+                        setValue('symbol', upperCaseSymbol);
                         setValue('name', asset.name);
+                        setValue('coinGeckoId', asset.id); // Store coingecko id separately
                         setSearchQuery(asset.name);
                         setIsListVisible(false);
                     }}
@@ -287,7 +275,6 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     )}
                 </Command>
                 {errors.id && <p className="text-sm text-destructive">{errors.id.message}</p>}
-                {errors.symbol && <p className="text-sm text-destructive">{errors.symbol.message}</p>}
                  {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
             </div>
             

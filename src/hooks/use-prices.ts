@@ -8,10 +8,10 @@ import { useToast } from './use-toast';
 
 export function usePrices(investments: Investment[] | null) {
     const [prices, setPrices] = useState<PriceData>({});
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const { toast } = useToast();
     
-    const investmentsKey = useMemo(() => investments?.map(inv => `${inv.id}-${inv.symbol}`).join(',') || '', [investments]);
+    const investmentsKey = useMemo(() => investments?.map(inv => inv.id).join(',') || '', [investments]);
 
     useEffect(() => {
         const fetchPrices = async () => {
@@ -23,20 +23,34 @@ export function usePrices(investments: Investment[] | null) {
             
             setIsLoading(true);
 
-            const cryptoIds = [...new Set(investments.filter(i => i.assetType === 'crypto').map(inv => inv.id))];
-            const stockSymbols = [...new Set(investments.filter(i => i.assetType === 'stock').map(inv => inv.symbol))];
+            const cryptoAssets = investments.filter(i => i.assetType === 'crypto');
+            const stockAssets = investments.filter(i => i.assetType === 'stock');
+
+            const cryptoIds = [...new Set(cryptoAssets.map(inv => inv.coinGeckoId).filter(Boolean) as string[])];
+            const stockSymbols = [...new Set(stockAssets.map(inv => inv.symbol))];
 
             try {
-                const pricePromises = [];
-
+                const promises = [];
                 if (cryptoIds.length > 0) {
-                    pricePromises.push(getCryptoPrices({ ids: cryptoIds }));
+                    promises.push(
+                        getCryptoPrices({ ids: cryptoIds }).then(cryptoPrices => {
+                            // Remap keys from coingeckoId to symbol
+                            const remapped: PriceData = {};
+                            for (const id in cryptoPrices) {
+                                const investment = cryptoAssets.find(inv => inv.coinGeckoId === id);
+                                if (investment) {
+                                    remapped[investment.symbol] = cryptoPrices[id];
+                                }
+                            }
+                            return remapped;
+                        })
+                    );
                 }
                 if (stockSymbols.length > 0) {
-                    pricePromises.push(getStockPrices({ symbols: stockSymbols }));
+                    promises.push(getStockPrices({ symbols: stockSymbols }));
                 }
                 
-                const results = await Promise.all(pricePromises);
+                const results = await Promise.all(promises);
                 const combinedPrices = Object.assign({}, ...results);
                 setPrices(combinedPrices);
 
@@ -54,7 +68,6 @@ export function usePrices(investments: Investment[] | null) {
         };
 
         fetchPrices();
-    // Depend on the memoized key of investments to refetch when they change.
     }, [investmentsKey, toast]);
 
     return { prices, isLoading };

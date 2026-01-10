@@ -48,14 +48,15 @@ export function usePortfolioHistory(
                     })
             );
 
-            const cryptoPromises = cryptoAssets.map(asset => 
-                getCryptoPriceHistory({ id: asset.symbol, from: startTimestamp, to: endTimestamp })
+            const cryptoPromises = cryptoAssets.map(asset => {
+                if (!asset.coinGeckoId) return Promise.resolve({ symbol: asset.symbol, data: {} });
+                return getCryptoPriceHistory({ id: asset.coinGeckoId, from: startTimestamp, to: endTimestamp })
                      .then(data => ({ symbol: asset.symbol, data: data.history }))
                      .catch(err => {
                         console.warn(`Could not fetch crypto history for ${asset.symbol}:`, err);
                         return { symbol: asset.symbol, data: {} };
-                    })
-            );
+                    });
+            });
 
             const results = await Promise.all([...stockPromises, ...cryptoPromises]);
 
@@ -70,21 +71,29 @@ export function usePortfolioHistory(
             });
             
             // Fill in missing weekend/holiday data by carrying forward the last known price
-            for (const pricesMap of allPriceHistory.values()) {
+            for (const [symbol, pricesMap] of allPriceHistory.entries()) {
                 let lastKnownPrice: number | undefined = undefined;
-                // Iterate backwards from today
-                for (let i = 0; i <= periodInDays; i++) {
+                // Get the oldest available price to backfill
+                const sortedPrices = Array.from(pricesMap.entries()).sort((a,b) => new Date(a[0]).getTime() - new Date(b[0]).getTime());
+
+                for (let i = periodInDays; i >= 0; i--) {
                     const currentDate = startOfDay(subDays(endDate, i));
                     const currentDateStr = format(currentDate, 'yyyy-MM-dd');
                     
                     const currentPrice = pricesMap.get(currentDateStr);
+                    
                     if (currentPrice !== undefined && currentPrice > 0) {
                         lastKnownPrice = currentPrice;
                     } else if (lastKnownPrice !== undefined) {
                         pricesMap.set(currentDateStr, lastKnownPrice);
+                    } else if (sortedPrices.length > 0 && isAfter(currentDate, new Date(sortedPrices[0][0]))) {
+                        // If no last known price, use the oldest known price for past dates
+                        pricesMap.set(currentDateStr, sortedPrices[0][1]);
                     }
                 }
+                allPriceHistory.set(symbol, pricesMap);
             }
+            
             setPriceHistory(allPriceHistory);
 
             const newChartData: PortfolioDataPoint[] = [];

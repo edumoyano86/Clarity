@@ -43,12 +43,13 @@ export type Note = {
 };
 
 export type Investment = {
-    id: string; // For Crypto: coingecko id, For Stock: same as symbol
+    id: string; // The main symbol, e.g. 'AAPL', 'BTC'
     assetType: 'crypto' | 'stock';
     name: string;
-    symbol: string; // For Crypto: e.g. BTC, For Stock: e.g. AAPL
+    symbol: string; // Same as ID
     amount: number;
     purchaseDate: number; // timestamp
+    coinGeckoId?: string; // Only for crypto, e.g. 'bitcoin'
 };
 
 // For Price APIs
@@ -63,5 +64,5 @@ export type PortfolioDataPoint = {
     value: number;
 };
 
-// Map<asset id/symbol, Map<date string 'yyyy-MM-dd', price>>
+// Map<asset symbol, Map<date string 'yyyy-MM-dd', price>>
 export type PriceHistory = Map<string, Map<string, number>>;

@@ -25,13 +25,13 @@ export default function InversionesPage() {
     const totalValue = useMemo(() => {
         if (!investments || Object.keys(prices).length === 0) return 0;
         return investments.reduce((acc, inv) => {
-            const priceKey = inv.assetType === 'crypto' ? inv.id : inv.symbol;
+            const priceKey = inv.symbol;
             const currentPrice = prices[priceKey]?.price || 0;
             return acc + (inv.amount * currentPrice);
         }, 0);
     }, [investments, prices]);
     
-    const isLoading = isUserLoading || loadingInvestments || (!!investments && investments.length > 0 && (isLoadingPrices || isLoadingHistory));
+    const isDataLoading = isUserLoading || loadingInvestments || (!!investments && investments.length > 0 && (isLoadingPrices || isLoadingHistory || Object.keys(prices).length === 0));
 
     if (isUserLoading || !user) {
         return <div className="flex h-full w-full items-center justify-center"><p>Cargando usuario...</p></div>
@@ -42,7 +42,7 @@ export default function InversionesPage() {
         userId={user.uid}
         portfolioHistory={portfolioHistory}
         totalValue={totalValue}
-        isLoading={isLoading}
+        isLoading={isDataLoading}
         prices={prices}
         priceHistory={priceHistory}
         period={period}
