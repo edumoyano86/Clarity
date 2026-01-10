@@ -25,13 +25,13 @@ export default function InversionesPage() {
     const totalValue = useMemo(() => {
         if (!investments || Object.keys(prices).length === 0) return 0;
         return investments.reduce((acc, inv) => {
-            const priceKey = inv.symbol;
-            const currentPrice = prices[priceKey]?.price || 0;
+            const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
+            const currentPrice = prices[priceKey!]?.price || 0;
             return acc + (inv.amount * currentPrice);
         }, 0);
     }, [investments, prices]);
     
-    const isDataLoading = isUserLoading || loadingInvestments || (!!investments && investments.length > 0 && (isLoadingPrices || isLoadingHistory || Object.keys(prices).length === 0));
+    const isDataLoading = isUserLoading || loadingInvestments || isLoadingPrices || isLoadingHistory;
 
     if (isUserLoading || !user) {
         return <div className="flex h-full w-full items-center justify-center"><p>Cargando usuario...</p></div>

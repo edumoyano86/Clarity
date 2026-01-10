@@ -28,6 +28,7 @@ export function usePortfolioHistory(
             }
 
             setIsLoading(true);
+            setPriceHistory(new Map());
             
             const cryptoAssets = investments.filter(i => i.assetType === 'crypto');
             const stockAssets = investments.filter(i => i.assetType === 'stock');
