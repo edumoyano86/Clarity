@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Investment, PortfolioDataPoint, PriceHistory } from '@/lib/definitions';
-import { format, subDays, startOfDay, getUnixTime, isAfter } from 'date-fns';
+import { format, subDays, startOfDay, getUnixTime, isAfter, differenceInDays } from 'date-fns';
 import { getStockPriceHistory } from '@/ai/flows/stock-price-history';
 import { getCryptoPriceHistory } from '@/ai/flows/crypto-price-history';
 
@@ -10,15 +10,16 @@ export type PortfolioPeriod = 7 | 30 | 90;
 
 export function usePortfolioHistory(
     investments: Investment[] | null,
-    periodInDays: PortfolioPeriod = 90
+    chartPeriodInDays: PortfolioPeriod = 90
 ) {
     const [portfolioHistory, setPortfolioHistory] = useState<PortfolioDataPoint[]>([]);
     const [priceHistory, setPriceHistory] = useState<PriceHistory>(new Map());
     const [isLoading, setIsLoading] = useState(true);
 
+    // Create a stable key from investments to use as a dependency
     const investmentsKey = useMemo(() => {
         if (!investments) return '';
-        return investments.map(inv => `${inv.id}-${inv.amount}`).sort().join(',');
+        return investments.map(inv => `${inv.id}-${inv.amount}-${inv.purchaseDate}`).sort().join(',');
     }, [investments]);
 
     useEffect(() => {
@@ -31,22 +32,28 @@ export function usePortfolioHistory(
             }
 
             setIsLoading(true);
-            
-            const cryptoAssets = investments.filter(i => i.assetType === 'crypto');
-            const stockAssets = investments.filter(i => i.assetType === 'stock');
 
+            // Determine the full date range needed for all purchase prices
+            const oldestPurchaseDate = investments
+                .filter(inv => inv.purchaseDate && typeof inv.purchaseDate === 'number')
+                .reduce((oldest, inv) => inv.purchaseDate < oldest ? inv.purchaseDate : oldest, Date.now());
+            
             const endDate = startOfDay(new Date());
-            const startDate = subDays(endDate, periodInDays);
+            const startDate = startOfDay(new Date(oldestPurchaseDate));
             const startTimestamp = getUnixTime(startDate);
             const endTimestamp = getUnixTime(endDate);
 
+            // Separate assets by type
+            const cryptoAssets = investments.filter(i => i.assetType === 'crypto');
+            const stockAssets = investments.filter(i => i.assetType === 'stock');
+
             const allPriceHistory: PriceHistory = new Map();
 
-            // Use coinGeckoId if it exists for crypto, otherwise fall back to id for legacy data
-            const cryptoIdsToFetch = [...new Set(cryptoAssets.map(a => a.coinGeckoId || a.id))];
+            // --- Fetching Logic ---
+            const cryptoIdsToFetch = [...new Set(cryptoAssets.map(a => a.coinGeckoId || a.id).filter(Boolean))];
             const stockSymbolsToFetch = [...new Set(stockAssets.map(a => a.symbol))];
-            
-            const stockPromises = stockSymbolsToFetch.map(symbol => 
+
+            const stockPromises = stockSymbolsToFetch.map(symbol =>
                 getStockPriceHistory({ symbol: symbol, from: startTimestamp, to: endTimestamp })
                     .then(data => ({ id: symbol, data: data.history }))
                     .catch(err => {
@@ -55,77 +62,69 @@ export function usePortfolioHistory(
                     })
             );
 
-            const cryptoPromises = cryptoIdsToFetch.map(id => {
-                return getCryptoPriceHistory({ id: id, from: startTimestamp, to: endTimestamp })
-                     .then(data => ({ id: id, data: data.history }))
-                     .catch(err => {
+            const cryptoPromises = cryptoIdsToFetch.map(id =>
+                getCryptoPriceHistory({ id, from: startTimestamp, to: endTimestamp })
+                    .then(data => ({ id, data: data.history }))
+                    .catch(err => {
                         console.warn(`Could not fetch crypto history for ${id}:`, err);
-                        return { id: id, data: {} };
-                    });
-            });
+                        return { id, data: {} };
+                    })
+            );
 
             const results = await Promise.all([...stockPromises, ...cryptoPromises]);
-
+            
             results.forEach(result => {
+                const pricesMap = new Map<string, number>();
                 if (result.data) {
-                    const pricesMap = new Map<string, number>();
                     Object.entries(result.data).forEach(([dateStr, price]) => {
                         pricesMap.set(dateStr, price);
                     });
-                    allPriceHistory.set(result.id, pricesMap);
                 }
+                allPriceHistory.set(result.id, pricesMap);
             });
-            
-            // Fill in missing weekend/holiday data by carrying forward the last known price
+
+            // --- Processing Logic ---
+
+            // Backfill prices for weekends/holidays for ALL fetched history
+            const totalDays = differenceInDays(endDate, startDate);
             for (const pricesMap of allPriceHistory.values()) {
                 let lastKnownPrice: number | undefined = undefined;
-                const sortedPrices = Array.from(pricesMap.entries()).sort((a,b) => new Date(a[0]).getTime() - new Date(b[0]).getTime());
-
-                for (let i = periodInDays; i >= 0; i--) {
+                for (let i = totalDays; i >= 0; i--) {
                     const currentDate = startOfDay(subDays(endDate, i));
                     const currentDateStr = format(currentDate, 'yyyy-MM-dd');
-                    
-                    const currentPrice = pricesMap.get(currentDateStr);
-                    
-                    if (currentPrice !== undefined && currentPrice > 0) {
-                        lastKnownPrice = currentPrice;
+                    if (pricesMap.has(currentDateStr)) {
+                        lastKnownPrice = pricesMap.get(currentDateStr);
                     } else if (lastKnownPrice !== undefined) {
                         pricesMap.set(currentDateStr, lastKnownPrice);
-                    } else if (sortedPrices.length > 0 && isAfter(currentDate, new Date(sortedPrices[0][0]))) {
-                        pricesMap.set(currentDateStr, sortedPrices[0][1]);
                     }
                 }
             }
-            
+
             setPriceHistory(allPriceHistory);
-
+            
+            // Generate chart data for the selected period (e.g., 90 days)
+            const chartStartDate = subDays(endDate, chartPeriodInDays);
             const newChartData: PortfolioDataPoint[] = [];
-            for (let i = periodInDays; i >= 0; i--) {
+
+            for (let i = chartPeriodInDays; i >= 0; i--) {
                 const currentDate = startOfDay(subDays(endDate, i));
-                const currentDateStr = format(currentDate, 'yyyy-MM-dd');
-                let dailyTotal = 0;
+                if (isAfter(currentDate, chartStartDate) || currentDate.getTime() === chartStartDate.getTime()) {
+                    const currentDateStr = format(currentDate, 'yyyy-MM-dd');
+                    let dailyTotal = 0;
 
-                investments.forEach(inv => {
-                    if (typeof inv.purchaseDate !== 'number' || inv.purchaseDate <= 0) return;
-                    const purchaseDate = startOfDay(new Date(inv.purchaseDate));
-                    if (!isAfter(purchaseDate, currentDate)) {
-                        
-                        let priceKey: string;
-                        if (inv.assetType === 'crypto') {
-                            priceKey = inv.coinGeckoId || inv.id;
-                        } else {
-                            priceKey = inv.symbol;
+                    investments.forEach(inv => {
+                        if (inv.purchaseDate && !isAfter(new Date(inv.purchaseDate), currentDate)) {
+                            const priceKey = inv.assetType === 'crypto' ? (inv.coinGeckoId || inv.id) : inv.symbol;
+                            const historyForAsset = allPriceHistory.get(priceKey);
+                            const priceForDay = historyForAsset?.get(currentDateStr);
+                            
+                            if (priceForDay) {
+                                dailyTotal += inv.amount * priceForDay;
+                            }
                         }
-
-                        const historyForAsset = allPriceHistory.get(priceKey);
-                        const priceForDay = historyForAsset?.get(currentDateStr);
-                        
-                        if (priceForDay) {
-                            dailyTotal += inv.amount * priceForDay;
-                        }
-                    }
-                });
-                newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
+                    });
+                    newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
+                }
             }
             
             setPortfolioHistory(newChartData);
@@ -137,7 +136,7 @@ export function usePortfolioHistory(
             setIsLoading(false);
         });
 
-    }, [investmentsKey, periodInDays]);
+    }, [investmentsKey, chartPeriodInDays]);
 
     return { portfolioHistory, isLoading, priceHistory };
 }

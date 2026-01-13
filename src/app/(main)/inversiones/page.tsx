@@ -19,30 +19,37 @@ export default function InversionesPage() {
     }, [firestore, user]);
 
     const { data: investments, isLoading: loadingInvestments } = useCollection<Investment>(investmentsQuery);
+
     const { prices, isLoading: isLoadingPrices } = usePrices(investments);
     const { portfolioHistory, isLoading: isLoadingHistory, priceHistory } = usePortfolioHistory(investments, period);
 
     const totalValue = useMemo(() => {
-        if (!investments || Object.keys(prices).length === 0) return 0;
+        if (!investments || !prices || Object.keys(prices).length === 0) return 0;
         return investments.reduce((acc, inv) => {
-            const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId! : inv.symbol;
+            const priceKey = inv.assetType === 'crypto' ? (inv.coinGeckoId || inv.id) : inv.symbol;
             const currentPrice = prices[priceKey]?.price || 0;
             return acc + (inv.amount * currentPrice);
         }, 0);
     }, [investments, prices]);
     
+    // The main loading state for the whole page.
     const isDataLoading = isUserLoading || loadingInvestments || isLoadingPrices || isLoadingHistory;
 
-    if (isUserLoading || !user) {
+    // A specific check for when there are no investments at all.
+    // In this case, we don't need to wait for price fetching.
+    const isTrulyLoading = (investments && investments.length > 0) ? isDataLoading : isUserLoading || loadingInvestments;
+
+
+    if (isTrulyLoading && !user) {
         return <div className="flex h-full w-full items-center justify-center"><p>Cargando usuario...</p></div>
     }
 
     return <InvestmentsManager 
         investments={investments || []} 
-        userId={user.uid}
+        userId={user?.uid || ''}
         portfolioHistory={portfolioHistory}
         totalValue={totalValue}
-        isLoading={isDataLoading}
+        isLoading={isTrulyLoading}
         prices={prices}
         priceHistory={priceHistory}
         period={period}

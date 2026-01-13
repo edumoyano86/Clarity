@@ -104,8 +104,8 @@ export function InvestmentsManager({
     const sortedInvestments = useMemo(() => {
         if (!investments) return [];
         return [...investments].sort((a, b) => {
-            const priceKeyA = a.assetType === 'crypto' ? a.coinGeckoId || a.id : a.symbol;
-            const priceKeyB = b.assetType === 'crypto' ? b.coinGeckoId || b.id : b.symbol;
+            const priceKeyA = a.assetType === 'crypto' ? (a.coinGeckoId || a.id) : a.symbol;
+            const priceKeyB = b.assetType === 'crypto' ? (b.coinGeckoId || b.id) : b.symbol;
             const aPrice = prices[priceKeyA]?.price || 0;
             const bPrice = prices[priceKeyB]?.price || 0;
             const aValue = a.amount * aPrice;
@@ -116,7 +116,6 @@ export function InvestmentsManager({
 
 
     const renderPortfolioRow = (investment: Investment) => {
-        // Robust date validation
         const isDateInvalid = typeof investment.purchaseDate !== 'number' || isNaN(investment.purchaseDate) || investment.purchaseDate <= 0;
 
         if (isDateInvalid) {
@@ -143,7 +142,6 @@ export function InvestmentsManager({
         
         const priceKey = investment.assetType === 'crypto' ? (investment.coinGeckoId || investment.id) : investment.symbol;
         
-        // Find the historical price for the purchase date
         const purchaseDateStr = format(startOfDay(new Date(investment.purchaseDate)), 'yyyy-MM-dd');
         const purchasePrice = priceHistory.get(priceKey)?.get(purchaseDateStr) || 0;
         const purchaseValue = investment.amount * purchasePrice;
