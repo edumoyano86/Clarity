@@ -164,9 +164,9 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             
             const collectionRef = collection(firestore, 'users', userId, 'investments');
             
-            const dataToSave: Omit<Investment, 'id'> & { id: string } = {
+            const dataToSave = {
                 ...data,
-                id: investment ? investment.id : data.id, // Keep original ID on edit
+                id: data.id,
                 purchaseDate: data.purchaseDate.getTime(),
             };
 
