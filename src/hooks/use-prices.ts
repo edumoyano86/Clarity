@@ -11,10 +11,10 @@ export function usePrices(investments: Investment[] | null) {
     const [isLoading, setIsLoading] = useState(true);
     const { toast } = useToast();
     
-    // Create a key that is stable and reflects the assets that need pricing
     const investmentsKey = useMemo(() => {
         if (!investments) return '';
-        return investments.map(inv => inv.id).sort().join(',');
+        // Use a more robust key including all relevant info
+        return investments.map(inv => `${inv.id}-${inv.assetType}`).sort().join(',');
     }, [investments]);
 
     useEffect(() => {
@@ -30,8 +30,8 @@ export function usePrices(investments: Investment[] | null) {
             const cryptoAssets = investments.filter(i => i.assetType === 'crypto');
             const stockAssets = investments.filter(i => i.assetType === 'stock');
             
-            // Use coinGeckoId if available, otherwise fall back to the investment's id (for older data)
-            const cryptoIds = [...new Set(cryptoAssets.map(inv => inv.coinGeckoId || inv.id).filter(Boolean) as string[])];
+            // For crypto, use coinGeckoId if present, otherwise fall back to the id (for legacy data)
+            const cryptoIds = [...new Set(cryptoAssets.map(inv => inv.coinGeckoId || inv.id).filter(Boolean))];
             const stockSymbols = [...new Set(stockAssets.map(inv => inv.symbol))];
 
             try {
@@ -45,7 +45,6 @@ export function usePrices(investments: Investment[] | null) {
                 
                 const results = await Promise.all(promises);
                 
-                // Merge results from different APIs
                 const combinedPrices = results.reduce((acc, current) => {
                     return { ...acc, ...current };
                 }, {});
@@ -66,7 +65,7 @@ export function usePrices(investments: Investment[] | null) {
         };
 
         fetchPrices();
-    }, [investmentsKey, toast]); // Depend on the stable key
+    }, [investmentsKey, toast]); 
 
     return { prices, isLoading };
 }
