@@ -13,8 +13,8 @@ export function usePrices(investments: Investment[] | null) {
     
     const investmentsKey = useMemo(() => {
         if (!investments) return '';
-        // Use a more robust key including all relevant info
-        return investments.map(inv => `${inv.id}-${inv.assetType}`).sort().join(',');
+        // Create a stable key based on the assets that need pricing
+        return investments.map(inv => inv.assetType === 'crypto' ? inv.coinGeckoId || inv.id : inv.symbol).sort().join(',');
     }, [investments]);
 
     useEffect(() => {
@@ -30,17 +30,17 @@ export function usePrices(investments: Investment[] | null) {
             const cryptoAssets = investments.filter(i => i.assetType === 'crypto');
             const stockAssets = investments.filter(i => i.assetType === 'stock');
             
-            // For crypto, use coinGeckoId if present, otherwise fall back to the id (for legacy data)
-            const cryptoIds = [...new Set(cryptoAssets.map(inv => inv.coinGeckoId || inv.id).filter(Boolean))];
-            const stockSymbols = [...new Set(stockAssets.map(inv => inv.symbol))];
+            // For crypto, ALWAYS use coinGeckoId. The fallback to `id` handles legacy data.
+            const cryptoIdsToFetch = [...new Set(cryptoAssets.map(inv => inv.coinGeckoId || inv.id).filter(Boolean))];
+            const stockSymbolsToFetch = [...new Set(stockAssets.map(inv => inv.symbol))];
 
             try {
                 const promises = [];
-                if (cryptoIds.length > 0) {
-                    promises.push(getCryptoPrices({ ids: cryptoIds }));
+                if (cryptoIdsToFetch.length > 0) {
+                    promises.push(getCryptoPrices({ ids: cryptoIdsToFetch }));
                 }
-                if (stockSymbols.length > 0) {
-                    promises.push(getStockPrices({ symbols: stockSymbols }));
+                if (stockSymbolsToFetch.length > 0) {
+                    promises.push(getStockPrices({ symbols: stockSymbolsToFetch }));
                 }
                 
                 const results = await Promise.all(promises);

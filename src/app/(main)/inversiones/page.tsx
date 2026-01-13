@@ -32,11 +32,8 @@ export default function InversionesPage() {
         }, 0);
     }, [investments, prices]);
     
-    // Main loading state for the page.
-    // It's loading if any of the core data hooks are loading.
     const isDataLoading = isUserLoading || loadingInvestments || isLoadingPrices || isLoadingHistory;
 
-    // A specific check for when we have finished loading but have no investments.
     const noInvestments = !loadingInvestments && investments && investments.length === 0;
 
     if (isDataLoading && !noInvestments) {

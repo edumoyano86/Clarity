@@ -104,8 +104,8 @@ export function InvestmentsManager({
     const sortedInvestments = useMemo(() => {
         if (!investments) return [];
         return [...investments].sort((a, b) => {
-            const priceKeyA = a.assetType === 'crypto' ? (a.coinGeckoId || a.id) : a.symbol;
-            const priceKeyB = b.assetType === 'crypto' ? (b.coinGeckoId || b.id) : b.symbol;
+            const priceKeyA = a.assetType === 'crypto' ? a.coinGeckoId || a.id : a.symbol;
+            const priceKeyB = b.assetType === 'crypto' ? b.coinGeckoId || b.id : b.symbol;
             const aPrice = prices[priceKeyA]?.price || 0;
             const bPrice = prices[priceKeyB]?.price || 0;
             const aValue = a.amount * aPrice;
@@ -140,7 +140,7 @@ export function InvestmentsManager({
             );
         }
         
-        const priceKey = investment.assetType === 'crypto' ? (investment.coinGeckoId || investment.id) : investment.symbol;
+        const priceKey = investment.assetType === 'crypto' ? investment.coinGeckoId || investment.id : investment.symbol;
         
         const purchaseDateStr = format(startOfDay(new Date(investment.purchaseDate)), 'yyyy-MM-dd');
         const purchasePrice = priceHistory.get(priceKey)?.get(purchaseDateStr) || 0;
@@ -159,14 +159,14 @@ export function InvestmentsManager({
                     <div className='text-sm text-muted-foreground'>{investment.symbol}</div>
                 </TableCell>
                 <TableCell>{investment.amount.toFixed(4)}</TableCell>
-                <TableCell>{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : formatCurrency(purchasePrice)}</TableCell>
-                <TableCell>{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : formatCurrency(purchaseValue)}</TableCell>
+                <TableCell>{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (purchasePrice > 0 ? formatCurrency(purchasePrice) : 'N/A')}</TableCell>
+                <TableCell>{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (purchaseValue > 0 ? formatCurrency(purchaseValue) : 'N/A')}</TableCell>
                 <TableCell>
                     {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : currentValue !== null ? formatCurrency(currentValue) : '-'}
                 </TableCell>
                 <TableCell>
                     {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
-                        pnl !== null && pnlPercent !== null ? (
+                        pnl !== null && pnlPercent !== null && purchaseValue > 0 ? (
                             <div className={`flex items-center gap-1 font-medium ${pnl >= 0 ? 'text-green-600' : 'text-destructive'}`}>
                                 {pnl >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
                                 <span>{formatCurrency(pnl)} ({pnlPercent.toFixed(2)}%)</span>

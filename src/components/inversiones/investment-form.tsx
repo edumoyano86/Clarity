@@ -15,7 +15,7 @@ import { Calendar } from '../ui/calendar';
 import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
 import { useFirestore } from '@/firebase';
-import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, doc, setDoc } from 'firebase/firestore';
 import { Investment } from '@/lib/definitions';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
@@ -165,14 +165,22 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             
             const collectionRef = collection(firestore, 'users', userId, 'investments');
             
+            // The document ID will be the main symbol for consistency
+            const docId = data.symbol.toUpperCase();
+            
             const dataToSave = {
                 ...data,
-                // The document ID is the coinGecko ID for crypto, or the symbol for stocks
-                id: data.id, 
+                id: docId,
+                symbol: docId,
                 purchaseDate: data.purchaseDate.getTime(),
             };
 
-            const docRef = doc(collectionRef, dataToSave.id);
+            // Remove id from the data to save if it's a crypto, as it's the coingecko id
+             if (data.assetType === 'crypto') {
+               (dataToSave as any).id = data.symbol.toUpperCase();
+            }
+
+            const docRef = doc(collectionRef, docId);
 
             setDoc(docRef, dataToSave, { merge: true }).catch(serverError => {
                 const operation = investment ? 'update' : 'create';
@@ -199,10 +207,10 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     onSelect={() => {
                         const upperCaseSymbol = asset.symbol.toUpperCase();
                         setSelectedAsset({ ...asset, id: upperCaseSymbol });
-                        setValue('id', upperCaseSymbol); // For stocks, ID is the symbol
+                        setValue('id', upperCaseSymbol);
                         setValue('symbol', upperCaseSymbol);
                         setValue('name', asset.name);
-                        setValue('coinGeckoId', ''); // Not a crypto
+                        setValue('coinGeckoId', '');
                         setSearchQuery(asset.name);
                         setIsListVisible(false);
                     }}
@@ -220,10 +228,10 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     onSelect={() => {
                         const upperCaseSymbol = asset.symbol.toUpperCase();
                         setSelectedAsset(asset);
-                        setValue('id', asset.id); // For crypto, ID is the CoinGecko ID
+                        setValue('id', upperCaseSymbol);
                         setValue('symbol', upperCaseSymbol);
                         setValue('name', asset.name);
-                        setValue('coinGeckoId', asset.id); // Store coingecko id separately for clarity
+                        setValue('coinGeckoId', asset.id);
                         setSearchQuery(asset.name);
                         setIsListVisible(false);
                     }}
@@ -239,7 +247,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             
-            {!investment && ( // Don't allow changing type when editing
+            {!investment && (
             <Controller
                 name="assetType"
                 control={control}
