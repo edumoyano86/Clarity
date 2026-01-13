@@ -32,24 +32,27 @@ export default function InversionesPage() {
         }, 0);
     }, [investments, prices]);
     
-    // The main loading state for the whole page.
+    // Main loading state for the page.
+    // It's loading if any of the core data hooks are loading.
     const isDataLoading = isUserLoading || loadingInvestments || isLoadingPrices || isLoadingHistory;
 
-    // A specific check for when there are no investments at all.
-    // In this case, we don't need to wait for price fetching.
-    const isTrulyLoading = (investments && investments.length > 0) ? isDataLoading : isUserLoading || loadingInvestments;
+    // A specific check for when we have finished loading but have no investments.
+    const noInvestments = !loadingInvestments && investments && investments.length === 0;
 
-
-    if (isTrulyLoading && !user) {
-        return <div className="flex h-full w-full items-center justify-center"><p>Cargando usuario...</p></div>
+    if (isDataLoading && !noInvestments) {
+        return <div className="flex h-full w-full items-center justify-center"><p>Cargando datos de inversiones...</p></div>
+    }
+    
+    if (!user) {
+        return <div className="flex h-full w-full items-center justify-center"><p>Usuario no autenticado.</p></div>
     }
 
     return <InvestmentsManager 
         investments={investments || []} 
-        userId={user?.uid || ''}
+        userId={user.uid}
         portfolioHistory={portfolioHistory}
         totalValue={totalValue}
-        isLoading={isTrulyLoading}
+        isLoading={isDataLoading}
         prices={prices}
         priceHistory={priceHistory}
         period={period}

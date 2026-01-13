@@ -16,7 +16,6 @@ export function usePortfolioHistory(
     const [priceHistory, setPriceHistory] = useState<PriceHistory>(new Map());
     const [isLoading, setIsLoading] = useState(true);
 
-    // Create a stable key from investments to use as a dependency
     const investmentsKey = useMemo(() => {
         if (!investments) return '';
         return investments.map(inv => `${inv.id}-${inv.amount}-${inv.purchaseDate}`).sort().join(',');
@@ -33,23 +32,19 @@ export function usePortfolioHistory(
 
             setIsLoading(true);
 
-            // Determine the full date range needed for all purchase prices
-            const oldestPurchaseDate = investments
-                .filter(inv => inv.purchaseDate && typeof inv.purchaseDate === 'number')
-                .reduce((oldest, inv) => inv.purchaseDate < oldest ? inv.purchaseDate : oldest, Date.now());
-            
+            // Determine the full date range needed.
+            // We only need to go back as far as the longest chart period (90 days)
+            // plus any purchase dates within that period.
             const endDate = startOfDay(new Date());
-            const startDate = startOfDay(new Date(oldestPurchaseDate));
+            const startDate = startOfDay(subDays(endDate, 90));
             const startTimestamp = getUnixTime(startDate);
             const endTimestamp = getUnixTime(endDate);
 
-            // Separate assets by type
             const cryptoAssets = investments.filter(i => i.assetType === 'crypto');
             const stockAssets = investments.filter(i => i.assetType === 'stock');
 
             const allPriceHistory: PriceHistory = new Map();
 
-            // --- Fetching Logic ---
             const cryptoIdsToFetch = [...new Set(cryptoAssets.map(a => a.coinGeckoId || a.id).filter(Boolean))];
             const stockSymbolsToFetch = [...new Set(stockAssets.map(a => a.symbol))];
 
@@ -83,9 +78,6 @@ export function usePortfolioHistory(
                 allPriceHistory.set(result.id, pricesMap);
             });
 
-            // --- Processing Logic ---
-
-            // Backfill prices for weekends/holidays for ALL fetched history
             const totalDays = differenceInDays(endDate, startDate);
             for (const pricesMap of allPriceHistory.values()) {
                 let lastKnownPrice: number | undefined = undefined;
@@ -102,18 +94,20 @@ export function usePortfolioHistory(
 
             setPriceHistory(allPriceHistory);
             
-            // Generate chart data for the selected period (e.g., 90 days)
             const chartStartDate = subDays(endDate, chartPeriodInDays);
             const newChartData: PortfolioDataPoint[] = [];
 
             for (let i = chartPeriodInDays; i >= 0; i--) {
                 const currentDate = startOfDay(subDays(endDate, i));
-                if (isAfter(currentDate, chartStartDate) || currentDate.getTime() === chartStartDate.getTime()) {
+                const isValidDateForChart = isAfter(currentDate, chartStartDate) || currentDate.getTime() === chartStartDate.getTime();
+
+                if (isValidDateForChart) {
                     const currentDateStr = format(currentDate, 'yyyy-MM-dd');
                     let dailyTotal = 0;
 
                     investments.forEach(inv => {
-                        if (inv.purchaseDate && !isAfter(new Date(inv.purchaseDate), currentDate)) {
+                        const isPurchased = inv.purchaseDate && !isAfter(new Date(inv.purchaseDate), currentDate);
+                        if (isPurchased) {
                             const priceKey = inv.assetType === 'crypto' ? (inv.coinGeckoId || inv.id) : inv.symbol;
                             const historyForAsset = allPriceHistory.get(priceKey);
                             const priceForDay = historyForAsset?.get(currentDateStr);

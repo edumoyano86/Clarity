@@ -33,9 +33,9 @@ const stockPriceHistoryFlow = ai.defineFlow(
     outputSchema: StockHistoryOutputSchema,
   },
   async (input) => {
-    const apiKey = process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
+    const apiKey = process.env.FINNHUB_API_KEY;
     if (!apiKey) {
-      console.error('Finnhub API key is not set.');
+      console.error('Finnhub API key is not set in .env.local (FINNHUB_API_KEY)');
       return { history: {} };
     }
 
@@ -49,7 +49,7 @@ const stockPriceHistoryFlow = ai.defineFlow(
       const data = await response.json();
       
       if (data.s !== 'ok' || !data.t) {
-        console.warn(`Finnhub API returned status '${data.s}' for ${input.symbol}`);
+        console.warn(`Finnhub API returned status '${data.s}' for ${input.symbol}. This might mean the symbol is incorrect or no data is available in the given range.`);
         return { history: {} };
       }
 

@@ -1,16 +1,14 @@
 'use server';
 
 /**
- * @fileOverview A Genkit flow for fetching stock and crypto prices from the Finnhub API.
- * 
- * - getStockPrices - A function that takes an array of stock/crypto symbols and returns their current prices.
+ * @fileOverview A Genkit flow for fetching stock prices from the Finnhub API.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
 const StockPricesInputSchema = z.object({
-  symbols: z.array(z.string()).describe('An array of stock ticker symbols or Finnhub crypto symbols (e.g., ["AAPL", "BINANCE:BTCUSDT"]).'),
+  symbols: z.array(z.string()).describe('An array of stock ticker symbols (e.g., ["AAPL", "MSFT"]).'),
 });
 export type StockPricesInput = z.infer<typeof StockPricesInputSchema>;
 
@@ -32,9 +30,9 @@ const stockPricesFlow = ai.defineFlow(
     outputSchema: PricesOutputSchema,
   },
   async (input) => {
-    const apiKey = process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
+    const apiKey = process.env.FINNHUB_API_KEY;
     if (!apiKey) {
-      console.error('Finnhub API key is not set.');
+      console.error('Finnhub API key is not set in .env.local (FINNHUB_API_KEY)');
       return {};
     }
 
@@ -53,7 +51,7 @@ const stockPricesFlow = ai.defineFlow(
         }
         const data = await response.json();
         // 'c' is the current price in the Finnhub response
-        if (typeof data.c === 'number' && data.c > 0) {
+        if (typeof data.c === 'number') {
             results[symbol] = { price: data.c };
         } else {
             console.warn(`No current price data for symbol: ${symbol}`, data);
