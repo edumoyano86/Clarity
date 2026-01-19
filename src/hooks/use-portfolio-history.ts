@@ -33,19 +33,17 @@ export function usePortfolioHistory(
             setIsLoading(true);
 
             const endDate = startOfDay(new Date());
-            // Simplified: Always fetch the last 90 days of history.
-            // This is enough for all chart periods and for purchase price lookup of recent investments.
             const historyStartDate = startOfDay(subDays(endDate, 90)); 
             
             const startTimestamp = getUnixTime(historyStartDate);
             const endTimestamp = getUnixTime(endDate);
 
-            const cryptoAssets = investments.filter(i => i.assetType === 'crypto');
+            const cryptoAssets = investments.filter(i => i.assetType === 'crypto' && i.coinGeckoId);
             const stockAssets = investments.filter(i => i.assetType === 'stock');
 
             const allPriceHistory: PriceHistory = new Map();
 
-            const cryptoIdsToFetch = [...new Set(cryptoAssets.map(a => a.coinGeckoId || a.id).filter(Boolean) as string[])];
+            const cryptoIdsToFetch = [...new Set(cryptoAssets.map(a => a.coinGeckoId!))];
             const stockSymbolsToFetch = [...new Set(stockAssets.map(a => a.symbol))];
 
             const stockPromises = stockSymbolsToFetch.map(symbol =>
@@ -62,7 +60,7 @@ export function usePortfolioHistory(
                     .then(data => ({ id, data: data.history }))
                     .catch(err => {
                         console.warn(`Could not fetch crypto history for ${id}:`, err);
-                        return { id, data: {} };
+                        return { id: id, data: {} };
                     })
             );
             
@@ -80,11 +78,20 @@ export function usePortfolioHistory(
                 }
             });
             
-            // Correct Gap-Filling Logic: Carry prices forward in time.
             const totalDays = differenceInDays(endDate, historyStartDate);
             if (totalDays >= 0) {
                 for (const pricesMap of allPriceHistory.values()) {
                     let lastKnownPrice: number | undefined;
+                    // First pass: find the earliest known price in the period
+                    for (let i = 0; i <= totalDays; i++) {
+                         const date = addDays(historyStartDate, i);
+                         const dateStr = format(date, 'yyyy-MM-dd');
+                         if (pricesMap.has(dateStr)) {
+                            lastKnownPrice = pricesMap.get(dateStr);
+                            break;
+                         }
+                    }
+                    // Second pass: fill forward
                     for (let i = 0; i <= totalDays; i++) {
                         const date = addDays(historyStartDate, i);
                         const dateStr = format(date, 'yyyy-MM-dd');
@@ -109,11 +116,11 @@ export function usePortfolioHistory(
                 investments.forEach(inv => {
                     const purchaseDate = inv.purchaseDate;
                     if (typeof purchaseDate !== 'number' || isNaN(purchaseDate) || purchaseDate <=0) return;
+                    if (inv.assetType === 'crypto' && !inv.coinGeckoId) return; // Skip legacy cryptos in chart
 
                     if (!isAfter(new Date(purchaseDate), currentDate)) {
-                        const priceKey = inv.assetType === 'crypto' ? (inv.coinGeckoId || inv.id) : inv.symbol;
-                        if (!priceKey) return;
-
+                        const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId! : inv.symbol;
+                        
                         const historyForAsset = allPriceHistory.get(priceKey);
                         const priceForDay = historyForAsset?.get(format(currentDate, 'yyyy-MM-dd'));
                         

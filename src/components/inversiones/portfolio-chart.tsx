@@ -16,7 +16,6 @@ interface PortfolioChartProps {
     isLoading: boolean;
     period: PortfolioPeriod;
     setPeriod: (period: PortfolioPeriod) => void;
-    periodOptions: { label: string; value: PortfolioPeriod }[];
 }
 
 const chartConfig = {
@@ -30,9 +29,15 @@ const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 };
 
-export function PortfolioChart({ portfolioHistory, totalValue, isLoading, period, setPeriod, periodOptions }: PortfolioChartProps) {
+export function PortfolioChart({ portfolioHistory, totalValue, isLoading, period, setPeriod }: PortfolioChartProps) {
     
     const hasData = portfolioHistory.length > 0 && portfolioHistory.some(d => d.value > 0);
+    const periodOptions: { label: string; value: PortfolioPeriod }[] = [
+        { label: '7D', value: 7 },
+        { label: '30D', value: 30 },
+        { label: '90D', value: 90 },
+    ];
+
 
     return (
         <Card>
