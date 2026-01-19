@@ -10,7 +10,7 @@ import { getCryptoPriceHistory } from '@/ai/flows/crypto-price-history';
 import { getCryptoPrices } from '@/ai/flows/crypto-prices';
 import { getStockPrices } from '@/ai/flows/stock-prices';
 import { useToast } from '@/hooks/use-toast';
-import { format, subDays, startOfDay, getUnixTime, isAfter, differenceInDays, addDays } from 'date-fns';
+import { subDays, startOfDay, getUnixTime, isAfter, differenceInDays, addDays } from 'date-fns';
 
 export type PortfolioPeriod = 7 | 30 | 90;
 
@@ -154,7 +154,7 @@ export default function InversionesPage() {
                     let lastKnownPrice: number | undefined;
                     for (let i = 0; i <= totalDaysInHistory; i++) {
                         const currentDate = addDays(historyFetchStartDate, i);
-                        const dateStr = format(currentDate, 'yyyy-MM-dd');
+                        const dateStr = currentDate.toISOString().split('T')[0];
                         if (pricesMap.has(dateStr)) {
                             lastKnownPrice = pricesMap.get(dateStr);
                         } else if (lastKnownPrice !== undefined) {
@@ -174,7 +174,7 @@ export default function InversionesPage() {
 
             for (let i = 0; i <= chartDays; i++) {
                 const currentDate = addDays(chartDataStartDate, i);
-                const dateStr = format(currentDate, 'yyyy-MM-dd');
+                const dateStr = currentDate.toISOString().split('T')[0];
                 let dailyTotal = 0;
                 let assetsWithValue = 0;
 

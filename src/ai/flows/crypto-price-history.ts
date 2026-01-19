@@ -8,7 +8,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { format } from 'date-fns';
 
 const CryptoHistoryInputSchema = z.object({
   id: z.string().describe('The CoinGecko coin ID (e.g., "bitcoin").'),
@@ -54,7 +53,8 @@ const cryptoPriceHistoryFlow = ai.defineFlow(
       const history: Record<string, number> = {};
       for (const [timestamp, price] of data.prices) {
         const date = new Date(timestamp);
-        const utcDateStr = format(date, 'yyyy-MM-dd');
+        // Using toISOString().split('T')[0] to get 'YYYY-MM-DD' in UTC
+        const utcDateStr = date.toISOString().split('T')[0];
         history[utcDateStr] = price;
       }
       return { history };

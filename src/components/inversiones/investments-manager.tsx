@@ -17,7 +17,6 @@ import { PortfolioChart } from './portfolio-chart';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
 import { SellInvestmentDialog } from './sell-investment-dialog';
-import { format, startOfDay } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { PortfolioPeriod } from '@/app/(main)/inversiones/page';
 
@@ -122,16 +121,9 @@ export function InvestmentsManager({
         });
     }, [investments, currentPrices]);
 
-
-    const periodOptions: { label: string; value: PortfolioPeriod }[] = [
-        { label: '7D', value: 7 },
-        { label: '30D', value: 30 },
-        { label: '90D', value: 90 },
-    ];
-
     const renderPortfolioRow = (investment: Investment) => {
         const priceKey = investment.assetType === 'crypto' ? (investment.coinGeckoId || investment.id) : investment.symbol;
-        const purchaseDateStr = format(startOfDay(new Date(investment.purchaseDate)), 'yyyy-MM-dd');
+        const purchaseDateStr = new Date(investment.purchaseDate).toISOString().split('T')[0];
         
         const historyForAsset = priceHistory.get(priceKey);
         const purchasePrice = historyForAsset?.get(purchaseDateStr);

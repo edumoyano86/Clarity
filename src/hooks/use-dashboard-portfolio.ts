@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Investment, PortfolioDataPoint, PriceHistory } from '@/lib/definitions';
-import { format, subDays, startOfDay, getUnixTime, isAfter, differenceInDays, addDays } from 'date-fns';
+import { subDays, startOfDay, getUnixTime, isAfter, differenceInDays, addDays } from 'date-fns';
 import { getCryptoPriceHistory } from '@/ai/flows/crypto-price-history';
 import { getStockPriceHistory } from '@/ai/flows/stock-price-history';
 import { getCryptoPrices } from '@/ai/flows/crypto-prices';
@@ -95,7 +95,7 @@ export function useDashboardPortfolio(
                 let lastKnownPrice: number | undefined;
                 for (let i = 0; i <= chartDays; i++) {
                     const currentDate = addDays(chartStartDate, i);
-                    const dateStr = format(currentDate, 'yyyy-MM-dd');
+                    const dateStr = currentDate.toISOString().split('T')[0];
                     if (pricesMap.has(dateStr)) {
                         lastKnownPrice = pricesMap.get(dateStr);
                     } else if (lastKnownPrice !== undefined) {
@@ -109,7 +109,7 @@ export function useDashboardPortfolio(
             let lastKnownTotal: number | null = null;
             for (let i = 0; i <= chartDays; i++) {
                 const currentDate = addDays(chartStartDate, i);
-                const dateStr = format(currentDate, 'yyyy-MM-dd');
+                const dateStr = currentDate.toISOString().split('T')[0];
                 let dailyTotal = 0;
                 let assetsWithValue = 0;
 
