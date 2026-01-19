@@ -15,7 +15,7 @@ import { Calendar } from '../ui/calendar';
 import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
 import { useFirestore } from '@/firebase';
-import { collection, doc, setDoc } from 'firebase/firestore';
+import { collection, doc, runTransaction } from 'firebase/firestore';
 import { Investment } from '@/lib/definitions';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
@@ -141,7 +141,14 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     }, [investment, reset]);
 
     useEffect(() => {
-        // Reset asset-specific fields when assetType changes, but not if editing an existing investment
+        if (!isListVisible) {
+            setStockResults([]);
+            setCryptoResults([]);
+        }
+    }, [isListVisible]);
+
+
+    useEffect(() => {
         if (investment) return;
 
         setValue('id', '');
@@ -167,17 +174,12 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             const collectionRef = collection(firestore, 'users', userId, 'investments');
             
             let docId: string;
-            // For cryptos, the document ID is the coinGeckoId. For stocks, it's the symbol.
             if (data.assetType === 'crypto') {
-                if (!data.coinGeckoId) {
-                    throw new Error("El ID de CoinGecko es requerido para criptomonedas.");
-                }
+                if (!data.coinGeckoId) throw new Error("El ID de CoinGecko es requerido para criptomonedas.");
                 docId = data.coinGeckoId;
             } else {
                 docId = data.symbol.toUpperCase();
             }
-
-            // The `id` field within the document should match the document's ID in Firestore.
             data.id = docId;
 
             const dataToSave = {
@@ -185,9 +187,29 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 purchaseDate: data.purchaseDate.getTime(),
             };
 
-            const docRef = doc(collectionRef, docId);
+            await runTransaction(firestore, async (transaction) => {
+                const docRef = doc(collectionRef, docId);
+                const docSnap = await transaction.get(docRef);
 
-            await setDoc(docRef, dataToSave, { merge: true });
+                if (docSnap.exists() && !investment) { // Handle adding to an existing asset
+                    const existingData = docSnap.data() as Investment;
+                    const newAmount = existingData.amount + data.amount;
+                    
+                    // Weighted average of purchase date by amount.
+                    // This is a simple way to represent an averaged cost basis date.
+                    const weightedPurchaseDate = Math.round(
+                        (existingData.purchaseDate * existingData.amount + data.purchaseDate.getTime() * data.amount) / newAmount
+                    );
+
+                    transaction.update(docRef, { 
+                        amount: newAmount, 
+                        purchaseDate: weightedPurchaseDate 
+                    });
+
+                } else { // Handle new investment or editing an existing one
+                    transaction.set(docRef, dataToSave, { merge: true });
+                }
+            });
 
             toast({ title: 'Éxito', description: 'Inversión guardada exitosamente.'});
             onFormSuccess();
@@ -200,50 +222,42 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     };
 
     const renderResults = () => {
-        if (assetType === 'stock') {
-            return stockResults.map((asset) => (
-                <CommandItem
-                    key={asset.symbol}
-                    value={asset.name}
-                    onSelect={() => {
-                        const upperCaseSymbol = asset.symbol.toUpperCase();
-                        setSelectedAsset({ ...asset, id: upperCaseSymbol });
-                        setValue('id', upperCaseSymbol);
-                        setValue('symbol', upperCaseSymbol);
-                        setValue('name', asset.name);
-                        setValue('coinGeckoId', ''); // Stocks don't have this
-                        setSearchQuery(asset.name);
-                        setIsListVisible(false);
-                    }}
-                >
-                    <Check className={cn("mr-2 h-4 w-4", (selectedAsset?.symbol === asset.symbol) ? "opacity-100" : "opacity-0")} />
-                    {asset.name} ({asset.symbol.toUpperCase()})
-                </CommandItem>
-            ))
-        }
-        if (assetType === 'crypto') {
-            return cryptoResults.map((asset) => (
-                 <CommandItem
-                    key={asset.id}
-                    value={asset.name} 
-                    onSelect={() => {
-                        const upperCaseSymbol = asset.symbol.toUpperCase();
-                        setSelectedAsset(asset);
-                        setValue('id', asset.id); // Set the main ID to coingecko ID
-                        setValue('symbol', upperCaseSymbol);
-                        setValue('name', asset.name);
-                        setValue('coinGeckoId', asset.id); // Also set the specific coingecko ID field
-                        setSearchQuery(asset.name);
-                        setIsListVisible(false);
-                    }}
-                >
-                    <Check className={cn("mr-2 h-4 w-4", ((selectedAsset as CryptoSearchResult)?.id === asset.id) ? "opacity-100" : "opacity-0")} />
-                    {asset.name} ({asset.symbol.toUpperCase()})
-                </CommandItem>
-            ))
-        }
-        return null;
+        const handleSelect = (asset: StockSearchResult | CryptoSearchResult) => {
+            if ('symbol' in asset && assetType === 'stock') {
+                const upperCaseSymbol = asset.symbol.toUpperCase();
+                setSelectedAsset({ ...asset, id: upperCaseSymbol });
+                setValue('id', upperCaseSymbol);
+                setValue('symbol', upperCaseSymbol);
+                setValue('name', asset.name);
+                setValue('coinGeckoId', '');
+                setSearchQuery(asset.name);
+            } else if ('id' in asset && assetType === 'crypto') {
+                const cryptoAsset = asset as CryptoSearchResult;
+                const upperCaseSymbol = cryptoAsset.symbol.toUpperCase();
+                setSelectedAsset(cryptoAsset);
+                setValue('id', cryptoAsset.id);
+                setValue('symbol', upperCaseSymbol);
+                setValue('name', cryptoAsset.name);
+                setValue('coinGeckoId', cryptoAsset.id);
+                setSearchQuery(cryptoAsset.name);
+            }
+            setIsListVisible(false);
+        };
+        
+        const results = assetType === 'stock' ? stockResults : cryptoResults;
+
+        return results.map((asset) => (
+            <CommandItem
+                key={(asset as any).id || (asset as any).symbol}
+                value={asset.name}
+                onSelect={() => handleSelect(asset)}
+            >
+                <Check className={cn("mr-2 h-4 w-4", selectedAsset?.name === asset.name ? "opacity-100" : "opacity-0")} />
+                {asset.name} ({(asset.symbol || '').toUpperCase()})
+            </CommandItem>
+        ));
     }
+
 
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -267,7 +281,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
 
             <div>
                 <Label htmlFor="symbol">Activo</Label>
-                <Command shouldFilter={false} className="relative overflow-visible">
+                 <Command shouldFilter={false} className="relative overflow-visible">
                     <CommandInput 
                         placeholder={assetType === 'crypto' ? "Busca cripto (ej: bitcoin)..." : "Busca acción (ej: AAPL)..."}
                         value={searchQuery}
@@ -277,6 +291,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                             if (!isListVisible) setIsListVisible(true);
                         }}
                         onFocus={() => setIsListVisible(true)}
+                        disabled={!!investment}
                     />
                     {isListVisible && (
                         <CommandList className="absolute top-10 z-10 w-full rounded-md border bg-popover text-popover-foreground shadow-md">

@@ -148,7 +148,7 @@ export default function InversionesPage() {
                             console.warn(`Could not fetch history for ${asset.id}:`, e)
                             historyResults.push({ id: asset.id, data: {} });
                         }
-                        await new Promise(resolve => setTimeout(resolve, 1500)); // Rate limit delay
+                        await new Promise(resolve => setTimeout(resolve, 2100)); // Rate limit delay
                     }
                 };
 

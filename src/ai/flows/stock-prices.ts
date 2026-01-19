@@ -33,7 +33,7 @@ const stockPricesFlow = ai.defineFlow(
     const apiKey = process.env.FINNHUB_API_KEY;
     if (!apiKey) {
       console.error('Finnhub API key is not set in .env.local (FINNHUB_API_KEY)');
-      return {};
+      throw new Error('Finnhub API key is not configured.');
     }
 
     const results: PricesOutput = {};
@@ -57,9 +57,10 @@ const stockPricesFlow = ai.defineFlow(
             console.warn(`No current price data for symbol: ${symbol}`, data);
         }
          // To avoid rate limiting on free tier
-        await delay(350);
+        await delay(2100);
       } catch (error) {
         console.error(`Error fetching price for ${symbol}:`, error);
+        // Do not throw here, just log and continue
       }
     }
 
