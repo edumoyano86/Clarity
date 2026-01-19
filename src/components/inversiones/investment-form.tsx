@@ -276,9 +276,8 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                             if (!isListVisible) setIsListVisible(true);
                         }}
                         onFocus={() => setIsListVisible(true)}
-                        disabled={!!investment}
                     />
-                    {isListVisible && !investment && (
+                    {isListVisible && (
                         <CommandList className="absolute top-10 z-10 w-full rounded-md border bg-popover text-popover-foreground shadow-md">
                             {isSearching && <CommandEmpty>Buscando...</CommandEmpty>}
                             {!isSearching && stockResults.length === 0 && cryptoResults.length === 0 && searchQuery.length > 1 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}

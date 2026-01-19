@@ -80,157 +80,169 @@ export default function InversionesPage() {
             
             setIsProcessing(true);
 
-            // 1. Fetch current prices
-            const cryptoAssets = investments.filter(i => i.assetType === 'crypto');
-            const stockAssets = investments.filter(i => i.assetType === 'stock');
-            
-            const cryptoIds = [...new Set(cryptoAssets.map(i => i.coinGeckoId).filter((id): id is string => !!id))];
-            const stockSymbols = [...new Set(stockAssets.map(i => i.symbol).filter((sym): sym is string => !!sym))];
-            
-            let fetchedPrices: PriceData = {};
             try {
-                const pricePromises = [];
-                if (cryptoIds.length > 0) pricePromises.push(getCryptoPrices({ ids: cryptoIds }));
-                if (stockSymbols.length > 0) pricePromises.push(getStockPrices({ symbols: stockSymbols }));
+                // 1. Fetch current prices
+                const cryptoAssets = investments.filter(i => i.assetType === 'crypto');
+                const stockAssets = investments.filter(i => i.assetType === 'stock');
                 
-                const results = await Promise.allSettled(pricePromises);
+                const cryptoIds = [...new Set(cryptoAssets.map(i => i.coinGeckoId).filter((id): id is string => !!id))];
+                const stockSymbols = [...new Set(stockAssets.map(i => i.symbol).filter((sym): sym is string => !!sym))];
+                
+                let fetchedPrices: PriceData = {};
+                try {
+                    const pricePromises = [];
+                    if (cryptoIds.length > 0) pricePromises.push(getCryptoPrices({ ids: cryptoIds }));
+                    if (stockSymbols.length > 0) pricePromises.push(getStockPrices({ symbols: stockSymbols }));
+                    
+                    const results = await Promise.allSettled(pricePromises);
 
-                results.forEach(res => {
-                    if (res.status === 'fulfilled' && res.value) {
-                        fetchedPrices = { ...fetchedPrices, ...res.value };
-                    } else if (res.status === 'rejected') {
-                        console.warn('Partial failure fetching prices:', res.reason);
+                    results.forEach(res => {
+                        if (res.status === 'fulfilled' && res.value) {
+                            fetchedPrices = { ...fetchedPrices, ...res.value };
+                        } else if (res.status === 'rejected') {
+                            console.warn('Partial failure fetching prices:', res.reason);
+                        }
+                    });
+                } catch (error) {
+                    toast({ title: 'Error de Precios', description: 'No se pudieron obtener algunas cotizaciones.', variant: 'destructive'});
+                }
+                setCurrentPrices(fetchedPrices);
+
+                // 2. Calculate Total Value
+                let newTotalValue = 0;
+                investments.forEach(inv => {
+                    const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
+                    if (priceKey && fetchedPrices[priceKey]) {
+                        newTotalValue += inv.amount * fetchedPrices[priceKey].price;
                     }
                 });
-            } catch (error) {
-                toast({ title: 'Error de Precios', description: 'No se pudieron obtener algunas cotizaciones.', variant: 'destructive'});
-            }
-            setCurrentPrices(fetchedPrices);
+                setTotalValue(newTotalValue);
 
-            // 2. Calculate Total Value
-            let newTotalValue = 0;
-            investments.forEach(inv => {
-                const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
-                if (priceKey && fetchedPrices[priceKey]) {
-                    newTotalValue += inv.amount * fetchedPrices[priceKey].price;
+                // 3. Fetch Price History
+                const chartPeriodStartDate = startOfDay(subDays(new Date(), period -1));
+                const earliestPurchaseDate = investments.reduce((earliest, inv) => 
+                    (inv.purchaseDate && inv.purchaseDate < earliest) ? inv.purchaseDate : earliest, 
+                    Date.now()
+                );
+
+                const historyFetchStartDate = isAfter(new Date(earliestPurchaseDate), chartPeriodStartDate) 
+                    ? chartPeriodStartDate 
+                    : startOfDay(new Date(earliestPurchaseDate));
+                
+                const endDate = startOfDay(new Date());
+                const startTimestamp = getUnixTime(historyFetchStartDate);
+                const endTimestamp = getUnixTime(endDate);
+
+                const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+                const historyResults: { id: string; data: Record<string, number> | {} }[] = [];
+
+                for (const symbol of stockSymbols) {
+                    try {
+                        const history = await getStockPriceHistory({ symbol, from: startTimestamp, to: endTimestamp });
+                        historyResults.push({ id: symbol, data: history.history });
+                    } catch (e) {
+                        console.warn(`Could not fetch stock history for ${symbol}:`, e)
+                        historyResults.push({ id: symbol, data: {} });
+                    }
+                    await delay(400); // Avoid Finnhub rate limit
                 }
-            });
-            setTotalValue(newTotalValue);
 
-            // 3. Fetch Price History
-            const chartPeriodStartDate = startOfDay(subDays(new Date(), period -1));
-            const earliestPurchaseDate = investments.reduce((earliest, inv) => 
-                (inv.purchaseDate && inv.purchaseDate < earliest) ? inv.purchaseDate : earliest, 
-                Date.now()
-            );
-
-            const historyFetchStartDate = isAfter(new Date(earliestPurchaseDate), chartPeriodStartDate) 
-                ? chartPeriodStartDate 
-                : startOfDay(new Date(earliestPurchaseDate));
-            
-            const endDate = startOfDay(new Date());
-            const startTimestamp = getUnixTime(historyFetchStartDate);
-            const endTimestamp = getUnixTime(endDate);
-
-            const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-            const historyResults: { id: string; data: Record<string, number> | {} }[] = [];
-
-            for (const symbol of stockSymbols) {
-                try {
-                    const history = await getStockPriceHistory({ symbol, from: startTimestamp, to: endTimestamp });
-                    historyResults.push({ id: symbol, data: history.history });
-                } catch (e) {
-                    console.warn(`Could not fetch stock history for ${symbol}:`, e)
-                    historyResults.push({ id: symbol, data: {} });
+                for (const id of cryptoIds) {
+                    try {
+                        const history = await getCryptoPriceHistory({ id, from: startTimestamp, to: endTimestamp });
+                        historyResults.push({ id: id, data: history.history });
+                    } catch (e) {
+                        console.warn(`Could not fetch crypto history for ${id}:`, e)
+                        historyResults.push({ id: id, data: {} });
+                    }
+                    await delay(500); // Avoid CoinGecko rate limit
                 }
-                await delay(400); // Avoid Finnhub rate limit
-            }
 
-            for (const id of cryptoIds) {
-                try {
-                    const history = await getCryptoPriceHistory({ id, from: startTimestamp, to: endTimestamp });
-                    historyResults.push({ id: id, data: history.history });
-                } catch (e) {
-                    console.warn(`Could not fetch crypto history for ${id}:`, e)
-                    historyResults.push({ id: id, data: {} });
-                }
-                await delay(500); // Avoid CoinGecko rate limit
-            }
-
-            const tempPriceHistory: PriceHistory = new Map();
-            historyResults.forEach(res => {
-                const pricesMap = new Map<string, number>();
-                 if (res.data) {
-                    Object.entries(res.data).forEach(([dateStr, price]) => {
-                        // Ensure date string is in UTC YYYY-MM-DD format
-                        const date = new Date(dateStr);
-                        const utcDateStr = date.toISOString().split('T')[0];
-                        pricesMap.set(utcDateStr, price)
-                    });
-                }
-                tempPriceHistory.set(res.id, pricesMap);
-            });
-            
-            // 4. Fill forward missing prices in the complete history
-            const totalDaysInHistory = differenceInDays(endDate, historyFetchStartDate);
-            if (totalDaysInHistory >= 0) {
-                for (const pricesMap of tempPriceHistory.values()) {
-                    let lastKnownPrice: number | undefined;
-                    for (let i = 0; i <= totalDaysInHistory; i++) {
-                        const currentDate = addDays(historyFetchStartDate, i);
-                        const dateStr = currentDate.toISOString().split('T')[0];
-                        if (pricesMap.has(dateStr)) {
-                            lastKnownPrice = pricesMap.get(dateStr);
-                        } else if (lastKnownPrice !== undefined) {
-                            pricesMap.set(dateStr, lastKnownPrice);
+                const tempPriceHistory: PriceHistory = new Map();
+                historyResults.forEach(res => {
+                    const pricesMap = new Map<string, number>();
+                    if (res.data) {
+                        Object.entries(res.data).forEach(([dateStr, price]) => {
+                            // Ensure date string is in UTC YYYY-MM-DD format
+                            const date = new Date(dateStr);
+                            const utcDateStr = date.toISOString().split('T')[0];
+                            pricesMap.set(utcDateStr, price)
+                        });
+                    }
+                    tempPriceHistory.set(res.id, pricesMap);
+                });
+                
+                // 4. Fill forward missing prices in the complete history
+                const totalDaysInHistory = differenceInDays(endDate, historyFetchStartDate);
+                if (totalDaysInHistory >= 0) {
+                    for (const pricesMap of tempPriceHistory.values()) {
+                        let lastKnownPrice: number | undefined;
+                        for (let i = 0; i <= totalDaysInHistory; i++) {
+                            const currentDate = addDays(historyFetchStartDate, i);
+                            const dateStr = currentDate.toISOString().split('T')[0];
+                            if (pricesMap.has(dateStr)) {
+                                lastKnownPrice = pricesMap.get(dateStr);
+                            } else if (lastKnownPrice !== undefined) {
+                                pricesMap.set(dateStr, lastKnownPrice);
+                            }
                         }
                     }
                 }
-            }
-            setPriceHistory(tempPriceHistory);
-            
-            // 5. Generate Chart Data
-            const chartDataStartDate = startOfDay(subDays(new Date(), period - 1));
-            const chartDays = differenceInDays(new Date(), chartDataStartDate);
-            const newChartData: PortfolioDataPoint[] = [];
-            let lastKnownTotal: number | null = null;
+                setPriceHistory(tempPriceHistory);
+                
+                // 5. Generate Chart Data
+                const chartDataStartDate = startOfDay(subDays(new Date(), period - 1));
+                const chartDays = differenceInDays(new Date(), chartDataStartDate);
+                const newChartData: PortfolioDataPoint[] = [];
+                let lastKnownTotal: number | null = null;
 
 
-            for (let i = 0; i <= chartDays; i++) {
-                const currentDate = addDays(chartDataStartDate, i);
-                const dateStr = currentDate.toISOString().split('T')[0];
-                let dailyTotal = 0;
-                let assetsWithValue = 0;
+                for (let i = 0; i <= chartDays; i++) {
+                    const currentDate = addDays(chartDataStartDate, i);
+                    const dateStr = currentDate.toISOString().split('T')[0];
+                    let dailyTotal = 0;
+                    let assetsWithValue = 0;
 
-                investments.forEach(inv => {
-                    // Only include assets purchased on or before the current day
-                    if (isAfter(new Date(inv.purchaseDate), currentDate)) {
-                        return;
+                    investments.forEach(inv => {
+                        // Only include assets purchased on or before the current day
+                        if (isAfter(new Date(inv.purchaseDate), currentDate)) {
+                            return;
+                        }
+                        
+                        const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
+                        if (!priceKey) return;
+
+                        const historyForAsset = tempPriceHistory.get(priceKey);
+                        const priceForDay = historyForAsset?.get(dateStr);
+                        
+                        if (priceForDay !== undefined) {
+                            dailyTotal += inv.amount * priceForDay;
+                            assetsWithValue++;
+                        }
+                    });
+
+                    if (assetsWithValue > 0) {
+                        lastKnownTotal = dailyTotal;
+                        newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
+                    } else {
+                        // If no assets had a value today, carry forward the last known total
+                        newChartData.push({ date: currentDate.getTime(), value: lastKnownTotal });
                     }
-                    
-                    const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
-                    if (!priceKey) return;
-
-                    const historyForAsset = tempPriceHistory.get(priceKey);
-                    const priceForDay = historyForAsset?.get(dateStr);
-                    
-                    if (priceForDay !== undefined) {
-                        dailyTotal += inv.amount * priceForDay;
-                        assetsWithValue++;
-                    }
-                });
-
-                if (assetsWithValue > 0) {
-                    lastKnownTotal = dailyTotal;
-                    newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
-                } else {
-                    // If no assets had a value today, carry forward the last known total
-                    newChartData.push({ date: currentDate.getTime(), value: lastKnownTotal });
                 }
-            }
-            setChartData(newChartData);
+                setChartData(newChartData);
 
-            setIsProcessing(false);
+            } catch (error) {
+                console.error("An error occurred during investment processing:", error);
+                toast({
+                    title: "Error de Procesamiento",
+                    description: "No se pudieron procesar los datos de inversiones.",
+                    variant: "destructive",
+                });
+                setTotalValue(0);
+                setChartData([]);
+            } finally {
+                setIsProcessing(false);
+            }
         };
 
         processInvestmentData();
