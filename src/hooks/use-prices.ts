@@ -14,7 +14,7 @@ export function usePrices(investments: Investment[] | null) {
     const investmentsKey = useMemo(() => {
         if (!investments) return '';
         // Create a stable key based on the assets that need pricing
-        return investments.map(inv => inv.assetType === 'crypto' ? inv.coinGeckoId || inv.id : inv.symbol).sort().join(',');
+        return investments.map(inv => inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol).sort().join(',');
     }, [investments]);
 
     useEffect(() => {
@@ -30,8 +30,7 @@ export function usePrices(investments: Investment[] | null) {
             const cryptoAssets = investments.filter(i => i.assetType === 'crypto');
             const stockAssets = investments.filter(i => i.assetType === 'stock');
             
-            // For crypto, ALWAYS use coinGeckoId. The fallback to `id` handles legacy data.
-            const cryptoIdsToFetch = [...new Set(cryptoAssets.map(inv => inv.coinGeckoId || inv.id).filter(Boolean))];
+            const cryptoIdsToFetch = [...new Set(cryptoAssets.map(inv => inv.coinGeckoId).filter(Boolean))];
             const stockSymbolsToFetch = [...new Set(stockAssets.map(inv => inv.symbol))];
 
             try {

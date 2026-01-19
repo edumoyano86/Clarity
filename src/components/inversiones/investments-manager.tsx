@@ -8,7 +8,7 @@ import { ManagerPage } from '../shared/manager-page';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { InvestmentForm } from './investment-form';
 import { Button } from '../ui/button';
-import { Edit, Trash2, TrendingUp, TrendingDown, Loader2, DollarSign } from 'lucide-react';
+import { Edit, Trash2, TrendingUp, TrendingDown, Loader2, DollarSign, AlertCircle } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useFirestore } from '@/firebase';
 import { deleteDoc, doc } from 'firebase/firestore';
@@ -19,6 +19,8 @@ import { Switch } from '../ui/switch';
 import { SellInvestmentDialog } from './sell-investment-dialog';
 import { PortfolioPeriod } from '@/hooks/use-portfolio-history';
 import { format, startOfDay } from 'date-fns';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+
 
 interface InvestmentsManagerProps {
     investments: Investment[];
@@ -104,8 +106,9 @@ export function InvestmentsManager({
     const sortedInvestments = useMemo(() => {
         if (!investments) return [];
         return [...investments].sort((a, b) => {
-            const priceKeyA = a.assetType === 'crypto' ? a.coinGeckoId || a.id : a.symbol;
-            const priceKeyB = b.assetType === 'crypto' ? b.coinGeckoId || b.id : b.symbol;
+            const priceKeyA = a.assetType === 'crypto' ? a.coinGeckoId : a.symbol;
+            const priceKeyB = b.assetType === 'crypto' ? b.coinGeckoId : b.symbol;
+            if (!priceKeyA || !priceKeyB) return 0;
             const aPrice = prices[priceKeyA]?.price || 0;
             const bPrice = prices[priceKeyB]?.price || 0;
             const aValue = a.amount * aPrice;
@@ -117,8 +120,10 @@ export function InvestmentsManager({
 
     const renderPortfolioRow = (investment: Investment) => {
         const isDateInvalid = typeof investment.purchaseDate !== 'number' || isNaN(investment.purchaseDate) || investment.purchaseDate <= 0;
-
-        if (isDateInvalid) {
+        const priceKey = investment.assetType === 'crypto' ? investment.coinGeckoId : investment.symbol;
+        const hasRequiredData = investment.assetType === 'stock' || (investment.assetType === 'crypto' && !!investment.coinGeckoId);
+        
+        if (isDateInvalid || !hasRequiredData) {
             return (
                 <TableRow key={investment.id}>
                     <TableCell>
@@ -126,7 +131,19 @@ export function InvestmentsManager({
                         <div className='text-sm text-muted-foreground'>{investment.symbol}</div>
                     </TableCell>
                     <TableCell colSpan={5} className="text-destructive text-center font-medium">
-                        Fecha de compra inválida. Por favor, edita la inversión.
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger>
+                                    <div className="flex items-center gap-2 justify-center">
+                                        <AlertCircle className="h-4 w-4" />
+                                        Datos incompletos
+                                    </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Esta inversión necesita ser actualizada para mostrar sus datos. Por favor, edítala.</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                     </TableCell>
                     <TableCell className='text-right space-x-0'>
                         <Button variant="ghost" size="icon" onClick={() => handleOpenForm(investment)} title="Editar">
@@ -140,13 +157,11 @@ export function InvestmentsManager({
             );
         }
         
-        const priceKey = investment.assetType === 'crypto' ? investment.coinGeckoId || investment.id : investment.symbol;
-        
         const purchaseDateStr = format(startOfDay(new Date(investment.purchaseDate)), 'yyyy-MM-dd');
-        const purchasePrice = priceHistory.get(priceKey)?.get(purchaseDateStr) || 0;
+        const purchasePrice = priceHistory.get(priceKey!)?.get(purchaseDateStr) || 0;
         const purchaseValue = investment.amount * purchasePrice;
         
-        const currentPrice = prices[priceKey]?.price;
+        const currentPrice = prices[priceKey!]?.price;
         const currentValue = currentPrice ? investment.amount * currentPrice : null;
         
         const pnl = currentValue !== null && purchaseValue > 0 ? currentValue - purchaseValue : null;

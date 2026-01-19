@@ -5,7 +5,7 @@ import { Investment } from "@/lib/definitions";
 import { InvestmentsManager } from "@/components/inversiones/investments-manager";
 import { collection, orderBy, query } from "firebase/firestore";
 import { usePortfolioHistory, type PortfolioPeriod } from "@/hooks/use-portfolio-history";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { usePrices } from "@/hooks/use-prices";
 
 export default function InversionesPage() {
@@ -21,25 +21,14 @@ export default function InversionesPage() {
     const { data: investments, isLoading: loadingInvestments } = useCollection<Investment>(investmentsQuery);
 
     const { prices, isLoading: isLoadingPrices } = usePrices(investments);
-    const { portfolioHistory, isLoading: isLoadingHistory, priceHistory } = usePortfolioHistory(investments, period);
-
-    const totalValue = useMemo(() => {
-        if (!investments || !prices || Object.keys(prices).length === 0) return 0;
-        return investments.reduce((acc, inv) => {
-            const priceKey = inv.assetType === 'crypto' ? (inv.coinGeckoId || inv.id) : inv.symbol;
-            const currentPrice = prices[priceKey]?.price || 0;
-            return acc + (inv.amount * currentPrice);
-        }, 0);
-    }, [investments, prices]);
+    const { portfolioHistory, isLoading: isLoadingHistory, priceHistory, totalValue } = usePortfolioHistory(investments, period);
     
     const isDataLoading = isUserLoading || loadingInvestments || isLoadingPrices || isLoadingHistory;
 
-    const noInvestments = !loadingInvestments && investments && investments.length === 0;
-
-    if (isDataLoading && !noInvestments) {
-        return <div className="flex h-full w-full items-center justify-center"><p>Cargando datos de inversiones...</p></div>
+    if (isUserLoading) {
+        return <div className="flex h-full w-full items-center justify-center"><p>Cargando usuario...</p></div>
     }
-    
+
     if (!user) {
         return <div className="flex h-full w-full items-center justify-center"><p>Usuario no autenticado.</p></div>
     }

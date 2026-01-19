@@ -45,7 +45,6 @@ export function usePortfolioHistory(
             }, Date.now());
 
             const endDate = startOfDay(new Date());
-            // Ensure the start date for fetching history is not in the future
             const safeEarliestDate = earliestPurchaseDate > endDate.getTime() ? endDate : new Date(earliestPurchaseDate);
             const startDate = startOfDay(safeEarliestDate);
             
@@ -57,13 +56,12 @@ export function usePortfolioHistory(
 
             const allPriceHistory: PriceHistory = new Map();
 
-            // ALWAYS use coinGeckoId for crypto, with a fallback to id for legacy data.
-            const cryptoIdsToFetch = [...new Set(cryptoAssets.map(a => a.coinGeckoId || a.id).filter(Boolean))];
+            const cryptoIdsToFetch = [...new Set(cryptoAssets.map(a => a.coinGeckoId).filter(Boolean))];
             const stockSymbolsToFetch = [...new Set(stockAssets.map(a => a.symbol))];
 
             const stockPromises = stockSymbolsToFetch.map(symbol =>
                 getStockPriceHistory({ symbol: symbol, from: startTimestamp, to: endTimestamp })
-                    .then(data => ({ id: symbol, data: data.history })) // Keyed by symbol
+                    .then(data => ({ id: symbol, data: data.history }))
                     .catch(err => {
                         console.warn(`Could not fetch stock history for ${symbol}:`, err);
                         toast({ title: 'Error de Historial', description: `No se pudo obtener el historial para ${symbol}.`, variant: 'destructive'});
@@ -73,7 +71,7 @@ export function usePortfolioHistory(
 
             const cryptoPromises = cryptoIdsToFetch.map(id =>
                 getCryptoPriceHistory({ id, from: startTimestamp, to: endTimestamp })
-                    .then(data => ({ id, data: data.history })) // Keyed by coinGeckoId
+                    .then(data => ({ id, data: data.history }))
                     .catch(err => {
                         console.warn(`Could not fetch crypto history for ${id}:`, err);
                         toast({ title: 'Error de Historial', description: `No se pudo obtener el historial para ${id}.`, variant: 'destructive'});
@@ -97,8 +95,7 @@ export function usePortfolioHistory(
             if (totalDays >= 0) {
                 for (const pricesMap of allPriceHistory.values()) {
                     let lastKnownPrice: number | undefined = undefined;
-                    // First pass to find the earliest available price
-                     for (let i = 0; i <= totalDays; i++) {
+                    for (let i = 0; i <= totalDays; i++) {
                         const currentDate = subDays(endDate, totalDays - i);
                         const currentDateStr = format(currentDate, 'yyyy-MM-dd');
                         if (pricesMap.has(currentDateStr)) {
@@ -107,7 +104,6 @@ export function usePortfolioHistory(
                         }
                      }
                     
-                    // Forward fill from the earliest available price
                     if(lastKnownPrice !== undefined) {
                         for (let i = 0; i <= totalDays; i++) {
                             const currentDate = subDays(endDate, totalDays - i);
@@ -136,7 +132,9 @@ export function usePortfolioHistory(
 
                     const isPurchased = !isAfter(new Date(purchaseDate), currentDate);
                     if (isPurchased) {
-                        const priceKey = inv.assetType === 'crypto' ? (inv.coinGeckoId || inv.id) : inv.symbol;
+                        const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
+                        if (!priceKey) return;
+
                         const historyForAsset = allPriceHistory.get(priceKey);
                         const priceForDay = historyForAsset?.get(format(currentDate, 'yyyy-MM-dd'));
                         
@@ -159,5 +157,10 @@ export function usePortfolioHistory(
 
     }, [investmentsKey, chartPeriodInDays, toast]);
 
-    return { portfolioHistory, isLoading, priceHistory };
+    const totalValue = useMemo(() => {
+        if (!investments || portfolioHistory.length === 0) return 0;
+        return portfolioHistory[portfolioHistory.length - 1]?.value || 0;
+    }, [investments, portfolioHistory]);
+
+    return { portfolioHistory, isLoading, priceHistory, totalValue };
 }

@@ -165,20 +165,19 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             
             const collectionRef = collection(firestore, 'users', userId, 'investments');
             
-            // The document ID will be the main symbol for consistency
-            const docId = data.symbol.toUpperCase();
-            
+            let docId : string;
+            if (data.assetType === 'crypto') {
+                docId = data.coinGeckoId!;
+                data.id = docId;
+            } else {
+                docId = data.symbol.toUpperCase();
+                data.id = docId;
+            }
+
             const dataToSave = {
                 ...data,
-                id: docId,
-                symbol: docId,
                 purchaseDate: data.purchaseDate.getTime(),
             };
-
-            // Remove id from the data to save if it's a crypto, as it's the coingecko id
-             if (data.assetType === 'crypto') {
-               (dataToSave as any).id = data.symbol.toUpperCase();
-            }
 
             const docRef = doc(collectionRef, docId);
 
@@ -228,10 +227,10 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     onSelect={() => {
                         const upperCaseSymbol = asset.symbol.toUpperCase();
                         setSelectedAsset(asset);
-                        setValue('id', upperCaseSymbol);
+                        setValue('id', asset.id); // Set the main ID to coingecko ID
                         setValue('symbol', upperCaseSymbol);
                         setValue('name', asset.name);
-                        setValue('coinGeckoId', asset.id);
+                        setValue('coinGeckoId', asset.id); // Also set the specific coingecko ID field
                         setSearchQuery(asset.name);
                         setIsListVisible(false);
                     }}
