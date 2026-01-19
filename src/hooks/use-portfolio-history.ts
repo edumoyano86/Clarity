@@ -5,7 +5,6 @@ import { Investment, PortfolioDataPoint, PriceHistory } from '@/lib/definitions'
 import { format, subDays, startOfDay, getUnixTime, isAfter, differenceInDays, addDays } from 'date-fns';
 import { getStockPriceHistory } from '@/ai/flows/stock-price-history';
 import { getCryptoPriceHistory } from '@/ai/flows/crypto-price-history';
-import { useToast } from './use-toast';
 
 export type PortfolioPeriod = 7 | 30 | 90;
 
@@ -16,7 +15,6 @@ export function usePortfolioHistory(
     const [portfolioHistory, setPortfolioHistory] = useState<PortfolioDataPoint[]>([]);
     const [priceHistory, setPriceHistory] = useState<PriceHistory>(new Map());
     const [isLoading, setIsLoading] = useState(true);
-    const { toast } = useToast();
 
     const investmentsKey = useMemo(() => {
         if (!investments) return '';
@@ -34,29 +32,20 @@ export function usePortfolioHistory(
 
             setIsLoading(true);
 
-            const earliestPurchaseDate = investments.reduce((earliest, inv) => {
-                const purchaseDate = inv.purchaseDate;
-                if (typeof purchaseDate === 'number' && !isNaN(purchaseDate) && purchaseDate > 0) {
-                     if (purchaseDate < earliest) {
-                        return purchaseDate;
-                    }
-                }
-                return earliest;
-            }, Date.now());
-
             const endDate = startOfDay(new Date());
-            const safeEarliestDate = earliestPurchaseDate > endDate.getTime() ? endDate : new Date(earliestPurchaseDate);
-            const startDate = startOfDay(safeEarliestDate);
+            // Simplified: Always fetch the last 90 days of history.
+            // This is enough for all chart periods and for purchase price lookup of recent investments.
+            const historyStartDate = startOfDay(subDays(endDate, 90)); 
             
-            const startTimestamp = getUnixTime(startDate);
+            const startTimestamp = getUnixTime(historyStartDate);
             const endTimestamp = getUnixTime(endDate);
 
-            const cryptoAssets = investments.filter(i => i.assetType === 'crypto' && i.coinGeckoId);
+            const cryptoAssets = investments.filter(i => i.assetType === 'crypto');
             const stockAssets = investments.filter(i => i.assetType === 'stock');
 
             const allPriceHistory: PriceHistory = new Map();
 
-            const cryptoIdsToFetch = [...new Set(cryptoAssets.map(a => a.coinGeckoId).filter(Boolean) as string[])];
+            const cryptoIdsToFetch = [...new Set(cryptoAssets.map(a => a.coinGeckoId || a.id).filter(Boolean) as string[])];
             const stockSymbolsToFetch = [...new Set(stockAssets.map(a => a.symbol))];
 
             const stockPromises = stockSymbolsToFetch.map(symbol =>
@@ -64,14 +53,13 @@ export function usePortfolioHistory(
                     .then(data => ({ id: symbol, data: data.history }))
                     .catch(err => {
                         console.warn(`Could not fetch stock history for ${symbol}:`, err);
-                        toast({ title: 'Error de Historial', description: `No se pudo obtener el historial para ${symbol}.`, variant: 'destructive'});
                         return { id: symbol, data: {} };
                     })
             );
 
             const cryptoPromises = cryptoIdsToFetch.map(id =>
-                getCryptoPriceHistory({ id: id, from: startTimestamp, to: endTimestamp })
-                    .then(data => ({ id: id, data: data.history }))
+                getCryptoPriceHistory({ id, from: startTimestamp, to: endTimestamp })
+                    .then(data => ({ id, data: data.history }))
                     .catch(err => {
                         console.warn(`Could not fetch crypto history for ${id}:`, err);
                         return { id, data: {} };
@@ -91,21 +79,19 @@ export function usePortfolioHistory(
                     allPriceHistory.set(result.id, pricesMap);
                 }
             });
-
+            
             // Correct Gap-Filling Logic: Carry prices forward in time.
-            const totalDays = differenceInDays(endDate, startDate);
+            const totalDays = differenceInDays(endDate, historyStartDate);
             if (totalDays >= 0) {
                 for (const pricesMap of allPriceHistory.values()) {
                     let lastKnownPrice: number | undefined;
                     for (let i = 0; i <= totalDays; i++) {
-                        const date = addDays(startDate, i);
+                        const date = addDays(historyStartDate, i);
                         const dateStr = format(date, 'yyyy-MM-dd');
 
                         if (pricesMap.has(dateStr)) {
-                            // If a price exists for the current day, update our last known price.
                             lastKnownPrice = pricesMap.get(dateStr);
                         } else if (lastKnownPrice !== undefined) {
-                            // If no price exists and we have a previously known price, fill the gap.
                             pricesMap.set(dateStr, lastKnownPrice);
                         }
                     }
@@ -121,17 +107,11 @@ export function usePortfolioHistory(
                 
                 let dailyTotal = 0;
                 investments.forEach(inv => {
-                    // Skip legacy assets that haven't been updated
-                    if (inv.assetType === 'crypto' && !inv.coinGeckoId) {
-                        return;
-                    }
-                    
                     const purchaseDate = inv.purchaseDate;
                     if (typeof purchaseDate !== 'number' || isNaN(purchaseDate) || purchaseDate <=0) return;
 
-                    const isPurchased = !isAfter(new Date(purchaseDate), currentDate);
-                    if (isPurchased) {
-                        const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId! : inv.symbol;
+                    if (!isAfter(new Date(purchaseDate), currentDate)) {
+                        const priceKey = inv.assetType === 'crypto' ? (inv.coinGeckoId || inv.id) : inv.symbol;
                         if (!priceKey) return;
 
                         const historyForAsset = allPriceHistory.get(priceKey);
@@ -154,13 +134,13 @@ export function usePortfolioHistory(
             setIsLoading(false);
         });
 
-    }, [investmentsKey, chartPeriodInDays, toast]);
+    }, [investmentsKey, chartPeriodInDays]);
 
     const totalValue = useMemo(() => {
-         if (!investments || isLoading || portfolioHistory.length === 0) return 0;
+        if (isLoading || portfolioHistory.length === 0) return 0;
         const lastDataPoint = portfolioHistory[portfolioHistory.length - 1];
         return lastDataPoint?.value || 0;
-    }, [investments, isLoading, portfolioHistory]);
+    }, [isLoading, portfolioHistory]);
 
     return { portfolioHistory, isLoading, priceHistory, totalValue };
 }

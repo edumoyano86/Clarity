@@ -32,6 +32,7 @@ interface InvestmentsManagerProps {
     priceHistory: PriceHistory;
     period: PortfolioPeriod;
     setPeriod: (period: PortfolioPeriod) => void;
+    periodOptions: { label: string; value: PortfolioPeriod }[];
 }
 
 const USD_TO_ARS_RATE = 1050; 
@@ -45,7 +46,8 @@ export function InvestmentsManager({
     prices,
     priceHistory,
     period, 
-    setPeriod 
+    setPeriod,
+    periodOptions,
 }: InvestmentsManagerProps) {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
@@ -94,8 +96,10 @@ export function InvestmentsManager({
     const handleDelete = async () => {
         if (!investmentToDelete) return;
         try {
-            // The document ID is now consistently the coinGeckoId for crypto or symbol for stock.
-            const docId = investmentToDelete.assetType === 'crypto' ? investmentToDelete.coinGeckoId! : investmentToDelete.symbol;
+            const docId = investmentToDelete.assetType === 'crypto' 
+                ? (investmentToDelete.coinGeckoId || investmentToDelete.id) 
+                : investmentToDelete.symbol;
+                
             if (!docId) {
                 throw new Error("ID de activo inválido para eliminar.");
             }
@@ -112,8 +116,8 @@ export function InvestmentsManager({
     const sortedInvestments = useMemo(() => {
         if (!investments) return [];
         return [...investments].sort((a, b) => {
-            const priceKeyA = a.assetType === 'crypto' ? a.coinGeckoId : a.symbol;
-            const priceKeyB = b.assetType === 'crypto' ? b.coinGeckoId : b.symbol;
+            const priceKeyA = a.assetType === 'crypto' ? (a.coinGeckoId || a.id) : a.symbol;
+            const priceKeyB = b.assetType === 'crypto' ? (b.coinGeckoId || b.id) : b.symbol;
             if (!priceKeyA || !priceKeyB) return 0;
             const aPrice = prices[priceKeyA]?.price || 0;
             const bPrice = prices[priceKeyB]?.price || 0;
@@ -162,18 +166,41 @@ export function InvestmentsManager({
                 </TableRow>
             );
         }
+
+        if (isDateInvalid) {
+            return (
+               <TableRow key={investment.id}>
+                   <TableCell>
+                       <div className='font-medium'>{investment.name}</div>
+                       <div className='text-sm text-muted-foreground'>{investment.symbol}</div>
+                   </TableCell>
+                   <TableCell colSpan={5} className="text-red-600 text-center font-medium">
+                       Fecha de compra inválida. Por favor, edita la inversión.
+                   </TableCell>
+                   <TableCell className='text-right space-x-0'>
+                       <Button variant="ghost" size="icon" onClick={() => handleOpenForm(investment)} title="Editar">
+                           <Edit className="h-4 w-4" />
+                       </Button>
+                       <Button variant="ghost" size="icon" onClick={() => handleOpenAlert(investment)} title="Eliminar">
+                           <Trash2 className="h-4 w-4" />
+                       </Button>
+                   </TableCell>
+               </TableRow>
+           );
+       }
         
-        const priceKey = investment.assetType === 'crypto' ? investment.coinGeckoId! : investment.symbol;
+        const priceKey = investment.assetType === 'crypto' ? (investment.coinGeckoId || investment.id) : investment.symbol;
         
-        const purchaseDateStr = isDateInvalid ? '' : format(startOfDay(new Date(investment.purchaseDate)), 'yyyy-MM-dd');
-        const purchasePrice = purchaseDateStr ? priceHistory.get(priceKey)?.get(purchaseDateStr) || 0 : 0;
-        const purchaseValue = investment.amount * purchasePrice;
+        const purchaseDateStr = format(startOfDay(new Date(investment.purchaseDate)), 'yyyy-MM-dd');
+        const purchasePriceFound = priceHistory.get(priceKey)?.has(purchaseDateStr);
+        const purchasePrice = purchasePriceFound ? priceHistory.get(priceKey)!.get(purchaseDateStr)! : null;
+        const purchaseValue = purchasePrice !== null ? investment.amount * purchasePrice : null;
         
         const currentPrice = prices[priceKey]?.price;
         const currentValue = currentPrice ? investment.amount * currentPrice : null;
         
-        const pnl = currentValue !== null && purchaseValue > 0 ? currentValue - purchaseValue : null;
-        const pnlPercent = pnl !== null && purchaseValue > 0 ? (pnl / purchaseValue) * 100 : null;
+        const pnl = (currentValue !== null && purchaseValue !== null) ? currentValue - purchaseValue : null;
+        const pnlPercent = (pnl !== null && purchaseValue !== null && purchaseValue > 0) ? (pnl / purchaseValue) * 100 : null;
 
         return (
             <TableRow key={investment.id}>
@@ -182,19 +209,19 @@ export function InvestmentsManager({
                     <div className='text-sm text-muted-foreground'>{investment.symbol}</div>
                 </TableCell>
                 <TableCell>{investment.amount.toFixed(4)}</TableCell>
-                <TableCell>{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (purchasePrice > 0 ? formatCurrency(purchasePrice) : 'N/A')}</TableCell>
-                <TableCell>{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (purchaseValue > 0 ? formatCurrency(purchaseValue) : 'N/A')}</TableCell>
+                <TableCell>{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (purchasePrice !== null ? formatCurrency(purchasePrice) : 'N/A')}</TableCell>
+                <TableCell>{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (purchaseValue !== null ? formatCurrency(purchaseValue) : 'N/A')}</TableCell>
                 <TableCell>
                     {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : currentValue !== null ? formatCurrency(currentValue) : '-'}
                 </TableCell>
                 <TableCell>
                     {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
-                        pnl !== null && pnlPercent !== null && purchaseValue > 0 ? (
+                        pnl !== null && pnlPercent !== null ? (
                             <div className={`flex items-center gap-1 font-medium ${pnl >= 0 ? 'text-green-600' : 'text-destructive'}`}>
                                 {pnl >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
                                 <span>{formatCurrency(pnl)} ({pnlPercent.toFixed(2)}%)</span>
                             </div>
-                        ) : '-'
+                        ) : 'N/A'
                     )}
                 </TableCell>
                 <TableCell className='text-right space-x-0'>
@@ -211,12 +238,6 @@ export function InvestmentsManager({
             </TableRow>
         )
     }
-
-    const periodOptions: { label: string; value: PortfolioPeriod }[] = [
-        { label: '7D', value: 7 },
-        { label: '30D', value: 30 },
-        { label: '90D', value: 90 },
-    ];
 
     return (
         <>
@@ -263,16 +284,7 @@ export function InvestmentsManager({
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {isLoading ? (
-                                        <TableRow>
-                                            <TableCell colSpan={7} className="text-center h-24">
-                                                <div className="flex justify-center items-center">
-                                                    <Loader2 className="mr-2 h-6 w-6 animate-spin" />
-                                                    Cargando datos de mercado...
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : investments.length > 0 ? (
+                                    {investments.length > 0 ? (
                                         sortedInvestments.map(renderPortfolioRow)
                                     ) : (
                                         <TableRow>

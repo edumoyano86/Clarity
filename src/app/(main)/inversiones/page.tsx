@@ -7,6 +7,7 @@ import { collection, orderBy, query } from "firebase/firestore";
 import { usePortfolioHistory, type PortfolioPeriod } from "@/hooks/use-portfolio-history";
 import { useState } from "react";
 import { usePrices } from "@/hooks/use-prices";
+import { Loader2 } from "lucide-react";
 
 export default function InversionesPage() {
     const firestore = useFirestore();
@@ -25,13 +26,26 @@ export default function InversionesPage() {
     
     const isDataLoading = isUserLoading || loadingInvestments || isLoadingPrices || isLoadingHistory;
 
-    if (isUserLoading) {
-        return <div className="flex h-full w-full items-center justify-center"><p>Cargando usuario...</p></div>
+    if (isDataLoading) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    <p className="text-muted-foreground">Cargando datos de inversiones...</p>
+                </div>
+            </div>
+        );
     }
 
     if (!user) {
         return <div className="flex h-full w-full items-center justify-center"><p>Usuario no autenticado.</p></div>
     }
+
+    const periodOptions: { label: string; value: PortfolioPeriod }[] = [
+        { label: '7D', value: 7 },
+        { label: '30D', value: 30 },
+        { label: '90D', value: 90 },
+    ];
 
     return <InvestmentsManager 
         investments={investments || []} 
@@ -43,5 +57,6 @@ export default function InversionesPage() {
         priceHistory={priceHistory}
         period={period}
         setPeriod={setPeriod}
+        periodOptions={periodOptions}
         />;
 }
