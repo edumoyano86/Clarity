@@ -67,9 +67,18 @@ export function useDashboardPortfolio(
             setTotalValue(newTotalValue);
 
             // 3. Fetch history for the chart
-            const chartStartDate = startOfDay(subDays(new Date(), period -1));
+            const chartPeriodStartDate = startOfDay(subDays(new Date(), period -1));
+            const earliestPurchaseDate = investments.reduce((earliest, inv) => 
+                (inv.purchaseDate && inv.purchaseDate < earliest) ? inv.purchaseDate : earliest, 
+                Date.now()
+            );
+
+            const historyFetchStartDate = isAfter(new Date(earliestPurchaseDate), chartPeriodStartDate) 
+                ? chartPeriodStartDate 
+                : startOfDay(new Date(earliestPurchaseDate));
+
             const endDate = startOfDay(new Date());
-            const startTimestamp = getUnixTime(chartStartDate);
+            const startTimestamp = getUnixTime(historyFetchStartDate);
             const endTimestamp = getUnixTime(endDate);
 
             const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -107,47 +116,61 @@ export function useDashboardPortfolio(
             });
             
             // 4. Fill forward missing prices
-            const chartDays = differenceInDays(endDate, chartStartDate);
-            for (const pricesMap of tempPriceHistory.values()) {
-                let lastKnownPrice: number | undefined;
-                for (let i = 0; i <= chartDays; i++) {
-                    const currentDate = addDays(chartStartDate, i);
-                    const dateStr = currentDate.toISOString().split('T')[0];
-                    if (pricesMap.has(dateStr)) {
-                        lastKnownPrice = pricesMap.get(dateStr);
-                    } else if (lastKnownPrice !== undefined) {
-                        pricesMap.set(dateStr, lastKnownPrice);
+            const totalDaysInHistory = differenceInDays(endDate, historyFetchStartDate);
+            if (totalDaysInHistory >= 0) {
+                 for (const pricesMap of tempPriceHistory.values()) {
+                    let lastKnownPrice: number | undefined;
+                    for (let i = 0; i <= totalDaysInHistory; i++) {
+                        const currentDate = addDays(historyFetchStartDate, i);
+                        const dateStr = currentDate.toISOString().split('T')[0];
+                        if (pricesMap.has(dateStr)) {
+                            lastKnownPrice = pricesMap.get(dateStr);
+                        } else if (lastKnownPrice !== undefined) {
+                            pricesMap.set(dateStr, lastKnownPrice);
+                        }
                     }
                 }
             }
 
             // 5. Generate chart data
+            const chartDataStartDate = startOfDay(subDays(new Date(), period - 1));
+            const chartDays = differenceInDays(new Date(), chartDataStartDate);
             const newChartData: PortfolioDataPoint[] = [];
             let lastKnownTotal: number | null = null;
+            
             for (let i = 0; i <= chartDays; i++) {
-                const currentDate = addDays(chartStartDate, i);
+                const currentDate = addDays(chartDataStartDate, i);
                 const dateStr = currentDate.toISOString().split('T')[0];
                 let dailyTotal = 0;
                 let assetsWithValue = 0;
 
                 investments.forEach(inv => {
-                    if (!isAfter(new Date(inv.purchaseDate), currentDate)) {
-                        const priceKey = inv.assetType === 'crypto' ? (inv.coinGeckoId || inv.id) : inv.symbol;
-                        const priceForDay = tempPriceHistory.get(priceKey)?.get(dateStr);
-                        if (priceForDay !== undefined) {
-                            dailyTotal += inv.amount * priceForDay;
-                            assetsWithValue++;
-                        }
+                    if (isAfter(new Date(inv.purchaseDate), currentDate)) {
+                        return;
+                    }
+
+                    const priceKey = inv.assetType === 'crypto' ? (inv.coinGeckoId || inv.id) : inv.symbol;
+                    if (!priceKey) return;
+                    
+                    const historyForAsset = tempPriceHistory.get(priceKey);
+                    const priceForDay = historyForAsset?.get(dateStr);
+
+                    if (priceForDay !== undefined) {
+                        dailyTotal += inv.amount * priceForDay;
+                        assetsWithValue++;
                     }
                 });
                 
                 if (assetsWithValue > 0) {
                     lastKnownTotal = dailyTotal;
                     newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
-                } else {
+                } else if (lastKnownTotal !== null) {
                     newChartData.push({ date: currentDate.getTime(), value: lastKnownTotal });
+                } else {
+                    newChartData.push({ date: currentDate.getTime(), value: null });
                 }
             }
+
             setChartData(newChartData);
             setIsLoading(false);
         };
