@@ -41,7 +41,7 @@ export default function DashboardPage() {
     if (!firestore || !user) return null;
     return collection(firestore, 'users', user.uid, 'expenseCategories');
   }, [firestore, user]);
-  const { data: categorias, isLoading: loadingCategorias } = useCollection<Categoria>(categoriasQuery);
+  const { data: categorias, isLoading: loadingCategorias } = useCollection<Categoria>(categoriesQuery);
 
    const investmentsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
