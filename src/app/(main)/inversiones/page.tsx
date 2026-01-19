@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useFirestore, useUser, useMemoFirebase } from "@/firebase";
 import { Investment, PriceData, PortfolioDataPoint, PriceHistory } from "@/lib/definitions";
 import { InvestmentsManager } from "@/components/inversiones/investments-manager";
@@ -32,6 +32,7 @@ export default function InversionesPage() {
     // UI state
     const [period, setPeriod] = useState<PortfolioPeriod>(90);
     const [isProcessing, setIsProcessing] = useState(true);
+    const isProcessingRef = useRef(false);
 
     const investmentsQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
@@ -67,7 +68,7 @@ export default function InversionesPage() {
     // The main effect to process all data when investments change
     useEffect(() => {
         const processInvestmentData = async () => {
-            if (loadingInvestments || isUserLoading) return;
+            if (loadingInvestments || isUserLoading || isProcessingRef.current) return;
             
             if (investments.length === 0) {
                 setIsProcessing(false);
@@ -78,6 +79,7 @@ export default function InversionesPage() {
                 return;
             }
             
+            isProcessingRef.current = true;
             setIsProcessing(true);
 
             try {
@@ -241,6 +243,7 @@ export default function InversionesPage() {
                 setTotalValue(0);
                 setChartData([]);
             } finally {
+                isProcessingRef.current = false;
                 setIsProcessing(false);
             }
         };
@@ -251,7 +254,7 @@ export default function InversionesPage() {
 
     const isLoading = isUserLoading || loadingInvestments || isProcessing;
     
-    if (isLoading) {
+    if (isLoading && investments.length === 0) {
         return (
             <div className="flex h-screen w-full items-center justify-center">
                 <div className="flex flex-col items-center gap-4">

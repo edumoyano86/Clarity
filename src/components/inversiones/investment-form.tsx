@@ -141,6 +141,9 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     }, [investment, reset]);
 
     useEffect(() => {
+        // Reset asset-specific fields when assetType changes, but not if editing an existing investment
+        if (investment) return;
+
         setValue('id', '');
         setValue('symbol', '');
         setValue('name', '');
@@ -150,7 +153,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         setStockResults([]);
         setCryptoResults([]);
         setIsListVisible(true);
-    }, [assetType, setValue]);
+    }, [assetType, setValue, investment]);
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         setIsLoading(true);
@@ -245,12 +248,11 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             
-            {!investment && (
             <Controller
                 name="assetType"
                 control={control}
                 render={({ field }) => (
-                    <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-2 gap-4">
+                    <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-2 gap-4" disabled={!!investment}>
                         <div>
                             <RadioGroupItem value="crypto" id="crypto" className="peer sr-only" />
                             <Label htmlFor="crypto" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">Criptomoneda</Label>
@@ -262,7 +264,6 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     </RadioGroup>
                 )}
             />
-            )}
 
             <div>
                 <Label htmlFor="symbol">Activo</Label>
