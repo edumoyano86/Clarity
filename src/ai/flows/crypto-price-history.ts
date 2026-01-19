@@ -34,7 +34,7 @@ const cryptoPriceHistoryFlow = ai.defineFlow(
   async (input) => {
     // CoinGecko's free API is rate-limited, but should be fine for this server-side use.
     // No API key needed for this public endpoint.
-    const url = `https://api.coingecko.com/api/v3/coins/${input.id}/market_chart/range?vs_currency=usd&from=${input.from}&to=${input.to}&precision=2`;
+    const url = `https://api.coingecko.com/api/v3/coins/${input.id}/market_chart/range?vs_currency=usd&from=${input.from}&to=${input.to}&precision=full`;
 
     try {
       const response = await fetch(url);
