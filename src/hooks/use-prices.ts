@@ -30,8 +30,8 @@ export function usePrices(investments: Investment[] | null) {
             const cryptoAssets = investments.filter(i => i.assetType === 'crypto');
             const stockAssets = investments.filter(i => i.assetType === 'stock');
             
-            // Use coinGeckoId if available, otherwise fall back to the asset's 'id' field for backward compatibility.
-            const cryptoIdsToFetch = [...new Set(cryptoAssets.map(inv => inv.coinGeckoId || inv.id).filter(Boolean))];
+            // Strict: Only fetch prices for cryptos that have a coinGeckoId. This prevents API spam.
+            const cryptoIdsToFetch = [...new Set(cryptoAssets.map(inv => inv.coinGeckoId).filter(Boolean))];
             const stockSymbolsToFetch = [...new Set(stockAssets.map(inv => inv.symbol))];
 
             try {

@@ -43,13 +43,13 @@ export type Note = {
 };
 
 export type Investment = {
-    id: string; // The main symbol, e.g. 'AAPL', 'BTC'
+    id: string; // The unique ID for the investment document in Firestore.
     assetType: 'crypto' | 'stock';
     name: string;
-    symbol: string; // Same as ID
+    symbol: string; // e.g., 'BTC', 'AAPL'
     amount: number;
     purchaseDate: number; // timestamp
-    coinGeckoId?: string; // Only for crypto, e.g. 'bitcoin'
+    coinGeckoId?: string; // The unique ID from CoinGecko, e.g., 'bitcoin'. Required for cryptos.
 };
 
 // For Price APIs
@@ -64,5 +64,5 @@ export type PortfolioDataPoint = {
     value: number;
 };
 
-// Map<asset symbol, Map<date string 'yyyy-MM-dd', price>>
+// Map<asset symbol or coinGeckoId, Map<date string 'yyyy-MM-dd', price>>
 export type PriceHistory = Map<string, Map<string, number>>;

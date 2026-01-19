@@ -94,10 +94,16 @@ export function InvestmentsManager({
     const handleDelete = async () => {
         if (!investmentToDelete) return;
         try {
-            await deleteDoc(doc(firestore, 'users', userId, 'investments', investmentToDelete.id));
+            // The document ID is now consistently the coinGeckoId for crypto or symbol for stock.
+            const docId = investmentToDelete.assetType === 'crypto' ? investmentToDelete.coinGeckoId! : investmentToDelete.symbol;
+            if (!docId) {
+                throw new Error("ID de activo inválido para eliminar.");
+            }
+            await deleteDoc(doc(firestore, 'users', userId, 'investments', docId));
             toast({ title: 'Éxito', description: 'Inversión eliminada correctamente.' });
         } catch (error) {
-            toast({ title: 'Error', description: 'No se pudo eliminar la inversión.', variant: 'destructive' });
+            console.error("Error deleting investment:", error);
+            toast({ title: 'Error', description: (error as Error).message || 'No se pudo eliminar la inversión.', variant: 'destructive' });
         } finally {
             handleCloseAlert();
         }
@@ -106,8 +112,8 @@ export function InvestmentsManager({
     const sortedInvestments = useMemo(() => {
         if (!investments) return [];
         return [...investments].sort((a, b) => {
-            const priceKeyA = a.assetType === 'crypto' ? (a.coinGeckoId || a.id) : a.symbol;
-            const priceKeyB = b.assetType === 'crypto' ? (b.coinGeckoId || b.id) : b.symbol;
+            const priceKeyA = a.assetType === 'crypto' ? a.coinGeckoId : a.symbol;
+            const priceKeyB = b.assetType === 'crypto' ? b.coinGeckoId : b.symbol;
             if (!priceKeyA || !priceKeyB) return 0;
             const aPrice = prices[priceKeyA]?.price || 0;
             const bPrice = prices[priceKeyB]?.price || 0;
@@ -120,28 +126,27 @@ export function InvestmentsManager({
 
     const renderPortfolioRow = (investment: Investment) => {
         const isDateInvalid = typeof investment.purchaseDate !== 'number' || isNaN(investment.purchaseDate) || investment.purchaseDate <= 0;
-        // Smart key selection: use coinGeckoId if available (new assets), otherwise fall back to id (old assets).
-        const priceKey = investment.assetType === 'crypto' ? (investment.coinGeckoId || investment.id) : investment.symbol;
         
-        // Essential data is the priceKey for lookups and a valid purchase date.
-        if (!priceKey || isDateInvalid) {
-            return (
+        const isLegacyCrypto = investment.assetType === 'crypto' && !investment.coinGeckoId;
+
+        if (isLegacyCrypto) {
+             return (
                 <TableRow key={investment.id}>
                     <TableCell>
                         <div className='font-medium'>{investment.name}</div>
                         <div className='text-sm text-muted-foreground'>{investment.symbol}</div>
                     </TableCell>
-                    <TableCell colSpan={5} className="text-destructive text-center font-medium">
+                    <TableCell colSpan={5} className="text-amber-600 text-center font-medium">
                         <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger>
                                     <div className="flex items-center gap-2 justify-center">
                                         <AlertCircle className="h-4 w-4" />
-                                        Datos incompletos
+                                        Requiere Actualización
                                     </div>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    <p>Faltan datos clave (ID o fecha). Edita esta inversión para corregirla.</p>
+                                    <p>Activo guardado con formato antiguo. Edítalo y vuelve a guardarlo para ver su valor.</p>
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
@@ -158,8 +163,10 @@ export function InvestmentsManager({
             );
         }
         
-        const purchaseDateStr = format(startOfDay(new Date(investment.purchaseDate)), 'yyyy-MM-dd');
-        const purchasePrice = priceHistory.get(priceKey)?.get(purchaseDateStr) || 0;
+        const priceKey = investment.assetType === 'crypto' ? investment.coinGeckoId! : investment.symbol;
+        
+        const purchaseDateStr = isDateInvalid ? '' : format(startOfDay(new Date(investment.purchaseDate)), 'yyyy-MM-dd');
+        const purchasePrice = purchaseDateStr ? priceHistory.get(priceKey)?.get(purchaseDateStr) || 0 : 0;
         const purchaseValue = investment.amount * purchasePrice;
         
         const currentPrice = prices[priceKey]?.price;

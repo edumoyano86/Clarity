@@ -56,8 +56,8 @@ export function usePortfolioHistory(
 
             const allPriceHistory: PriceHistory = new Map();
 
-            // Use coinGeckoId if available, otherwise fall back to id for backward compatibility
-            const cryptoIdsToFetch = [...new Set(cryptoAssets.map(a => a.coinGeckoId || a.id).filter(Boolean))];
+            // Strict: Only fetch for cryptos with a coinGeckoId.
+            const cryptoIdsToFetch = [...new Set(cryptoAssets.map(a => a.coinGeckoId).filter(Boolean))];
             const stockSymbolsToFetch = [...new Set(stockAssets.map(a => a.symbol))];
 
             const stockPromises = stockSymbolsToFetch.map(symbol =>
@@ -79,17 +79,19 @@ export function usePortfolioHistory(
                         return { id: id, data: {} };
                     })
             );
-
+            
             const results = await Promise.all([...stockPromises, ...cryptoPromises]);
             
             results.forEach(result => {
-                const pricesMap = new Map<string, number>();
-                if (result.data) {
-                    Object.entries(result.data).forEach(([dateStr, price]) => {
-                        pricesMap.set(dateStr, price);
-                    });
+                if (result) {
+                    const pricesMap = new Map<string, number>();
+                    if (result.data) {
+                        Object.entries(result.data).forEach(([dateStr, price]) => {
+                            pricesMap.set(dateStr, price);
+                        });
+                    }
+                    allPriceHistory.set(result.id, pricesMap);
                 }
-                allPriceHistory.set(result.id, pricesMap);
             });
 
             const totalDays = differenceInDays(endDate, startDate);
@@ -133,7 +135,8 @@ export function usePortfolioHistory(
 
                     const isPurchased = !isAfter(new Date(purchaseDate), currentDate);
                     if (isPurchased) {
-                        const priceKey = inv.assetType === 'crypto' ? (inv.coinGeckoId || inv.id) : inv.symbol;
+                        // Use coinGeckoId for crypto, symbol for stock.
+                        const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
                         if (!priceKey) return;
 
                         const historyForAsset = allPriceHistory.get(priceKey);

@@ -165,14 +165,19 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             
             const collectionRef = collection(firestore, 'users', userId, 'investments');
             
-            let docId : string;
+            let docId: string;
+            // For cryptos, the document ID is the coinGeckoId. For stocks, it's the symbol.
             if (data.assetType === 'crypto') {
-                docId = data.coinGeckoId!;
-                data.id = docId;
+                if (!data.coinGeckoId) {
+                    throw new Error("El ID de CoinGecko es requerido para criptomonedas.");
+                }
+                docId = data.coinGeckoId;
             } else {
                 docId = data.symbol.toUpperCase();
-                data.id = docId;
             }
+
+            // The `id` field within the document should match the document's ID in Firestore.
+            data.id = docId;
 
             const dataToSave = {
                 ...data,
@@ -209,7 +214,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                         setValue('id', upperCaseSymbol);
                         setValue('symbol', upperCaseSymbol);
                         setValue('name', asset.name);
-                        setValue('coinGeckoId', '');
+                        setValue('coinGeckoId', ''); // Stocks don't have this
                         setSearchQuery(asset.name);
                         setIsListVisible(false);
                     }}
