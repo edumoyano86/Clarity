@@ -127,7 +127,7 @@ export default function InversionesPage() {
                     ? chartPeriodStartDate 
                     : startOfDay(new Date(earliestPurchaseDate));
                 
-                const endDate = startOfDay(new Date());
+                const endDate = new Date();
                 const startTimestamp = getUnixTime(historyFetchStartDate);
                 const endTimestamp = getUnixTime(endDate);
 
@@ -148,7 +148,7 @@ export default function InversionesPage() {
                             console.warn(`Could not fetch history for ${asset.id}:`, e)
                             historyResults.push({ id: asset.id, data: {} });
                         }
-                        await new Promise(resolve => setTimeout(resolve, 400)); // Rate limit delay
+                        await new Promise(resolve => setTimeout(resolve, 1200)); // Rate limit delay
                     }
                 };
 
@@ -167,7 +167,6 @@ export default function InversionesPage() {
                     tempPriceHistory.set(res.id, pricesMap);
                 });
                 
-                // *** FIX STARTS HERE ***
                 // 4. Inject current day's price into history to ensure chart is up-to-date
                 const todayStr = new Date().toISOString().split('T')[0];
                 for (const [assetId, priceInfo] of Object.entries(fetchedPrices)) {
@@ -180,7 +179,6 @@ export default function InversionesPage() {
                         assetHistoryMap.set(todayStr, priceInfo.price);
                     }
                 }
-                // *** FIX ENDS HERE ***
 
                 // 5. Fill forward missing prices in the complete history
                 const totalDaysInHistory = differenceInDays(endDate, historyFetchStartDate);

@@ -78,7 +78,7 @@ export function useDashboardPortfolio(
                 ? chartPeriodStartDate 
                 : startOfDay(new Date(earliestPurchaseDate));
 
-            const endDate = startOfDay(new Date());
+            const endDate = new Date();
             const startTimestamp = getUnixTime(historyFetchStartDate);
             const endTimestamp = getUnixTime(endDate);
 
@@ -93,7 +93,7 @@ export function useDashboardPortfolio(
                     console.warn(`Dashboard: Could not fetch stock history for ${symbol}:`, e)
                     historyResults.push({ id: symbol, data: {} });
                 }
-                await delay(400); // Avoid Finnhub rate limit
+                await delay(1200); // Avoid Finnhub rate limit
             }
 
             for (const id of cryptoIds) {
@@ -104,7 +104,7 @@ export function useDashboardPortfolio(
                     console.warn(`Dashboard: Could not fetch crypto history for ${id}:`, e)
                     historyResults.push({ id: id, data: {} });
                 }
-                await delay(500); // Avoid CoinGecko rate limit
+                await delay(1200); // Avoid CoinGecko rate limit
             }
             
             const tempPriceHistory: PriceHistory = new Map();
