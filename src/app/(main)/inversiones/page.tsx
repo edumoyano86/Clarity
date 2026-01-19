@@ -115,10 +115,18 @@ export default function InversionesPage() {
             setTotalValue(newTotalValue);
 
             // 3. Fetch Price History
-            const earliestDate = investments.reduce((earliest, inv) => (inv.purchaseDate && inv.purchaseDate < earliest) ? inv.purchaseDate : earliest, Date.now());
-            const startDate = startOfDay(new Date(earliestDate));
+            const chartPeriodStartDate = startOfDay(subDays(new Date(), period -1));
+            const earliestPurchaseDate = investments.reduce((earliest, inv) => 
+                (inv.purchaseDate && inv.purchaseDate < earliest) ? inv.purchaseDate : earliest, 
+                Date.now()
+            );
+
+            const historyFetchStartDate = isAfter(new Date(earliestPurchaseDate), chartPeriodStartDate) 
+                ? chartPeriodStartDate 
+                : startOfDay(new Date(earliestPurchaseDate));
+            
             const endDate = startOfDay(new Date());
-            const startTimestamp = getUnixTime(startDate);
+            const startTimestamp = getUnixTime(historyFetchStartDate);
             const endTimestamp = getUnixTime(endDate);
 
             const stockHistoryPromises = stockSymbols.map(symbol => 
@@ -140,12 +148,12 @@ export default function InversionesPage() {
             });
             
             // 4. Fill forward missing prices in the complete history
-            const totalDays = differenceInDays(endDate, startDate);
-            if (totalDays >= 0) {
+            const totalDaysInHistory = differenceInDays(endDate, historyFetchStartDate);
+            if (totalDaysInHistory >= 0) {
                 for (const pricesMap of tempPriceHistory.values()) {
                     let lastKnownPrice: number | undefined;
-                    for (let i = 0; i <= totalDays; i++) {
-                        const currentDate = addDays(startDate, i);
+                    for (let i = 0; i <= totalDaysInHistory; i++) {
+                        const currentDate = addDays(historyFetchStartDate, i);
                         const dateStr = format(currentDate, 'yyyy-MM-dd');
                         if (pricesMap.has(dateStr)) {
                             lastKnownPrice = pricesMap.get(dateStr);
@@ -158,15 +166,12 @@ export default function InversionesPage() {
             setPriceHistory(tempPriceHistory);
             
             // 5. Generate Chart Data
-            const chartStartDate = startOfDay(subDays(new Date(), period - 1));
-            const chartDays = differenceInDays(new Date(), chartStartDate);
+            const chartDataStartDate = startOfDay(subDays(new Date(), period - 1));
+            const chartDays = differenceInDays(new Date(), chartDataStartDate);
             const newChartData: PortfolioDataPoint[] = [];
 
-            // A map to hold the most recently seen price for each asset during chart generation
-            const lastKnownPricesForChart = new Map<string, number>();
-
             for (let i = 0; i <= chartDays; i++) {
-                const currentDate = addDays(chartStartDate, i);
+                const currentDate = addDays(chartDataStartDate, i);
                 const dateStr = format(currentDate, 'yyyy-MM-dd');
                 let dailyTotal = 0;
                 let assetsWithValue = 0;
@@ -183,20 +188,11 @@ export default function InversionesPage() {
                     const historyForAsset = tempPriceHistory.get(priceKey);
                     const priceForDay = historyForAsset?.get(dateStr);
                     
-                    // Update last known price if we have a price for today
                     if (priceForDay !== undefined) {
-                        lastKnownPricesForChart.set(priceKey, priceForDay);
-                    }
-
-                    // Use the last known price to calculate value
-                    const lastPrice = lastKnownPricesForChart.get(priceKey);
-                    if (lastPrice !== undefined) {
-                        dailyTotal += inv.amount * lastPrice;
+                        dailyTotal += inv.amount * priceForDay;
                         assetsWithValue++;
                     }
                 });
-
-                // Push null if no assets had value to let the chart connect points
                 newChartData.push({ date: currentDate.getTime(), value: assetsWithValue > 0 ? dailyTotal : null });
             }
             setChartData(newChartData);

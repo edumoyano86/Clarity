@@ -34,12 +34,13 @@ export function useDashboardPortfolio(
 
             setIsLoading(true);
 
-            // Fetch current prices for total value
+            // 1. Get asset lists
             const cryptoAssets = investments.filter(i => i.assetType === 'crypto');
             const stockAssets = investments.filter(i => i.assetType === 'stock');
             const cryptoIds = [...new Set(cryptoAssets.map(i => i.coinGeckoId || i.id).filter(Boolean))];
             const stockSymbols = [...new Set(stockAssets.map(i => i.symbol).filter(Boolean))];
 
+            // 2. Fetch current prices for total value
             let fetchedPrices: { [key: string]: { price: number } } = {};
             try {
                 const pricePromises = [];
@@ -65,10 +66,10 @@ export function useDashboardPortfolio(
             });
             setTotalValue(newTotalValue);
 
-            // Fetch history for chart
+            // 3. Fetch history for the chart
+            const chartStartDate = startOfDay(subDays(new Date(), period -1));
             const endDate = startOfDay(new Date());
-            const startDate = startOfDay(subDays(endDate, period));
-            const startTimestamp = getUnixTime(startDate);
+            const startTimestamp = getUnixTime(chartStartDate);
             const endTimestamp = getUnixTime(endDate);
 
             const stockHistoryPromises = stockSymbols.map(symbol =>
@@ -88,11 +89,12 @@ export function useDashboardPortfolio(
                 tempPriceHistory.set(res.id, pricesMap);
             });
             
-            // Fill forward
+            // 4. Fill forward missing prices
+            const chartDays = differenceInDays(endDate, chartStartDate);
             for (const pricesMap of tempPriceHistory.values()) {
                 let lastKnownPrice: number | undefined;
-                for (let i = 0; i <= period; i++) {
-                    const currentDate = addDays(startDate, i);
+                for (let i = 0; i <= chartDays; i++) {
+                    const currentDate = addDays(chartStartDate, i);
                     const dateStr = format(currentDate, 'yyyy-MM-dd');
                     if (pricesMap.has(dateStr)) {
                         lastKnownPrice = pricesMap.get(dateStr);
@@ -102,22 +104,25 @@ export function useDashboardPortfolio(
                 }
             }
 
-            // Generate chart data
+            // 5. Generate chart data
             const newChartData: PortfolioDataPoint[] = [];
-            for (let i = 0; i <= period; i++) {
-                const currentDate = addDays(startDate, i);
+            for (let i = 0; i <= chartDays; i++) {
+                const currentDate = addDays(chartStartDate, i);
                 const dateStr = format(currentDate, 'yyyy-MM-dd');
                 let dailyTotal = 0;
+                let assetsWithValue = 0;
+
                 investments.forEach(inv => {
                     if (!isAfter(new Date(inv.purchaseDate), currentDate)) {
                         const priceKey = inv.assetType === 'crypto' ? (inv.coinGeckoId || inv.id) : inv.symbol;
                         const priceForDay = tempPriceHistory.get(priceKey)?.get(dateStr);
                         if (priceForDay !== undefined) {
                             dailyTotal += inv.amount * priceForDay;
+                            assetsWithValue++;
                         }
                     }
                 });
-                newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
+                 newChartData.push({ date: currentDate.getTime(), value: assetsWithValue > 0 ? dailyTotal : null });
             }
             setChartData(newChartData);
             setIsLoading(false);
