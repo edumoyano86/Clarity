@@ -32,7 +32,6 @@ interface InvestmentsManagerProps {
     priceHistory: PriceHistory;
     period: PortfolioPeriod;
     setPeriod: (period: PortfolioPeriod) => void;
-    periodOptions: { label: string; value: PortfolioPeriod }[];
 }
 
 const USD_TO_ARS_RATE = 1050; 
@@ -47,7 +46,6 @@ export function InvestmentsManager({
     priceHistory,
     period, 
     setPeriod,
-    periodOptions,
 }: InvestmentsManagerProps) {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
@@ -127,6 +125,12 @@ export function InvestmentsManager({
         });
     }, [investments, prices]);
 
+
+    const periodOptions: { label: string; value: PortfolioPeriod }[] = [
+        { label: '7D', value: 7 },
+        { label: '30D', value: 30 },
+        { label: '90D', value: 90 },
+    ];
 
     const renderPortfolioRow = (investment: Investment) => {
         const isDateInvalid = typeof investment.purchaseDate !== 'number' || isNaN(investment.purchaseDate) || investment.purchaseDate <= 0;

@@ -182,6 +182,13 @@ export default function DashboardPage() {
      return <div className="flex h-full items-center justify-center"><p>Usuario no encontrado.</p></div>
   }
 
+    const portfolioPeriodOptions: { label: string; value: PortfolioHistoryPeriod }[] = [
+        { label: '7D', value: 7 },
+        { label: '30D', value: 30 },
+        { label: '90D', value: 90 },
+    ];
+
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -216,7 +223,7 @@ export default function DashboardPage() {
               isLoading={isLoadingHistory}
               period={portfolioPeriod}
               setPeriod={setPortfolioPeriod}
-              periodOptions={[]} 
+              periodOptions={portfolioPeriodOptions} 
             />
             <BalanceChart ingresos={dashboardData.totalIngresos} gastos={dashboardData.totalGastos} />
           </div>

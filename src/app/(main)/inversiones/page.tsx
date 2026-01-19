@@ -41,12 +41,6 @@ export default function InversionesPage() {
         return <div className="flex h-full w-full items-center justify-center"><p>Usuario no autenticado.</p></div>
     }
 
-    const periodOptions: { label: string; value: PortfolioPeriod }[] = [
-        { label: '7D', value: 7 },
-        { label: '30D', value: 30 },
-        { label: '90D', value: 90 },
-    ];
-
     return <InvestmentsManager 
         investments={investments || []} 
         userId={user.uid}
@@ -57,6 +51,5 @@ export default function InversionesPage() {
         priceHistory={priceHistory}
         period={period}
         setPeriod={setPeriod}
-        periodOptions={periodOptions}
         />;
 }
