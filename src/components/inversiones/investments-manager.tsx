@@ -110,26 +110,24 @@ export function InvestmentsManager({
     const sortedInvestments = useMemo(() => {
         if (!investments) return [];
         return [...investments].sort((a, b) => {
-            const priceKeyA = a.assetType === 'crypto' ? (a.coinGeckoId || a.id) : a.symbol;
-            const priceKeyB = b.assetType === 'crypto' ? (b.coinGeckoId || b.id) : b.symbol;
-            if (!priceKeyA || !priceKeyB) return 0;
-            const aPrice = currentPrices[priceKeyA]?.price || 0;
-            const bPrice = currentPrices[priceKeyB]?.price || 0;
+            const priceKeyA = a.assetType === 'crypto' ? a.coinGeckoId : a.symbol;
+            const priceKeyB = b.assetType === 'crypto' ? b.coinGeckoId : b.symbol;
+            
+            const aPrice = (priceKeyA && currentPrices[priceKeyA]?.price) || 0;
+            const bPrice = (priceKeyB && currentPrices[priceKeyB]?.price) || 0;
+
             const aValue = a.amount * aPrice;
             const bValue = b.amount * bPrice;
+            
             return bValue - aValue;
         });
     }, [investments, currentPrices]);
 
     const renderPortfolioRow = (investment: Investment) => {
-        const priceKey = investment.assetType === 'crypto' ? (investment.coinGeckoId || investment.id) : investment.symbol;
-        const purchaseDateStr = new Date(investment.purchaseDate).toISOString().split('T')[0];
+        const isCrypto = investment.assetType === 'crypto';
+        const priceKey = isCrypto ? investment.coinGeckoId : investment.symbol;
+        const isDataIncomplete = !priceKey;
         
-        const historyForAsset = priceHistory.get(priceKey);
-        const purchasePrice = historyForAsset?.get(purchaseDateStr);
-
-        const isDataIncomplete = !priceKey || (investment.assetType === 'crypto' && !investment.coinGeckoId && !investment.id);
-
         if (isDataIncomplete) {
              return (
                 <TableRow key={investment.id || Math.random()}>
@@ -164,6 +162,10 @@ export function InvestmentsManager({
             );
         }
         
+        const purchaseDateStr = new Date(investment.purchaseDate).toISOString().split('T')[0];
+        const historyForAsset = priceHistory.get(priceKey);
+        const purchasePrice = historyForAsset?.get(purchaseDateStr);
+
         const purchaseValue = purchasePrice !== undefined ? investment.amount * purchasePrice : null;
         const currentPrice = currentPrices[priceKey]?.price;
         const currentValue = currentPrice !== undefined ? investment.amount * currentPrice : null;

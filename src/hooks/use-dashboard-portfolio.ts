@@ -37,8 +37,9 @@ export function useDashboardPortfolio(
             // 1. Get asset lists
             const cryptoAssets = investments.filter(i => i.assetType === 'crypto');
             const stockAssets = investments.filter(i => i.assetType === 'stock');
-            const cryptoIds = [...new Set(cryptoAssets.map(i => i.coinGeckoId || i.id).filter(Boolean))];
-            const stockSymbols = [...new Set(stockAssets.map(i => i.symbol).filter(Boolean))];
+            const cryptoIds = [...new Set(cryptoAssets.map(i => i.coinGeckoId).filter((id): id is string => !!id))];
+            const stockSymbols = [...new Set(stockAssets.map(i => i.symbol).filter((sym): sym is string => !!sym))];
+
 
             // 2. Fetch current prices for total value
             let fetchedPrices: { [key: string]: { price: number } } = {};
@@ -59,7 +60,7 @@ export function useDashboardPortfolio(
 
             let newTotalValue = 0;
             investments.forEach(inv => {
-                const priceKey = inv.assetType === 'crypto' ? (inv.coinGeckoId || inv.id) : inv.symbol;
+                const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
                 if (priceKey && fetchedPrices[priceKey]) {
                     newTotalValue += inv.amount * fetchedPrices[priceKey].price;
                 }
@@ -110,7 +111,11 @@ export function useDashboardPortfolio(
             historyResults.forEach(res => {
                 const pricesMap = new Map<string, number>();
                 if (res.data) {
-                    Object.entries(res.data).forEach(([dateStr, price]) => pricesMap.set(dateStr, price));
+                    Object.entries(res.data).forEach(([dateStr, price]) => {
+                         const date = new Date(dateStr);
+                         const utcDateStr = date.toISOString().split('T')[0];
+                         pricesMap.set(utcDateStr, price)
+                    });
                 }
                 tempPriceHistory.set(res.id, pricesMap);
             });
@@ -149,7 +154,7 @@ export function useDashboardPortfolio(
                         return;
                     }
 
-                    const priceKey = inv.assetType === 'crypto' ? (inv.coinGeckoId || inv.id) : inv.symbol;
+                    const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
                     if (!priceKey) return;
                     
                     const historyForAsset = tempPriceHistory.get(priceKey);

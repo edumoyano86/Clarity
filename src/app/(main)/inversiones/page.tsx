@@ -10,7 +10,7 @@ import { getCryptoPriceHistory } from '@/ai/flows/crypto-price-history';
 import { getCryptoPrices } from '@/ai/flows/crypto-prices';
 import { getStockPrices } from '@/ai/flows/stock-prices';
 import { useToast } from '@/hooks/use-toast';
-import { subDays, startOfDay, getUnixTime, isAfter, differenceInDays, addDays } from 'date-fns';
+import { subDays, startOfDay, getUnixTime, isAfter, differenceInDays, addDays, format as formatDate } from 'date-fns';
 
 export type PortfolioPeriod = 7 | 30 | 90;
 
@@ -83,15 +83,18 @@ export default function InversionesPage() {
             // 1. Fetch current prices
             const cryptoAssets = investments.filter(i => i.assetType === 'crypto');
             const stockAssets = investments.filter(i => i.assetType === 'stock');
-            const cryptoIds = [...new Set(cryptoAssets.map(i => i.coinGeckoId || i.id).filter(Boolean))];
-            const stockSymbols = [...new Set(stockAssets.map(i => i.symbol).filter(Boolean))];
+            
+            const cryptoIds = [...new Set(cryptoAssets.map(i => i.coinGeckoId).filter((id): id is string => !!id))];
+            const stockSymbols = [...new Set(stockAssets.map(i => i.symbol).filter((sym): sym is string => !!sym))];
             
             let fetchedPrices: PriceData = {};
             try {
                 const pricePromises = [];
                 if (cryptoIds.length > 0) pricePromises.push(getCryptoPrices({ ids: cryptoIds }));
                 if (stockSymbols.length > 0) pricePromises.push(getStockPrices({ symbols: stockSymbols }));
+                
                 const results = await Promise.allSettled(pricePromises);
+
                 results.forEach(res => {
                     if (res.status === 'fulfilled' && res.value) {
                         fetchedPrices = { ...fetchedPrices, ...res.value };
@@ -107,7 +110,7 @@ export default function InversionesPage() {
             // 2. Calculate Total Value
             let newTotalValue = 0;
             investments.forEach(inv => {
-                const priceKey = inv.assetType === 'crypto' ? (inv.coinGeckoId || inv.id) : inv.symbol;
+                const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
                 if (priceKey && fetchedPrices[priceKey]) {
                     newTotalValue += inv.amount * fetchedPrices[priceKey].price;
                 }
@@ -158,7 +161,12 @@ export default function InversionesPage() {
             historyResults.forEach(res => {
                 const pricesMap = new Map<string, number>();
                  if (res.data) {
-                    Object.entries(res.data).forEach(([dateStr, price]) => pricesMap.set(dateStr, price));
+                    Object.entries(res.data).forEach(([dateStr, price]) => {
+                        // Ensure date string is in UTC YYYY-MM-DD format
+                        const date = new Date(dateStr);
+                        const utcDateStr = date.toISOString().split('T')[0];
+                        pricesMap.set(utcDateStr, price)
+                    });
                 }
                 tempPriceHistory.set(res.id, pricesMap);
             });
@@ -195,11 +203,12 @@ export default function InversionesPage() {
                 let assetsWithValue = 0;
 
                 investments.forEach(inv => {
+                    // Only include assets purchased on or before the current day
                     if (isAfter(new Date(inv.purchaseDate), currentDate)) {
                         return;
                     }
                     
-                    const priceKey = inv.assetType === 'crypto' ? (inv.coinGeckoId || inv.id) : inv.symbol;
+                    const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
                     if (!priceKey) return;
 
                     const historyForAsset = tempPriceHistory.get(priceKey);
@@ -215,6 +224,7 @@ export default function InversionesPage() {
                     lastKnownTotal = dailyTotal;
                     newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
                 } else {
+                    // If no assets had a value today, carry forward the last known total
                     newChartData.push({ date: currentDate.getTime(), value: lastKnownTotal });
                 }
             }
