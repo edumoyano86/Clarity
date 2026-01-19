@@ -94,7 +94,6 @@ export function PortfolioChart({ chartData, totalValue, isLoading, period, setPe
                                     axisLine={false}
                                     tickMargin={8}
                                     tickFormatter={(value) => formatCurrency(value as number)}
-                                    domain={['dataMin', 'dataMax']}
                                     width={80}
                                 />
                                 <Tooltip
