@@ -72,14 +72,31 @@ export function useDashboardPortfolio(
             const startTimestamp = getUnixTime(chartStartDate);
             const endTimestamp = getUnixTime(endDate);
 
-            const stockHistoryPromises = stockSymbols.map(symbol =>
-                getStockPriceHistory({ symbol, from: startTimestamp, to: endTimestamp }).then(d => ({ id: symbol, data: d.history })).catch(() => ({ id: symbol, data: {} }))
-            );
-            const cryptoHistoryPromises = cryptoIds.map(id =>
-                getCryptoPriceHistory({ id, from: startTimestamp, to: endTimestamp }).then(d => ({ id: id, data: d.history })).catch(() => ({ id: id, data: {} }))
-            );
+            const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+            const historyResults: { id: string; data: Record<string, number> | {} }[] = [];
+
+            for (const symbol of stockSymbols) {
+                try {
+                    const history = await getStockPriceHistory({ symbol, from: startTimestamp, to: endTimestamp });
+                    historyResults.push({ id: symbol, data: history.history });
+                } catch (e) {
+                    console.warn(`Dashboard: Could not fetch stock history for ${symbol}:`, e)
+                    historyResults.push({ id: symbol, data: {} });
+                }
+                await delay(400); // Avoid Finnhub rate limit
+            }
+
+            for (const id of cryptoIds) {
+                try {
+                    const history = await getCryptoPriceHistory({ id, from: startTimestamp, to: endTimestamp });
+                    historyResults.push({ id: id, data: history.history });
+                } catch (e) {
+                    console.warn(`Dashboard: Could not fetch crypto history for ${id}:`, e)
+                    historyResults.push({ id: id, data: {} });
+                }
+                await delay(500); // Avoid CoinGecko rate limit
+            }
             
-            const historyResults = await Promise.all([...stockHistoryPromises, ...cryptoHistoryPromises]);
             const tempPriceHistory: PriceHistory = new Map();
             historyResults.forEach(res => {
                 const pricesMap = new Map<string, number>();
