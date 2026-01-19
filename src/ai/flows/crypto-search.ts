@@ -48,7 +48,7 @@ const cryptoSearchFlow = ai.defineFlow(
       if (!response.ok) {
         const errorBody = await response.text();
         console.error(`CoinGecko search API request failed with status ${response.status}: ${errorBody}`);
-        return { results: [] };
+        throw new Error(`CoinGecko search API request failed with status ${response.status}`);
       }
       const data = await response.json();
 
@@ -65,7 +65,7 @@ const cryptoSearchFlow = ai.defineFlow(
 
     } catch (error) {
       console.error('Error searching cryptos:', error);
-      return { results: [] };
+      throw error;
     }
   }
 );

@@ -40,8 +40,10 @@ const cryptoPriceHistoryFlow = ai.defineFlow(
       const response = await fetch(url);
       if (!response.ok) {
         const errorBody = await response.text();
+        // Log the error for server-side debugging
         console.error(`CoinGecko API request failed for ${input.id} with status ${response.status}: ${errorBody}`);
-        return { history: {} };
+        // Throw an error to be handled by the client-side caller
+        throw new Error(`CoinGecko API request failed for ${input.id} with status ${response.status}`);
       }
       const data = await response.json();
       
@@ -61,7 +63,8 @@ const cryptoPriceHistoryFlow = ai.defineFlow(
 
     } catch (error) {
       console.error(`Error fetching crypto history for ${input.id}:`, error);
-      return { history: {} };
+      // Re-throw the error so the client knows something went wrong.
+      throw error;
     }
   }
 );

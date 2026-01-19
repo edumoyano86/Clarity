@@ -39,7 +39,7 @@ const stockSearchFlow = ai.defineFlow(
     const apiKey = process.env.FINNHUB_API_KEY;
     if (!apiKey) {
       console.error('Finnhub API key is not set in .env.local (FINNHUB_API_KEY)');
-      return { results: [] };
+      throw new Error('Finnhub API key is not configured.');
     }
 
     if (!input.query) {
@@ -51,8 +51,8 @@ const stockSearchFlow = ai.defineFlow(
     try {
       const response = await fetch(url);
       if (!response.ok) {
-        console.warn(`Finnhub API request failed with status ${response.status}`);
-        return { results: [] };
+        console.error(`Finnhub API request failed with status ${response.status}`);
+        throw new Error(`Finnhub API request failed with status ${response.status}`);
       }
       const data = await response.json();
 
@@ -71,7 +71,7 @@ const stockSearchFlow = ai.defineFlow(
 
     } catch (error) {
       console.error('Error searching stocks:', error);
-      return { results: [] };
+      throw error;
     }
   }
 );

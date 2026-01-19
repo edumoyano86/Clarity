@@ -36,7 +36,8 @@ const stockPriceHistoryFlow = ai.defineFlow(
     const apiKey = process.env.FINNHUB_API_KEY;
     if (!apiKey) {
       console.error('Finnhub API key is not set in .env.local (FINNHUB_API_KEY)');
-      return { history: {} };
+      // Throw an error if the API key is missing.
+      throw new Error('Finnhub API key is not configured.');
     }
 
     const url = `https://finnhub.io/api/v1/stock/candle?symbol=${input.symbol}&resolution=D&from=${input.from}&to=${input.to}&token=${apiKey}`;
@@ -44,15 +45,15 @@ const stockPriceHistoryFlow = ai.defineFlow(
     try {
       const response = await fetch(url);
       if (!response.ok) {
-        console.warn(`Finnhub API request failed for ${input.symbol} with status ${response.status}`);
-        return { history: {} };
+        console.error(`Finnhub API request failed for ${input.symbol} with status ${response.status}`);
+        throw new Error(`Finnhub API request failed for ${input.symbol} with status ${response.status}`);
       }
       const data = await response.json();
       
-      // The 's' status can be 'no_data', which is a valid response for no data.
+      // The 's' status can be 'no_data', which is a valid response, not an error.
       if (data.s === 'no_data' || !data.t || data.t.length === 0) {
         console.warn(`Finnhub API returned no time data for ${input.symbol}. Status: ${data.s}`);
-        return { history: {} };
+        return { history: {} }; // Return empty history, not an error.
       }
 
       const history: Record<string, number> = {};
@@ -65,7 +66,7 @@ const stockPriceHistoryFlow = ai.defineFlow(
 
     } catch (error) {
       console.error(`Error fetching stock history for ${input.symbol}:`, error);
-      return { history: {} };
+      throw error; // Re-throw the error for the client to handle.
     }
   }
 );

@@ -42,7 +42,7 @@ const cryptoPricesFlow = ai.defineFlow(
       if (!response.ok) {
         const errorBody = await response.text();
         console.error(`CoinGecko simple price API request failed with status ${response.status}: ${errorBody}`);
-        return {};
+        throw new Error(`CoinGecko simple price API request failed with status ${response.status}`);
       }
       const data = await response.json();
 
@@ -56,7 +56,7 @@ const cryptoPricesFlow = ai.defineFlow(
 
     } catch (error) {
       console.error(`Error fetching crypto prices:`, error);
-      return {};
+      throw error;
     }
   }
 );
