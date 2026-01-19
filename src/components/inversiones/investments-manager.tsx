@@ -17,7 +17,7 @@ import { PortfolioChart } from './portfolio-chart';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
 import { SellInvestmentDialog } from './sell-investment-dialog';
-import { PortfolioPeriod } from '@/hooks/use-portfolio-history';
+import { PortfolioPeriod } from '@/hooks/use-portfolio-chart-data';
 import { format, startOfDay } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
@@ -25,10 +25,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/
 interface InvestmentsManagerProps {
     investments: Investment[];
     userId: string;
-    portfolioHistory: PortfolioDataPoint[];
+    chartData: PortfolioDataPoint[];
     totalValue: number;
     isLoading: boolean;
-    prices: PriceData;
+    currentPrices: PriceData;
     priceHistory: PriceHistory;
     period: PortfolioPeriod;
     setPeriod: (period: PortfolioPeriod) => void;
@@ -39,10 +39,10 @@ const USD_TO_ARS_RATE = 1050;
 export function InvestmentsManager({ 
     investments, 
     userId, 
-    portfolioHistory, 
+    chartData, 
     totalValue, 
     isLoading,
-    prices,
+    currentPrices,
     priceHistory,
     period, 
     setPeriod,
@@ -114,13 +114,13 @@ export function InvestmentsManager({
             const priceKeyA = a.assetType === 'crypto' ? a.coinGeckoId : a.symbol;
             const priceKeyB = b.assetType === 'crypto' ? b.coinGeckoId : b.symbol;
             if (!priceKeyA || !priceKeyB) return 0;
-            const aPrice = prices[priceKeyA]?.price || 0;
-            const bPrice = prices[priceKeyB]?.price || 0;
+            const aPrice = currentPrices[priceKeyA]?.price || 0;
+            const bPrice = currentPrices[priceKeyB]?.price || 0;
             const aValue = a.amount * aPrice;
             const bValue = b.amount * bPrice;
             return bValue - aValue;
         });
-    }, [investments, prices]);
+    }, [investments, currentPrices]);
 
 
     const periodOptions: { label: string; value: PortfolioPeriod }[] = [
@@ -130,10 +130,9 @@ export function InvestmentsManager({
     ];
 
     const renderPortfolioRow = (investment: Investment) => {
-        const isDateInvalid = typeof investment.purchaseDate !== 'number' || isNaN(investment.purchaseDate) || investment.purchaseDate <= 0;
-        const isLegacyCrypto = investment.assetType === 'crypto' && !investment.coinGeckoId;
+        const isLegacyOrInvalid = (investment.assetType === 'crypto' && !investment.coinGeckoId) || typeof investment.purchaseDate !== 'number' || isNaN(investment.purchaseDate) || investment.purchaseDate <= 0;
 
-        if (isLegacyCrypto) {
+        if (isLegacyOrInvalid) {
              return (
                 <TableRow key={investment.id}>
                     <TableCell>
@@ -150,7 +149,7 @@ export function InvestmentsManager({
                                     </div>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    <p>Activo antiguo. Edítalo y vuelve a guardarlo para ver su valor.</p>
+                                    <p>Activo antiguo o con datos inválidos. Edítalo y vuelve a guardarlo para ver su valor.</p>
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
@@ -166,39 +165,15 @@ export function InvestmentsManager({
                 </TableRow>
             );
         }
-
-        if (isDateInvalid) {
-            return (
-               <TableRow key={investment.id}>
-                   <TableCell>
-                       <div className='font-medium'>{investment.name}</div>
-                       <div className='text-sm text-muted-foreground'>{investment.symbol}</div>
-                   </TableCell>
-                   <TableCell colSpan={5} className="text-red-600 text-center font-medium">
-                       Fecha de compra inválida. Por favor, edita la inversión.
-                   </TableCell>
-                   <TableCell className='text-right space-x-0'>
-                       <Button variant="ghost" size="icon" onClick={() => handleOpenForm(investment)} title="Editar">
-                           <Edit className="h-4 w-4" />
-                       </Button>
-                       <Button variant="ghost" size="icon" onClick={() => handleOpenAlert(investment)} title="Eliminar">
-                           <Trash2 className="h-4 w-4" />
-                       </Button>
-                   </TableCell>
-               </TableRow>
-           );
-       }
         
-        const priceKey = investment.assetType === 'crypto' ? investment.coinGeckoId : investment.symbol;
-        if (!priceKey) return null; // Should not happen with the legacy check above
+        const priceKey = investment.assetType === 'crypto' ? investment.coinGeckoId! : investment.symbol;
         
         const purchaseDateStr = format(startOfDay(new Date(investment.purchaseDate)), 'yyyy-MM-dd');
-        const purchasePriceFound = priceHistory.get(priceKey)?.has(purchaseDateStr);
-        const purchasePrice = purchasePriceFound ? priceHistory.get(priceKey)!.get(purchaseDateStr)! : null;
-        const purchaseValue = purchasePrice !== null ? investment.amount * purchasePrice : null;
+        const purchasePrice = priceHistory.get(priceKey)?.get(purchaseDateStr);
+        const purchaseValue = purchasePrice !== undefined ? investment.amount * purchasePrice : null;
         
-        const currentPrice = prices[priceKey]?.price;
-        const currentValue = currentPrice ? investment.amount * currentPrice : null;
+        const currentPrice = currentPrices[priceKey]?.price;
+        const currentValue = currentPrice !== undefined ? investment.amount * currentPrice : null;
         
         const pnl = (currentValue !== null && purchaseValue !== null) ? currentValue - purchaseValue : null;
         const pnlPercent = (pnl !== null && purchaseValue !== null && purchaseValue > 0) ? (pnl / purchaseValue) * 100 : null;
@@ -210,10 +185,10 @@ export function InvestmentsManager({
                     <div className='text-sm text-muted-foreground'>{investment.symbol}</div>
                 </TableCell>
                 <TableCell>{investment.amount.toFixed(4)}</TableCell>
-                <TableCell>{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (purchasePrice !== null ? formatCurrency(purchasePrice) : 'N/A')}</TableCell>
+                <TableCell>{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (purchasePrice !== undefined ? formatCurrency(purchasePrice) : 'N/A')}</TableCell>
                 <TableCell>{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (purchaseValue !== null ? formatCurrency(purchaseValue) : 'N/A')}</TableCell>
                 <TableCell>
-                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : currentValue !== null ? formatCurrency(currentValue) : '-'}
+                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : currentValue !== null ? formatCurrency(currentValue) : 'N/A'}
                 </TableCell>
                 <TableCell>
                     {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
@@ -250,7 +225,7 @@ export function InvestmentsManager({
             >
                 <div className="space-y-8">
                     <PortfolioChart 
-                        portfolioHistory={portfolioHistory} 
+                        chartData={chartData} 
                         totalValue={totalValue} 
                         isLoading={isLoading}
                         period={period}
@@ -319,7 +294,7 @@ export function InvestmentsManager({
                     onOpenChange={setIsSellDialogOpen}
                     investment={investmentToSell}
                     userId={userId}
-                    prices={prices}
+                    prices={currentPrices}
                     onSuccess={() => {
                         setIsSellDialogOpen(false);
                         setInvestmentToSell(undefined);

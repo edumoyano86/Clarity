@@ -8,10 +8,10 @@ import { PortfolioDataPoint } from '@/lib/definitions';
 import { Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '../ui/button';
-import { PortfolioPeriod } from '@/hooks/use-portfolio-history';
+import { PortfolioPeriod } from '@/hooks/use-portfolio-chart-data';
 
 interface PortfolioChartProps {
-    portfolioHistory: PortfolioDataPoint[];
+    chartData: PortfolioDataPoint[];
     totalValue: number;
     isLoading: boolean;
     period: PortfolioPeriod;
@@ -30,9 +30,9 @@ const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 };
 
-export function PortfolioChart({ portfolioHistory, totalValue, isLoading, period, setPeriod, periodOptions }: PortfolioChartProps) {
+export function PortfolioChart({ chartData, totalValue, isLoading, period, setPeriod, periodOptions }: PortfolioChartProps) {
     
-    const hasData = portfolioHistory.length > 0 && portfolioHistory.some(d => d.value > 0);
+    const hasData = chartData.length > 0 && chartData.some(d => d.value > 0);
     
     return (
         <Card>
@@ -68,7 +68,7 @@ export function PortfolioChart({ portfolioHistory, totalValue, isLoading, period
                     )}
                     {!isLoading && hasData ? (
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={portfolioHistory} margin={{ left: 12, right: 12, top: 10 }}>
+                            <AreaChart data={chartData} margin={{ left: 12, right: 12, top: 10 }}>
                                 <defs>
                                     <linearGradient id="fillValue" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="5%" stopColor="var(--color-value)" stopOpacity={0.8} />
@@ -118,7 +118,7 @@ export function PortfolioChart({ portfolioHistory, totalValue, isLoading, period
                     {!isLoading && !hasData && (
                         <div className="flex h-full items-center justify-center">
                             <p className="text-muted-foreground text-center">
-                                No hay suficientes datos históricos para mostrar el gráfico de evolución.
+                                No hay suficientes datos históricos para mostrar el gráfico.
                             </p>
                         </div>
                     )}

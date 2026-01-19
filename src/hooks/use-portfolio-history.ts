@@ -1,30 +1,33 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Investment, PortfolioDataPoint, PriceHistory } from '@/lib/definitions';
-import { format, subDays, startOfDay, getUnixTime, isAfter, differenceInDays, addDays } from 'date-fns';
+import { Investment, PriceHistory } from '@/lib/definitions';
+import { format, startOfDay, getUnixTime, isAfter, differenceInDays, addDays } from 'date-fns';
 import { getStockPriceHistory } from '@/ai/flows/stock-price-history';
 import { getCryptoPriceHistory } from '@/ai/flows/crypto-price-history';
 
-export type PortfolioPeriod = 7 | 30 | 90;
-
+/**
+ * A hook to fetch and prepare all historical price data needed for the portfolio.
+ * It determines the full date range required from all investments and fetches
+ * the daily prices for each asset. It also fills in missing data for non-trading days.
+ * 
+ * @param investments The user's list of investments.
+ * @returns An object containing the complete price history map and a loading state.
+ */
 export function usePortfolioHistory(
-    investments: Investment[] | null,
-    chartPeriodInDays: PortfolioPeriod = 90
+    investments: Investment[] | null
 ) {
-    const [portfolioHistory, setPortfolioHistory] = useState<PortfolioDataPoint[]>([]);
     const [priceHistory, setPriceHistory] = useState<PriceHistory>(new Map());
     const [isLoading, setIsLoading] = useState(true);
 
     const investmentsKey = useMemo(() => {
-        if (!investments) return '';
+        if (!investments) return 'no-investments';
         return investments.map(inv => `${inv.id}-${inv.amount}-${inv.purchaseDate}`).sort().join(',');
     }, [investments]);
 
     useEffect(() => {
         const fetchHistory = async () => {
             if (!investments || investments.length === 0) {
-                setPortfolioHistory([]);
                 setPriceHistory(new Map());
                 setIsLoading(false);
                 return;
@@ -32,6 +35,7 @@ export function usePortfolioHistory(
 
             setIsLoading(true);
 
+            // 1. Determine the full date range needed.
             const earliestPurchaseDate = investments.reduce((earliest, inv) => {
                 if (typeof inv.purchaseDate === 'number' && !isNaN(inv.purchaseDate) && inv.purchaseDate > 0) {
                     return Math.min(earliest, inv.purchaseDate);
@@ -43,12 +47,14 @@ export function usePortfolioHistory(
             const historyStartDate = startOfDay(new Date(earliestPurchaseDate));
             const startTimestamp = getUnixTime(historyStartDate);
             const endTimestamp = getUnixTime(endDate);
-            
+
+            // 2. Identify all unique assets that need price history.
             const cryptoAssets = investments.filter(i => i.assetType === 'crypto' && i.coinGeckoId);
             const stockAssets = investments.filter(i => i.assetType === 'stock');
             const cryptoIdsToFetch = [...new Set(cryptoAssets.map(a => a.coinGeckoId!))];
             const stockSymbolsToFetch = [...new Set(stockAssets.map(a => a.symbol))];
 
+            // 3. Fetch all price histories in parallel.
             const stockPromises = stockSymbolsToFetch.map(symbol =>
                 getStockPriceHistory({ symbol: symbol, from: startTimestamp, to: endTimestamp })
                     .then(data => ({ id: symbol, data: data.history }))
@@ -67,6 +73,8 @@ export function usePortfolioHistory(
             );
             
             const results = await Promise.all([...stockPromises, ...cryptoPromises]);
+            
+            // 4. Build the initial price history map.
             const allPriceHistory: PriceHistory = new Map();
             results.forEach(result => {
                 if (result) {
@@ -80,6 +88,7 @@ export function usePortfolioHistory(
                 }
             });
             
+            // 5. Fill forward missing prices for non-trading days (weekends, holidays).
             const totalDays = differenceInDays(endDate, historyStartDate);
             if (totalDays >= 0) {
                 for (const pricesMap of allPriceHistory.values()) {
@@ -95,66 +104,17 @@ export function usePortfolioHistory(
                     }
                 }
             }
+
             setPriceHistory(allPriceHistory);
-            
-            const chartStartDate = startOfDay(subDays(endDate, chartPeriodInDays -1));
-            const chartDays = differenceInDays(endDate, chartStartDate) + 1;
-            const newChartData: PortfolioDataPoint[] = [];
-
-            for (let i = 0; i < chartDays; i++) {
-                const currentDate = addDays(chartStartDate, i);
-                
-                let dailyTotal = 0;
-                investments.forEach(inv => {
-                    const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
-
-                    if (!priceKey || typeof inv.purchaseDate !== 'number' || isNaN(inv.purchaseDate) || inv.purchaseDate <=0) return;
-
-                    if (!isAfter(new Date(inv.purchaseDate), currentDate)) {
-                        const historyForAsset = allPriceHistory.get(priceKey);
-                        const priceForDay = historyForAsset?.get(format(currentDate, 'yyyy-MM-dd'));
-                        
-                        if (priceForDay) {
-                            dailyTotal += inv.amount * priceForDay;
-                        }
-                    }
-                });
-                newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
-            }
-            
-            setPortfolioHistory(newChartData);
             setIsLoading(false);
         };
 
         fetchHistory().catch(error => {
-            console.error("Error fetching portfolio history:", error);
+            console.error("Error fetching full portfolio history:", error);
             setIsLoading(false);
         });
 
-    }, [investmentsKey, chartPeriodInDays]);
+    }, [investmentsKey]);
 
-    const totalValue = useMemo(() => {
-        if (!investments || isLoading) return 0;
-        
-        let currentTotal = 0;
-        investments.forEach(inv => {
-            const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
-            if (!priceKey) return;
-
-            const lastDate = portfolioHistory[portfolioHistory.length - 1]?.date;
-            if (!lastDate) return;
-
-            const dateStr = format(new Date(lastDate), 'yyyy-MM-dd');
-            const assetPriceHistory = priceHistory.get(priceKey);
-            const price = assetPriceHistory?.get(dateStr);
-            
-            if (price) {
-                currentTotal += inv.amount * price;
-            }
-        });
-        return currentTotal;
-
-    }, [investments, isLoading, portfolioHistory, priceHistory]);
-
-    return { portfolioHistory, isLoading, priceHistory, totalValue };
+    return { priceHistory, isLoading };
 }
