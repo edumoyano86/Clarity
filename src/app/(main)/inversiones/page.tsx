@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useFirestore, useUser, useMemoFirebase } from "@/firebase";
 import { Investment, PriceData, PortfolioDataPoint, PriceHistory } from "@/lib/definitions";
 import { InvestmentsManager } from "@/components/inversiones/investments-manager";
-import { collection, orderBy, query } from "firebase/firestore";
+import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { Loader2 } from "lucide-react";
 import { getStockPriceHistory } from '@/ai/flows/stock-price-history';
 import { getCryptoPriceHistory } from '@/ai/flows/crypto-price-history';
@@ -45,13 +45,24 @@ export default function InversionesPage() {
             return;
         }
         setLoadingInvestments(true);
-        const unsub = collection(investmentsQuery).onSnapshot(snap => {
-            const newInvestments = snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Investment));
-            setInvestments(newInvestments);
-            setLoadingInvestments(false);
-        });
+        const unsub = onSnapshot(investmentsQuery, 
+            (snap) => {
+                const newInvestments = snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Investment));
+                setInvestments(newInvestments);
+                setLoadingInvestments(false);
+            },
+            (error) => {
+                console.error("Investment listener error:", error);
+                toast({
+                    title: "Error al cargar inversiones",
+                    description: "No se pudieron obtener los datos de inversiones en tiempo real.",
+                    variant: "destructive",
+                });
+                setLoadingInvestments(false);
+            }
+        );
         return () => unsub();
-    }, [investmentsQuery]);
+    }, [investmentsQuery, toast]);
     
     // The main effect to process all data when investments change
     useEffect(() => {
