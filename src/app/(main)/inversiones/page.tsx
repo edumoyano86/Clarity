@@ -161,11 +161,14 @@ export default function InversionesPage() {
             const chartStartDate = startOfDay(subDays(endDate, period - 1));
             const chartDays = differenceInDays(endDate, chartStartDate) + 1;
             const newChartData: PortfolioDataPoint[] = [];
+            let lastDayValue: number | null = null;
+
 
             for (let i = 0; i < chartDays; i++) {
                 const currentDate = addDays(chartStartDate, i);
                 const dateStr = format(currentDate, 'yyyy-MM-dd');
                 let dailyTotal = 0;
+                let pricesFoundForDay = false;
 
                 investments.forEach(inv => {
                     if (!isAfter(new Date(inv.purchaseDate), currentDate)) {
@@ -173,11 +176,19 @@ export default function InversionesPage() {
                         const historyForAsset = tempPriceHistory.get(priceKey);
                         const priceForDay = historyForAsset?.get(dateStr);
                         if (priceForDay !== undefined) {
+                            pricesFoundForDay = true;
                             dailyTotal += inv.amount * priceForDay;
                         }
                     }
                 });
-                newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
+
+                if (pricesFoundForDay) {
+                    newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
+                    lastDayValue = dailyTotal;
+                } else {
+                    // If no price was found, carry over the last known value to avoid drops to 0 on weekends
+                    newChartData.push({ date: currentDate.getTime(), value: lastDayValue });
+                }
             }
             setChartData(newChartData);
 

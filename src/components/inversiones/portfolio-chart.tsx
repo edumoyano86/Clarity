@@ -32,7 +32,7 @@ const formatCurrency = (amount: number) => {
 
 export function PortfolioChart({ chartData, totalValue, isLoading, period, setPeriod }: PortfolioChartProps) {
     
-    const hasData = chartData.length > 0 && chartData.some(d => d.value > 0);
+    const hasData = chartData.length > 0 && chartData.some(d => d.value !== null && d.value > 0);
     const periodOptions: { label: string; value: PortfolioPeriod }[] = [
         { label: '7D', value: 7 },
         { label: '30D', value: 30 },
@@ -110,6 +110,7 @@ export function PortfolioChart({ chartData, totalValue, isLoading, period, setPe
                                     />}
                                 />
                                 <Area
+                                    connectNulls
                                     dataKey="value"
                                     type="monotone"
                                     fill="url(#fillValue)"

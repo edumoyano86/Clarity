@@ -61,7 +61,7 @@ export type PriceData = {
 
 export type PortfolioDataPoint = {
     date: number;
-    value: number;
+    value: number | null;
 };
 
 // Map<asset symbol or coinGeckoId, Map<date string 'yyyy-MM-dd', price>>
