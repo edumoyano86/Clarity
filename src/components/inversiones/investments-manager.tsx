@@ -106,8 +106,8 @@ export function InvestmentsManager({
     const sortedInvestments = useMemo(() => {
         if (!investments) return [];
         return [...investments].sort((a, b) => {
-            const priceKeyA = a.assetType === 'crypto' ? a.coinGeckoId : a.symbol;
-            const priceKeyB = b.assetType === 'crypto' ? b.coinGeckoId : b.symbol;
+            const priceKeyA = a.assetType === 'crypto' ? (a.coinGeckoId || a.id) : a.symbol;
+            const priceKeyB = b.assetType === 'crypto' ? (b.coinGeckoId || b.id) : b.symbol;
             if (!priceKeyA || !priceKeyB) return 0;
             const aPrice = prices[priceKeyA]?.price || 0;
             const bPrice = prices[priceKeyB]?.price || 0;
@@ -120,10 +120,11 @@ export function InvestmentsManager({
 
     const renderPortfolioRow = (investment: Investment) => {
         const isDateInvalid = typeof investment.purchaseDate !== 'number' || isNaN(investment.purchaseDate) || investment.purchaseDate <= 0;
-        const priceKey = investment.assetType === 'crypto' ? investment.coinGeckoId : investment.symbol;
-        const hasRequiredData = investment.assetType === 'stock' || (investment.assetType === 'crypto' && !!investment.coinGeckoId);
+        // Smart key selection: use coinGeckoId if available (new assets), otherwise fall back to id (old assets).
+        const priceKey = investment.assetType === 'crypto' ? (investment.coinGeckoId || investment.id) : investment.symbol;
         
-        if (isDateInvalid || !hasRequiredData) {
+        // Essential data is the priceKey for lookups and a valid purchase date.
+        if (!priceKey || isDateInvalid) {
             return (
                 <TableRow key={investment.id}>
                     <TableCell>
@@ -140,7 +141,7 @@ export function InvestmentsManager({
                                     </div>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    <p>Esta inversión necesita ser actualizada para mostrar sus datos. Por favor, edítala.</p>
+                                    <p>Faltan datos clave (ID o fecha). Edita esta inversión para corregirla.</p>
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
@@ -158,10 +159,10 @@ export function InvestmentsManager({
         }
         
         const purchaseDateStr = format(startOfDay(new Date(investment.purchaseDate)), 'yyyy-MM-dd');
-        const purchasePrice = priceHistory.get(priceKey!)?.get(purchaseDateStr) || 0;
+        const purchasePrice = priceHistory.get(priceKey)?.get(purchaseDateStr) || 0;
         const purchaseValue = investment.amount * purchasePrice;
         
-        const currentPrice = prices[priceKey!]?.price;
+        const currentPrice = prices[priceKey]?.price;
         const currentValue = currentPrice ? investment.amount * currentPrice : null;
         
         const pnl = currentValue !== null && purchaseValue > 0 ? currentValue - purchaseValue : null;

@@ -56,7 +56,8 @@ export function usePortfolioHistory(
 
             const allPriceHistory: PriceHistory = new Map();
 
-            const cryptoIdsToFetch = [...new Set(cryptoAssets.map(a => a.coinGeckoId).filter(Boolean))];
+            // Use coinGeckoId if available, otherwise fall back to id for backward compatibility
+            const cryptoIdsToFetch = [...new Set(cryptoAssets.map(a => a.coinGeckoId || a.id).filter(Boolean))];
             const stockSymbolsToFetch = [...new Set(stockAssets.map(a => a.symbol))];
 
             const stockPromises = stockSymbolsToFetch.map(symbol =>
@@ -132,7 +133,7 @@ export function usePortfolioHistory(
 
                     const isPurchased = !isAfter(new Date(purchaseDate), currentDate);
                     if (isPurchased) {
-                        const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
+                        const priceKey = inv.assetType === 'crypto' ? (inv.coinGeckoId || inv.id) : inv.symbol;
                         if (!priceKey) return;
 
                         const historyForAsset = allPriceHistory.get(priceKey);
@@ -159,8 +160,23 @@ export function usePortfolioHistory(
 
     const totalValue = useMemo(() => {
         if (!investments || portfolioHistory.length === 0) return 0;
-        return portfolioHistory[portfolioHistory.length - 1]?.value || 0;
-    }, [investments, portfolioHistory]);
+        const lastDataPoint = portfolioHistory[portfolioHistory.length - 1];
+        if (lastDataPoint) {
+            return lastDataPoint.value;
+        }
+
+        // Fallback calculation if chart data is not ready, but prices are.
+        return investments.reduce((acc, inv) => {
+             const priceKey = inv.assetType === 'crypto' ? (inv.coinGeckoId || inv.id) : inv.symbol;
+             if (!priceKey) return acc;
+             const history = priceHistory.get(priceKey);
+             if (!history) return acc;
+             const latestDate = format(startOfDay(new Date()), 'yyyy-MM-dd');
+             const price = history.get(latestDate) || 0;
+             return acc + (inv.amount * price);
+        }, 0);
+
+    }, [investments, portfolioHistory, priceHistory]);
 
     return { portfolioHistory, isLoading, priceHistory, totalValue };
 }
