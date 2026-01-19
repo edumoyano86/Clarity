@@ -21,8 +21,6 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { searchStocks } from '@/ai/flows/stock-search';
 import { searchCryptos } from '@/ai/flows/crypto-search';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 
 interface StockSearchResult {
     symbol: string;
@@ -186,11 +184,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
 
             const docRef = doc(collectionRef, docId);
 
-            setDoc(docRef, dataToSave, { merge: true }).catch(serverError => {
-                const operation = investment ? 'update' : 'create';
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation, requestResourceData: dataToSave, }));
-                throw serverError;
-            });
+            await setDoc(docRef, dataToSave, { merge: true });
 
             toast({ title: 'Éxito', description: 'Inversión guardada exitosamente.'});
             onFormSuccess();

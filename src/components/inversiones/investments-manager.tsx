@@ -94,10 +94,7 @@ export function InvestmentsManager({
     const handleDelete = async () => {
         if (!investmentToDelete) return;
         try {
-            const docId = investmentToDelete.assetType === 'crypto' 
-                ? (investmentToDelete.coinGeckoId || investmentToDelete.id) 
-                : investmentToDelete.symbol;
-                
+            const docId = investmentToDelete.id;
             if (!docId) {
                 throw new Error("ID de activo inválido para eliminar.");
             }
@@ -114,8 +111,8 @@ export function InvestmentsManager({
     const sortedInvestments = useMemo(() => {
         if (!investments) return [];
         return [...investments].sort((a, b) => {
-            const priceKeyA = a.assetType === 'crypto' ? (a.coinGeckoId || a.id) : a.symbol;
-            const priceKeyB = b.assetType === 'crypto' ? (b.coinGeckoId || b.id) : b.symbol;
+            const priceKeyA = a.assetType === 'crypto' ? a.coinGeckoId : a.symbol;
+            const priceKeyB = b.assetType === 'crypto' ? b.coinGeckoId : b.symbol;
             if (!priceKeyA || !priceKeyB) return 0;
             const aPrice = prices[priceKeyA]?.price || 0;
             const bPrice = prices[priceKeyB]?.price || 0;
@@ -134,7 +131,6 @@ export function InvestmentsManager({
 
     const renderPortfolioRow = (investment: Investment) => {
         const isDateInvalid = typeof investment.purchaseDate !== 'number' || isNaN(investment.purchaseDate) || investment.purchaseDate <= 0;
-        
         const isLegacyCrypto = investment.assetType === 'crypto' && !investment.coinGeckoId;
 
         if (isLegacyCrypto) {
@@ -154,7 +150,7 @@ export function InvestmentsManager({
                                     </div>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    <p>Activo guardado con formato antiguo. Edítalo y vuelve a guardarlo para ver su valor.</p>
+                                    <p>Activo antiguo. Edítalo y vuelve a guardarlo para ver su valor.</p>
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
@@ -193,7 +189,8 @@ export function InvestmentsManager({
            );
        }
         
-        const priceKey = investment.assetType === 'crypto' ? (investment.coinGeckoId || investment.id) : investment.symbol;
+        const priceKey = investment.assetType === 'crypto' ? investment.coinGeckoId : investment.symbol;
+        if (!priceKey) return null; // Should not happen with the legacy check above
         
         const purchaseDateStr = format(startOfDay(new Date(investment.purchaseDate)), 'yyyy-MM-dd');
         const purchasePriceFound = priceHistory.get(priceKey)?.has(purchaseDateStr);

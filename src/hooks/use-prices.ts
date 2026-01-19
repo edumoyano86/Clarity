@@ -13,7 +13,6 @@ export function usePrices(investments: Investment[] | null) {
     
     const investmentsKey = useMemo(() => {
         if (!investments) return '';
-        // Create a stable key based on the assets that need pricing
         return investments.map(inv => inv.assetType === 'crypto' ? (inv.coinGeckoId || inv.id) : inv.symbol).sort().join(',');
     }, [investments]);
 
@@ -27,11 +26,10 @@ export function usePrices(investments: Investment[] | null) {
             
             setIsLoading(true);
 
-            const cryptoAssets = investments.filter(i => i.assetType === 'crypto');
+            const cryptoAssets = investments.filter(i => i.assetType === 'crypto' && i.coinGeckoId);
             const stockAssets = investments.filter(i => i.assetType === 'stock');
             
-            // Strict: Only fetch prices for cryptos that have a coinGeckoId. This prevents API spam.
-            const cryptoIdsToFetch = [...new Set(cryptoAssets.map(inv => inv.coinGeckoId).filter(Boolean))];
+            const cryptoIdsToFetch = [...new Set(cryptoAssets.map(inv => inv.coinGeckoId!))];
             const stockSymbolsToFetch = [...new Set(stockAssets.map(inv => inv.symbol))];
 
             try {
@@ -43,10 +41,16 @@ export function usePrices(investments: Investment[] | null) {
                     promises.push(getStockPrices({ symbols: stockSymbolsToFetch }));
                 }
                 
-                const results = await Promise.all(promises);
+                const results = await Promise.allSettled(promises);
                 
-                const combinedPrices = results.reduce((acc, current) => {
-                    return { ...acc, ...current };
+                const combinedPrices = results.reduce((acc, result) => {
+                    if (result.status === 'fulfilled' && result.value) {
+                       return { ...acc, ...result.value };
+                    }
+                     if (result.status === 'rejected') {
+                        console.warn('Partial failure fetching prices:', result.reason);
+                    }
+                    return acc;
                 }, {});
 
                 setPrices(combinedPrices);
