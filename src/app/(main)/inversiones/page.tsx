@@ -139,7 +139,7 @@ export default function InversionesPage() {
                 tempPriceHistory.set(res.id, pricesMap);
             });
             
-            // 4. Fill forward missing prices
+            // 4. Fill forward missing prices in the complete history
             const totalDays = differenceInDays(endDate, startDate);
             if (totalDays >= 0) {
                 for (const pricesMap of tempPriceHistory.values()) {
@@ -158,37 +158,46 @@ export default function InversionesPage() {
             setPriceHistory(tempPriceHistory);
             
             // 5. Generate Chart Data
-            const chartStartDate = startOfDay(subDays(endDate, period - 1));
-            const chartDays = differenceInDays(endDate, chartStartDate) + 1;
+            const chartStartDate = startOfDay(subDays(new Date(), period - 1));
+            const chartDays = differenceInDays(new Date(), chartStartDate);
             const newChartData: PortfolioDataPoint[] = [];
-            let lastDayValue: number | null = null;
 
+            // A map to hold the most recently seen price for each asset during chart generation
+            const lastKnownPricesForChart = new Map<string, number>();
 
-            for (let i = 0; i < chartDays; i++) {
+            for (let i = 0; i <= chartDays; i++) {
                 const currentDate = addDays(chartStartDate, i);
                 const dateStr = format(currentDate, 'yyyy-MM-dd');
                 let dailyTotal = 0;
-                let pricesFoundForDay = false;
+                let assetsWithValue = 0;
 
                 investments.forEach(inv => {
-                    if (!isAfter(new Date(inv.purchaseDate), currentDate)) {
-                        const priceKey = inv.assetType === 'crypto' ? (inv.coinGeckoId || inv.id) : inv.symbol;
-                        const historyForAsset = tempPriceHistory.get(priceKey);
-                        const priceForDay = historyForAsset?.get(dateStr);
-                        if (priceForDay !== undefined) {
-                            pricesFoundForDay = true;
-                            dailyTotal += inv.amount * priceForDay;
-                        }
+                    // Only include assets purchased on or before the current day
+                    if (isAfter(new Date(inv.purchaseDate), currentDate)) {
+                        return;
+                    }
+                    
+                    const priceKey = inv.assetType === 'crypto' ? (inv.coinGeckoId || inv.id) : inv.symbol;
+                    if (!priceKey) return;
+
+                    const historyForAsset = tempPriceHistory.get(priceKey);
+                    const priceForDay = historyForAsset?.get(dateStr);
+                    
+                    // Update last known price if we have a price for today
+                    if (priceForDay !== undefined) {
+                        lastKnownPricesForChart.set(priceKey, priceForDay);
+                    }
+
+                    // Use the last known price to calculate value
+                    const lastPrice = lastKnownPricesForChart.get(priceKey);
+                    if (lastPrice !== undefined) {
+                        dailyTotal += inv.amount * lastPrice;
+                        assetsWithValue++;
                     }
                 });
 
-                if (pricesFoundForDay) {
-                    newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
-                    lastDayValue = dailyTotal;
-                } else {
-                    // If no price was found, carry over the last known value to avoid drops to 0 on weekends
-                    newChartData.push({ date: currentDate.getTime(), value: lastDayValue });
-                }
+                // Push null if no assets had value to let the chart connect points
+                newChartData.push({ date: currentDate.getTime(), value: assetsWithValue > 0 ? dailyTotal : null });
             }
             setChartData(newChartData);
 
