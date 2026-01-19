@@ -1,29 +1,28 @@
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
-import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { initializeFirestore } from 'firebase/firestore'
+import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
+import { getAuth, type Auth } from 'firebase/auth';
+import { initializeFirestore, type Firestore } from 'firebase/firestore';
 
-// IMPORTANT: DO NOT MODIFY THIS FUNCTION
-export function initializeFirebase() {
-  if (!getApps().length) {
-    // Directly initialize with the config to avoid auto-detection issues in dev environments.
-    const firebaseApp = initializeApp(firebaseConfig);
-    return getSdks(firebaseApp);
-  }
+let firebaseApp: FirebaseApp;
+let auth: Auth;
+let firestore: Firestore;
 
-  // If already initialized, return the SDKs with the already initialized App
-  return getSdks(getApp());
+// This check prevents re-initializing the app on every hot-reload
+if (!getApps().length) {
+  firebaseApp = initializeApp(firebaseConfig);
+} else {
+  firebaseApp = getApp();
 }
 
-export function getSdks(firebaseApp: FirebaseApp) {
-  return {
-    firebaseApp,
-    auth: getAuth(firebaseApp),
-    firestore: initializeFirestore(firebaseApp, { experimentalForceLongPolling: true })
-  };
-}
+auth = getAuth(firebaseApp);
+// Use initializeFirestore to apply settings
+firestore = initializeFirestore(firebaseApp, {
+  experimentalForceLongPolling: true,
+});
+
+export { firebaseApp, auth, firestore };
 
 export * from './provider';
 export * from './client-provider';
