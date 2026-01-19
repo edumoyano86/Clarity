@@ -169,6 +169,8 @@ export default function InversionesPage() {
             const chartDataStartDate = startOfDay(subDays(new Date(), period - 1));
             const chartDays = differenceInDays(new Date(), chartDataStartDate);
             const newChartData: PortfolioDataPoint[] = [];
+            let lastKnownTotal: number | null = null;
+
 
             for (let i = 0; i <= chartDays; i++) {
                 const currentDate = addDays(chartDataStartDate, i);
@@ -177,7 +179,6 @@ export default function InversionesPage() {
                 let assetsWithValue = 0;
 
                 investments.forEach(inv => {
-                    // Only include assets purchased on or before the current day
                     if (isAfter(new Date(inv.purchaseDate), currentDate)) {
                         return;
                     }
@@ -193,7 +194,13 @@ export default function InversionesPage() {
                         assetsWithValue++;
                     }
                 });
-                newChartData.push({ date: currentDate.getTime(), value: assetsWithValue > 0 ? dailyTotal : null });
+
+                if (assetsWithValue > 0) {
+                    lastKnownTotal = dailyTotal;
+                    newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
+                } else {
+                    newChartData.push({ date: currentDate.getTime(), value: lastKnownTotal });
+                }
             }
             setChartData(newChartData);
 
@@ -202,7 +209,7 @@ export default function InversionesPage() {
 
         processInvestmentData();
 
-    }, [investments, isUserLoading, loadingInvestments, period, toast]); // Re-run when investments or period change
+    }, [investments, isUserLoading, loadingInvestments, period, toast]);
 
     const isLoading = isUserLoading || loadingInvestments || isProcessing;
     

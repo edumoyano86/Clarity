@@ -106,6 +106,7 @@ export function useDashboardPortfolio(
 
             // 5. Generate chart data
             const newChartData: PortfolioDataPoint[] = [];
+            let lastKnownTotal: number | null = null;
             for (let i = 0; i <= chartDays; i++) {
                 const currentDate = addDays(chartStartDate, i);
                 const dateStr = format(currentDate, 'yyyy-MM-dd');
@@ -122,7 +123,13 @@ export function useDashboardPortfolio(
                         }
                     }
                 });
-                 newChartData.push({ date: currentDate.getTime(), value: assetsWithValue > 0 ? dailyTotal : null });
+                
+                if (assetsWithValue > 0) {
+                    lastKnownTotal = dailyTotal;
+                    newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
+                } else {
+                    newChartData.push({ date: currentDate.getTime(), value: lastKnownTotal });
+                }
             }
             setChartData(newChartData);
             setIsLoading(false);
