@@ -17,9 +17,9 @@ import { PortfolioChart } from './portfolio-chart';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
 import { SellInvestmentDialog } from './sell-investment-dialog';
-import { PortfolioPeriod } from '@/hooks/use-portfolio-chart-data';
 import { format, startOfDay } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import { PortfolioPeriod } from '@/app/(main)/inversiones/page';
 
 
 interface InvestmentsManagerProps {
@@ -111,8 +111,8 @@ export function InvestmentsManager({
     const sortedInvestments = useMemo(() => {
         if (!investments) return [];
         return [...investments].sort((a, b) => {
-            const priceKeyA = a.assetType === 'crypto' ? a.coinGeckoId : a.symbol;
-            const priceKeyB = b.assetType === 'crypto' ? b.coinGeckoId : b.symbol;
+            const priceKeyA = a.assetType === 'crypto' ? (a.coinGeckoId || a.id) : a.symbol;
+            const priceKeyB = b.assetType === 'crypto' ? (b.coinGeckoId || b.id) : b.symbol;
             if (!priceKeyA || !priceKeyB) return 0;
             const aPrice = currentPrices[priceKeyA]?.price || 0;
             const bPrice = currentPrices[priceKeyB]?.price || 0;
@@ -130,11 +130,17 @@ export function InvestmentsManager({
     ];
 
     const renderPortfolioRow = (investment: Investment) => {
-        const isLegacyOrInvalid = (investment.assetType === 'crypto' && !investment.coinGeckoId) || typeof investment.purchaseDate !== 'number' || isNaN(investment.purchaseDate) || investment.purchaseDate <= 0;
+        const priceKey = investment.assetType === 'crypto' ? (investment.coinGeckoId || investment.id) : investment.symbol;
+        const purchaseDateStr = format(startOfDay(new Date(investment.purchaseDate)), 'yyyy-MM-dd');
+        
+        const historyForAsset = priceHistory.get(priceKey);
+        const purchasePrice = historyForAsset?.get(purchaseDateStr);
 
-        if (isLegacyOrInvalid) {
+        const isDataIncomplete = !priceKey || (investment.assetType === 'crypto' && !investment.coinGeckoId && !investment.id);
+
+        if (isDataIncomplete) {
              return (
-                <TableRow key={investment.id}>
+                <TableRow key={investment.id || Math.random()}>
                     <TableCell>
                         <div className='font-medium'>{investment.name}</div>
                         <div className='text-sm text-muted-foreground'>{investment.symbol}</div>
@@ -166,12 +172,7 @@ export function InvestmentsManager({
             );
         }
         
-        const priceKey = investment.assetType === 'crypto' ? investment.coinGeckoId! : investment.symbol;
-        
-        const purchaseDateStr = format(startOfDay(new Date(investment.purchaseDate)), 'yyyy-MM-dd');
-        const purchasePrice = priceHistory.get(priceKey)?.get(purchaseDateStr);
         const purchaseValue = purchasePrice !== undefined ? investment.amount * purchasePrice : null;
-        
         const currentPrice = currentPrices[priceKey]?.price;
         const currentValue = currentPrice !== undefined ? investment.amount * currentPrice : null;
         
@@ -230,7 +231,6 @@ export function InvestmentsManager({
                         isLoading={isLoading}
                         period={period}
                         setPeriod={setPeriod}
-                        periodOptions={periodOptions}
                     />
                     <Card>
                         <CardHeader>

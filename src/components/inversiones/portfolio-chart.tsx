@@ -8,7 +8,8 @@ import { PortfolioDataPoint } from '@/lib/definitions';
 import { Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '../ui/button';
-import { PortfolioPeriod } from '@/hooks/use-portfolio-chart-data';
+import { PortfolioPeriod } from '@/app/(main)/inversiones/page';
+
 
 interface PortfolioChartProps {
     chartData: PortfolioDataPoint[];
@@ -16,7 +17,6 @@ interface PortfolioChartProps {
     isLoading: boolean;
     period: PortfolioPeriod;
     setPeriod: (period: PortfolioPeriod) => void;
-    periodOptions: { label: string; value: PortfolioPeriod }[];
 }
 
 const chartConfig = {
@@ -30,9 +30,14 @@ const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 };
 
-export function PortfolioChart({ chartData, totalValue, isLoading, period, setPeriod, periodOptions }: PortfolioChartProps) {
+export function PortfolioChart({ chartData, totalValue, isLoading, period, setPeriod }: PortfolioChartProps) {
     
     const hasData = chartData.length > 0 && chartData.some(d => d.value > 0);
+    const periodOptions: { label: string; value: PortfolioPeriod }[] = [
+        { label: '7D', value: 7 },
+        { label: '30D', value: 30 },
+        { label: '90D', value: 90 },
+    ];
     
     return (
         <Card>

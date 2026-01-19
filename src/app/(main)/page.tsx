@@ -12,7 +12,7 @@ import { collection, query, where, orderBy, limit } from "firebase/firestore";
 import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear, startOfToday } from 'date-fns';
 import { PortfolioChart } from "@/components/inversiones/portfolio-chart";
 import { BalanceChart } from "@/components/dashboard/balance-chart";
-import { usePortfolioHistory, type PortfolioPeriod as PortfolioHistoryPeriod } from "@/hooks/use-portfolio-history";
+import { useDashboardPortfolio, type PortfolioPeriod } from "@/hooks/use-dashboard-portfolio";
 
 type Periodo = 'mes_actual' | 'mes_pasado' | 'ultimos_3_meses' | 'ano_actual';
 
@@ -28,7 +28,7 @@ export default function DashboardPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const [periodo, setPeriodo] = useState<Periodo>('mes_actual');
-  const [portfolioPeriod, setPortfolioPeriod] = useState<PortfolioHistoryPeriod>(90);
+  const [portfolioPeriod, setPortfolioPeriod] = useState<PortfolioPeriod>(90);
 
 
   const transactionsQuery = useMemoFirebase(() => {
@@ -41,14 +41,14 @@ export default function DashboardPage() {
     if (!firestore || !user) return null;
     return collection(firestore, 'users', user.uid, 'expenseCategories');
   }, [firestore, user]);
-  const { data: categorias, isLoading: loadingCategorias } = useCollection<Categoria>(categoriesQuery);
+  const { data: categorias, isLoading: loadingCategorias } = useCollection<Categoria>(categoriasQuery);
 
    const investmentsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(collection(firestore, 'users', user.uid, 'investments'), orderBy('purchaseDate', 'asc'));
   }, [firestore, user]);
   const { data: investments, isLoading: loadingInvestments } = useCollection<Investment>(investmentsQuery);
-  const { portfolioHistory, totalValue, isLoading: isLoadingHistory } = usePortfolioHistory(investments || [], portfolioPeriod);
+  const { chartData, totalValue, isLoading: isLoadingHistory } = useDashboardPortfolio(investments, portfolioPeriod);
 
 
   const accountsQuery = useMemoFirebase(() => {
@@ -182,7 +182,7 @@ export default function DashboardPage() {
      return <div className="flex h-full items-center justify-center"><p>Usuario no encontrado.</p></div>
   }
 
-    const portfolioPeriodOptions: { label: string; value: PortfolioHistoryPeriod }[] = [
+    const portfolioPeriodOptions: { label: string; value: PortfolioPeriod }[] = [
         { label: '7D', value: 7 },
         { label: '30D', value: 30 },
         { label: '90D', value: 90 },
@@ -218,12 +218,11 @@ export default function DashboardPage() {
           />
           <div className="grid gap-8 md:grid-cols-2">
             <PortfolioChart 
-              portfolioHistory={portfolioHistory} 
+              chartData={chartData} 
               totalValue={totalValue} 
               isLoading={isLoadingHistory}
               period={portfolioPeriod}
               setPeriod={setPortfolioPeriod}
-              periodOptions={portfolioPeriodOptions} 
             />
             <BalanceChart ingresos={dashboardData.totalIngresos} gastos={dashboardData.totalGastos} />
           </div>
