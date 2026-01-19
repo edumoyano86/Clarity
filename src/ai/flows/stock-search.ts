@@ -51,7 +51,8 @@ const stockSearchFlow = ai.defineFlow(
     try {
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`Finnhub API request failed with status ${response.status}`);
+        console.warn(`Finnhub API request failed with status ${response.status}`);
+        return { results: [] };
       }
       const data = await response.json();
 
