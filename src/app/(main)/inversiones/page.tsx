@@ -124,8 +124,8 @@ export default function InversionesPage() {
                 );
 
                 const historyFetchStartDate = isAfter(new Date(earliestPurchaseDate), chartPeriodStartDate) 
-                    ? startOfDay(new Date(earliestPurchaseDate))
-                    : chartPeriodStartDate;
+                    ? chartPeriodStartDate
+                    : startOfDay(new Date(earliestPurchaseDate));
                 
                 const endDate = new Date();
                 const startTimestamp = getUnixTime(historyFetchStartDate);
