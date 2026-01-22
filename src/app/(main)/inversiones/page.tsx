@@ -167,6 +167,19 @@ export default function InversionesPage() {
                 const totalDaysInHistory = differenceInDays(endDate, historyFetchStartDate);
                 if (totalDaysInHistory >= 0) {
                     for (const pricesMap of tempPriceHistory.values()) {
+                        // BACKWARD PASS to fill missing data from the future
+                        let nextKnownPrice: number | undefined;
+                        for (let i = totalDaysInHistory; i >= 0; i--) {
+                            const currentDate = addDays(historyFetchStartDate, i);
+                            const dateStr = currentDate.toISOString().split('T')[0];
+                            if (pricesMap.has(dateStr)) {
+                                nextKnownPrice = pricesMap.get(dateStr);
+                            } else if (nextKnownPrice !== undefined) {
+                                pricesMap.set(dateStr, nextKnownPrice);
+                            }
+                        }
+
+                        // FORWARD PASS to fill any remaining gaps from the past
                         let lastKnownPrice: number | undefined;
                         for (let i = 0; i <= totalDaysInHistory; i++) {
                             const currentDate = addDays(historyFetchStartDate, i);
