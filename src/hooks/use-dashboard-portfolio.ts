@@ -59,7 +59,7 @@ export function useDashboardPortfolio(
                     } catch (e) {
                          console.warn(`Dashboard: Could not fetch stock price for ${symbol}`, e);
                     }
-                    await new Promise(resolve => setTimeout(resolve, 2100)); // Rate limit
+                    await new Promise(resolve => setTimeout(resolve, 6000)); // Rate limit
                 }
             } catch (e) {
                 console.error("Dashboard: Failed to fetch prices", e);
@@ -93,7 +93,7 @@ export function useDashboardPortfolio(
                     console.warn(`Dashboard: Could not fetch history for ${asset.id}:`, e)
                     historyResults.push({ id: asset.id, data: {} });
                 }
-                await new Promise(resolve => setTimeout(resolve, 2100));
+                await new Promise(resolve => setTimeout(resolve, 6000));
             }
             
             const tempPriceHistory: PriceHistory = new Map();
@@ -109,7 +109,10 @@ export function useDashboardPortfolio(
             
             const totalDaysInHistory = differenceInDays(endDate, historyFetchStartDate);
             if (totalDaysInHistory >= 0) {
-                 for (const pricesMap of tempPriceHistory.values()) {
+                 for (const [assetId, pricesMap] of tempPriceHistory.entries()) {
+                    // Fallback to current price if history is completely empty
+                    const lastResortPrice = currentPrices[assetId]?.price;
+                    
                     // BACKWARD PASS to fill missing data from the future
                     let nextKnownPrice: number | undefined;
                     for (let i = totalDaysInHistory; i >= 0; i--) {
@@ -131,6 +134,14 @@ export function useDashboardPortfolio(
                             lastKnownPrice = pricesMap.get(dateStr);
                         } else if (lastKnownPrice !== undefined) {
                             pricesMap.set(dateStr, lastKnownPrice);
+                        }
+                    }
+                     // FINAL PASS: if still gaps, use last resort price
+                    if (pricesMap.size === 0 && lastResortPrice !== undefined) {
+                        for (let i = 0; i <= totalDaysInHistory; i++) {
+                            const currentDate = addDays(historyFetchStartDate, i);
+                            const dateStr = currentDate.toISOString().split('T')[0];
+                            pricesMap.set(dateStr, lastResortPrice);
                         }
                     }
                 }
