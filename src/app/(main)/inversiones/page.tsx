@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useFirestore, useUser, useMemoFirebase } from "@/firebase";
 import { Investment, PriceData, PortfolioDataPoint, PriceHistory } from "@/lib/definitions";
 import { InvestmentsManager } from "@/components/inversiones/investments-manager";
@@ -10,7 +10,7 @@ import { getCryptoPriceHistory } from '@/ai/flows/crypto-price-history';
 import { getCryptoPrices } from '@/ai/flows/crypto-prices';
 import { getStockPrices } from '@/ai/flows/stock-prices';
 import { useToast } from '@/hooks/use-toast';
-import { subDays, startOfDay, getUnixTime, isAfter, differenceInDays, addDays, min } from 'date-fns';
+import { subDays, startOfDay, getUnixTime, isAfter, differenceInDays, addDays, min, max } from 'date-fns';
 
 export type PortfolioPeriod = 7 | 30 | 90;
 
@@ -23,23 +23,22 @@ export default function InversionesPage() {
     const [investments, setInvestments] = useState<Investment[]>([]);
     const [loadingInvestments, setLoadingInvestments] = useState(true);
     
-    // Derived state
+    // Derived state from processing
     const [currentPrices, setCurrentPrices] = useState<PriceData>({});
-    const [priceHistory, setPriceHistory] = useState<PriceHistory>(new Map());
+    const [priceHistory, setPriceHistory] = useState<PriceHistory>(new Map()); // Master 90-day history
     const [totalValue, setTotalValue] = useState(0);
     const [chartData, setChartData] = useState<PortfolioDataPoint[]>([]);
     
     // UI state
     const [period, setPeriod] = useState<PortfolioPeriod>(90);
-    const [isProcessing, setIsProcessing] = useState(true);
-    const isProcessingRef = useRef(false);
+    const [isDataLoading, setIsDataLoading] = useState(true);
 
     const investmentsQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
         return query(collection(firestore, 'users', user.uid, 'investments'), orderBy('purchaseDate', 'desc'));
     }, [firestore, user]);
 
-    // Firestore listener for investments
+    // Effect 1: Listen to raw investment data from Firestore
     useEffect(() => {
         if (!investmentsQuery) {
             setLoadingInvestments(false);
@@ -65,22 +64,21 @@ export default function InversionesPage() {
         return () => unsub();
     }, [investmentsQuery, toast]);
     
-    // The main effect to process all data when investments change
+    // Effect 2: Fetch all remote data (prices, history) when the list of investments changes.
     useEffect(() => {
-        const processInvestmentData = async () => {
-            if (loadingInvestments || isUserLoading || isProcessingRef.current) return;
-            
+        const fetchAllInvestmentData = async () => {
+            if (isUserLoading || loadingInvestments) return;
+
             if (investments.length === 0) {
-                setIsProcessing(false);
-                setTotalValue(0);
-                setChartData([]);
+                setIsDataLoading(false);
                 setCurrentPrices({});
                 setPriceHistory(new Map());
+                setTotalValue(0);
+                setChartData([]);
                 return;
             }
             
-            isProcessingRef.current = true;
-            setIsProcessing(true);
+            setIsDataLoading(true);
 
             try {
                 // 1. Fetch current prices
@@ -92,17 +90,15 @@ export default function InversionesPage() {
                 
                 let fetchedPrices: PriceData = {};
                 
-                // Fetch crypto prices in a batch
                 if (cryptoIds.length > 0) {
                     try {
                         const cryptoPrices = await getCryptoPrices({ ids: cryptoIds });
                         fetchedPrices = { ...fetchedPrices, ...cryptoPrices };
                     } catch (e) {
-                         console.warn('Could not fetch crypto prices:', e);
+                         console.warn('Partial failure fetching crypto prices:', e);
                     }
                 }
 
-                // Fetch stock prices serially to avoid rate-limiting
                 for (const symbol of stockSymbols) {
                     try {
                         const stockPrice = await getStockPrices({ symbol });
@@ -110,56 +106,40 @@ export default function InversionesPage() {
                     } catch (e) {
                         console.warn(`Could not fetch current price for ${symbol}:`, e);
                     }
-                    await new Promise(resolve => setTimeout(resolve, 2100));
+                    await new Promise(resolve => setTimeout(resolve, 2100)); // Rate limit
                 }
                 
                 setCurrentPrices(fetchedPrices);
 
-                // 2. Calculate Total Value
-                let newTotalValue = 0;
-                investments.forEach(inv => {
-                    const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
-                    if (priceKey && fetchedPrices[priceKey]) {
-                        newTotalValue += inv.amount * fetchedPrices[priceKey].price;
-                    }
-                });
-                setTotalValue(newTotalValue);
-
-                // 3. Fetch Price History
-                const chartPeriodStartDate = startOfDay(subDays(new Date(), period -1));
+                // 2. Fetch FULL 90-DAY history for ALL assets
                 const earliestPurchaseDate = investments.reduce((earliest, inv) => 
                     min([earliest, new Date(inv.purchaseDate)]), 
                     new Date()
                 );
-
-                const historyFetchStartDate = min([earliestPurchaseDate, chartPeriodStartDate]);
+                const historyFetchStartDate = min([earliestPurchaseDate, startOfDay(subDays(new Date(), 90))]);
                 
                 const endDate = new Date();
                 const startTimestamp = getUnixTime(historyFetchStartDate);
                 const endTimestamp = getUnixTime(endDate);
 
-                const historyResults: { id: string; data: Record<string, number> | {} }[] = [];
-                
-                const fetchHistorySerially = async () => {
-                    const allAssets = [...stockSymbols.map(s => ({type: 'stock', id: s})), ...cryptoIds.map(c => ({type: 'crypto', id: c}))];
-                    for (const asset of allAssets) {
-                         try {
-                            if (asset.type === 'stock') {
-                                const history = await getStockPriceHistory({ symbol: asset.id, from: startTimestamp, to: endTimestamp });
-                                historyResults.push({ id: asset.id, data: history.history });
-                            } else {
-                                const history = await getCryptoPriceHistory({ id: asset.id, from: startTimestamp, to: endTimestamp });
-                                historyResults.push({ id: asset.id, data: history.history });
-                            }
-                        } catch (e) {
-                            console.warn(`Could not fetch history for ${asset.id}:`, e)
-                            historyResults.push({ id: asset.id, data: {} });
-                        }
-                        await new Promise(resolve => setTimeout(resolve, 2100)); // Rate limit delay
-                    }
-                };
+                const historyResults: { id: string; data: Record<string, number> }[] = [];
+                const allAssets = [...stockSymbols.map(s => ({type: 'stock', id: s})), ...cryptoIds.map(c => ({type: 'crypto', id: c}))];
 
-                await fetchHistorySerially();
+                for (const asset of allAssets) {
+                     try {
+                        let history: { history: Record<string, number> };
+                        if (asset.type === 'stock') {
+                            history = await getStockPriceHistory({ symbol: asset.id, from: startTimestamp, to: endTimestamp });
+                        } else {
+                            history = await getCryptoPriceHistory({ id: asset.id, from: startTimestamp, to: endTimestamp });
+                        }
+                        historyResults.push({ id: asset.id, data: history.history || {} });
+                    } catch (e) {
+                        console.warn(`Could not fetch history for ${asset.id}:`, e)
+                        historyResults.push({ id: asset.id, data: {} });
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 2100)); // Rate limit delay
+                }
 
                 const tempPriceHistory: PriceHistory = new Map();
                 historyResults.forEach(res => {
@@ -172,7 +152,6 @@ export default function InversionesPage() {
                     tempPriceHistory.set(res.id, pricesMap);
                 });
                 
-                // 4. Inject current day's price into history to ensure chart is up-to-date
                 const todayStr = new Date().toISOString().split('T')[0];
                 for (const [assetId, priceInfo] of Object.entries(fetchedPrices)) {
                     if (priceInfo && typeof priceInfo.price === 'number') {
@@ -184,8 +163,7 @@ export default function InversionesPage() {
                         assetHistoryMap.set(todayStr, priceInfo.price);
                     }
                 }
-
-                // 5. Fill forward missing prices in the complete history
+                
                 const totalDaysInHistory = differenceInDays(endDate, historyFetchStartDate);
                 if (totalDaysInHistory >= 0) {
                     for (const pricesMap of tempPriceHistory.values()) {
@@ -202,67 +180,82 @@ export default function InversionesPage() {
                     }
                 }
                 setPriceHistory(tempPriceHistory);
-                
-                // 6. Generate Chart Data
-                const newChartData: PortfolioDataPoint[] = [];
-                let lastKnownTotal: number | null = null;
-                const chartDays = differenceInDays(new Date(), chartPeriodStartDate);
-
-                for (let i = 0; i <= chartDays; i++) {
-                    const currentDate = addDays(chartPeriodStartDate, i);
-                    const dateStr = currentDate.toISOString().split('T')[0];
-                    let dailyTotal = 0;
-                    let assetsWithValue = 0;
-
-                    investments.forEach(inv => {
-                        if (isAfter(new Date(inv.purchaseDate), currentDate)) {
-                            return;
-                        }
-                        
-                        const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
-                        if (!priceKey) return;
-
-                        const historyForAsset = tempPriceHistory.get(priceKey);
-                        const priceForDay = historyForAsset?.get(dateStr);
-                        
-                        if (priceForDay !== undefined) {
-                            dailyTotal += inv.amount * priceForDay;
-                            assetsWithValue++;
-                        }
-                    });
-
-                     if (assetsWithValue > 0) {
-                        lastKnownTotal = dailyTotal;
-                        newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
-                    } else if (lastKnownTotal !== null) {
-                        // If no assets had a value today, carry forward the last known total
-                        newChartData.push({ date: currentDate.getTime(), value: lastKnownTotal });
-                    } else {
-                        newChartData.push({ date: currentDate.getTime(), value: null });
-                    }
-                }
-                setChartData(newChartData);
 
             } catch (error) {
-                console.error("An error occurred during investment processing:", error);
+                console.error("An error occurred during investment data fetching:", error);
                 toast({
-                    title: "Error de Procesamiento",
-                    description: "No se pudieron procesar los datos de inversiones.",
+                    title: "Error de Carga de Datos",
+                    description: "No se pudieron obtener todos los datos de mercado.",
                     variant: "destructive",
                 });
-                setTotalValue(0);
-                setChartData([]);
             } finally {
-                isProcessingRef.current = false;
-                setIsProcessing(false);
+                setIsDataLoading(false);
             }
         };
 
-        processInvestmentData();
+        fetchAllInvestmentData();
+    }, [investments, isUserLoading, loadingInvestments, toast]);
 
-    }, [investments, isUserLoading, loadingInvestments, period, toast]);
+    // Effect 3: Generate display data (total value, chart) when period or master data changes.
+    useEffect(() => {
+        if (isDataLoading || investments.length === 0) {
+            return;
+        }
 
-    const isLoading = isUserLoading || loadingInvestments || isProcessing;
+        // 1. Calculate Total Value
+        let newTotalValue = 0;
+        investments.forEach(inv => {
+            const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
+            if (priceKey && currentPrices[priceKey]) {
+                newTotalValue += inv.amount * currentPrices[priceKey].price;
+            }
+        });
+        setTotalValue(newTotalValue);
+
+        // 2. Generate Chart Data
+        const chartPeriodStartDate = startOfDay(subDays(new Date(), period - 1));
+        const newChartData: PortfolioDataPoint[] = [];
+        let lastKnownTotal: number | null = null;
+        const chartDays = differenceInDays(new Date(), chartPeriodStartDate);
+
+        for (let i = 0; i <= chartDays; i++) {
+            const currentDate = addDays(chartPeriodStartDate, i);
+            const dateStr = currentDate.toISOString().split('T')[0];
+            let dailyTotal = 0;
+            let assetsWithValue = 0;
+
+            investments.forEach(inv => {
+                if (isAfter(new Date(inv.purchaseDate), currentDate)) {
+                    return;
+                }
+                
+                const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
+                if (!priceKey) return;
+
+                const historyForAsset = priceHistory.get(priceKey);
+                const priceForDay = historyForAsset?.get(dateStr);
+                
+                if (priceForDay !== undefined) {
+                    dailyTotal += inv.amount * priceForDay;
+                    assetsWithValue++;
+                }
+            });
+
+             if (assetsWithValue > 0) {
+                lastKnownTotal = dailyTotal;
+                newChartData.push({ date: currentDate.getTime(), value: dailyTotal });
+            } else if (lastKnownTotal !== null) {
+                newChartData.push({ date: currentDate.getTime(), value: lastKnownTotal });
+            } else {
+                newChartData.push({ date: currentDate.getTime(), value: null });
+            }
+        }
+        setChartData(newChartData);
+
+    }, [period, priceHistory, currentPrices, investments, isDataLoading]);
+
+
+    const isLoading = isUserLoading || loadingInvestments || isDataLoading;
     
     if (isLoading && investments.length === 0) {
         return (
