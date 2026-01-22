@@ -159,9 +159,9 @@ export default function InversionesPage() {
                     const pricesMap = new Map<string, number>();
                     if (res.data) {
                         Object.entries(res.data).forEach(([dateStr, price]) => {
-                            const date = new Date(dateStr);
-                            const utcDateStr = date.toISOString().split('T')[0];
-                            pricesMap.set(utcDateStr, price)
+                            // The dateStr from the flow is already the correct 'YYYY-MM-DD' UTC string.
+                            // Do not convert it again, as it can cause timezone-related-off-by-one errors.
+                            pricesMap.set(dateStr, price);
                         });
                     }
                     tempPriceHistory.set(res.id, pricesMap);
