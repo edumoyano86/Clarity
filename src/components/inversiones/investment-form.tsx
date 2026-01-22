@@ -34,14 +34,23 @@ interface CryptoSearchResult {
 }
 
 const InvestmentSchema = z.object({
-    id: z.string().min(1, 'Debes seleccionar un activo válido de la lista.'),
+    id: z.string().min(1, 'Debes buscar y seleccionar un activo de la lista.'),
     assetType: z.enum(['crypto', 'stock'], { required_error: 'Debes seleccionar un tipo de activo.' }),
-    symbol: z.string().min(1, 'Debes seleccionar un activo.'),
+    symbol: z.string().min(1, 'Símbolo del activo es requerido.'),
     name: z.string().min(1, 'El nombre del activo es requerido'),
     amount: z.coerce.number().positive('La cantidad debe ser un número positivo.'),
     purchaseDate: z.date({ required_error: 'La fecha de compra es requerida.' }),
     coinGeckoId: z.string().optional(),
+}).superRefine((data, ctx) => {
+    if (data.assetType === 'crypto' && (!data.coinGeckoId || data.coinGeckoId.length === 0)) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['id'], // Attach error to the asset search field visually
+            message: 'Para criptomonedas, el ID de CoinGecko es requerido. Por favor, vuelve a seleccionar el activo de la lista.',
+        });
+    }
 });
+
 
 type FormValues = z.infer<typeof InvestmentSchema>;
 
@@ -149,8 +158,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
 
 
     useEffect(() => {
-        if (investment) return;
-
+        // When asset type changes, clear the selected asset
         setValue('id', '');
         setValue('symbol', '');
         setValue('name', '');
@@ -160,17 +168,11 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         setStockResults([]);
         setCryptoResults([]);
         setIsListVisible(true);
-    }, [assetType, setValue, investment]);
+    }, [assetType, setValue]);
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         setIsLoading(true);
         try {
-            if (!selectedAsset && !investment) {
-                 toast({ title: 'Error', description: 'Por favor selecciona un activo válido de la lista.', variant: 'destructive' });
-                 setIsLoading(false);
-                 return;
-            }
-            
             const collectionRef = collection(firestore, 'users', userId, 'investments');
             
             let newDocId: string;
@@ -181,16 +183,9 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 newDocId = (data.symbol || '').toUpperCase();
             }
 
-            if (!newDocId) {
-                toast({ title: 'Error', description: 'El ID del activo es inválido.', variant: 'destructive' });
-                setIsLoading(false);
-                return;
-            }
-            
-            data.id = newDocId;
-
             const dataToSave = {
                 ...data,
+                id: newDocId, // Ensure the final data has the correct ID
                 purchaseDate: data.purchaseDate.getTime(),
             };
 
@@ -205,9 +200,10 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 const newDocRef = doc(collectionRef, newDocId);
                 const newDocSnap = await transaction.get(newDocRef);
 
-                // This condition handles adding to an existing position when CREATING a new investment.
-                // It should not run when editing an existing item (that logic is in the else block)
-                if (newDocSnap.exists() && !investment) { 
+                if (newDocSnap.exists() && (!investment || investment.id !== newDocId)) { 
+                    // This condition handles:
+                    // 1. Adding to an existing position when CREATING a new investment.
+                    // 2. Editing an investment and changing it to ANOTHER existing asset.
                     const existingData = newDocSnap.data() as Investment;
                     const newAmount = existingData.amount + data.amount;
                     
@@ -223,8 +219,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 } else { 
                     // This handles:
                     // 1. Creating a brand new investment.
-                    // 2. Editing an existing investment (overwriting its data).
-                    // 3. Creating a new investment record after an edit changed the asset.
+                    // 2. Editing an existing investment (and not changing the asset).
                     transaction.set(newDocRef, dataToSave, { merge: true });
                 }
             });
@@ -324,6 +319,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 </Command>
                 {errors.id && <p className="text-sm text-destructive">{errors.id.message}</p>}
                  {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+                 {errors.symbol && <p className="text-sm text-destructive">{errors.symbol.message}</p>}
             </div>
             
             <div>
