@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useForm, SubmitHandler, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -109,7 +109,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         setSelectedAsset(null);
     }, [assetType, setValue]);
 
-    const handleSelectAsset = (asset: AssetSearchResult) => {
+    const handleSelectAsset = useCallback((asset: AssetSearchResult) => {
         if ('symbol' in asset && assetType === 'stock') {
             const stockAsset = asset as StockSearchResult;
             const upperCaseSymbol = stockAsset.symbol.toUpperCase();
@@ -127,7 +127,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             setValue('name', cryptoAsset.name);
             setValue('coinGeckoId', cryptoAsset.id, { shouldValidate: true });
         }
-    };
+    }, [assetType, setValue]);
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         setIsLoading(true);
@@ -203,6 +203,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                         onValueChange={field.onChange} 
                         value={field.value} 
                         className="grid grid-cols-2 gap-4"
+                        disabled={!!investment}
                     >
                         <div>
                             <RadioGroupItem value="crypto" id="crypto" className="peer sr-only" />
@@ -222,6 +223,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     assetType={assetType}
                     selectedAsset={selectedAsset}
                     onSelectAsset={handleSelectAsset}
+                    disabled={!!investment}
                 />
                 {errors.id && <p className="text-sm text-destructive">{errors.id.message}</p>}
                 {errors.coinGeckoId && <p className="text-sm text-destructive">{errors.coinGeckoId.message}</p>}
