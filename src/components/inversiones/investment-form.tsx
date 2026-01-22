@@ -72,10 +72,10 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
 
     useEffect(() => {
         if (investment) {
-            const initialAsset = { 
+            const initialAsset: AssetSearchResult = { 
                 symbol: investment.symbol, 
                 name: investment.name, 
-                id: investment.coinGeckoId || investment.id 
+                id: investment.assetType === 'crypto' ? (investment.coinGeckoId || '') : investment.symbol
             };
             reset({
                 id: investment.id,
@@ -86,7 +86,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 purchaseDate: new Date(investment.purchaseDate),
                 coinGeckoId: investment.coinGeckoId,
             });
-            setSelectedAsset(initialAsset as AssetSearchResult);
+            setSelectedAsset(initialAsset);
         } else {
              reset({
                 id: '',
@@ -101,21 +101,19 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         }
     }, [investment, reset]);
 
-    // Reset form fields when asset type changes
     useEffect(() => {
-        // Don't reset if editing an existing investment
-        if (investment) return;
-
-        handleSelectAsset(null);
-    }, [assetType, investment, setValue]);
+        if (!investment) {
+            handleSelectAsset(null);
+        }
+    }, [assetType, investment]);
 
 
     const handleSelectAsset = useCallback((asset: AssetSearchResult | null) => {
+        setSelectedAsset(asset); 
         if (asset) {
             if ('symbol' in asset && assetType === 'stock') {
                 const stockAsset = asset as StockSearchResult;
                 const upperCaseSymbol = stockAsset.symbol.toUpperCase();
-                setSelectedAsset({ ...stockAsset, symbol: upperCaseSymbol, id: upperCaseSymbol });
                 setValue('id', upperCaseSymbol, { shouldValidate: true });
                 setValue('symbol', upperCaseSymbol);
                 setValue('name', stockAsset.name);
@@ -123,15 +121,12 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             } else if ('id' in asset && assetType === 'crypto') {
                 const cryptoAsset = asset as CryptoSearchResult;
                 const upperCaseSymbol = cryptoAsset.symbol.toUpperCase();
-                setSelectedAsset({ ...cryptoAsset, symbol: upperCaseSymbol });
                 setValue('id', cryptoAsset.id, { shouldValidate: true });
                 setValue('symbol', upperCaseSymbol);
                 setValue('name', cryptoAsset.name);
                 setValue('coinGeckoId', cryptoAsset.id, { shouldValidate: true });
             }
         } else {
-            // Clear fields if asset is null
-            setSelectedAsset(null);
             setValue('id', '', { shouldValidate: true });
             setValue('symbol', '');
             setValue('name', '');
@@ -166,10 +161,8 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     oldDocRef = doc(collectionRef, investment.id);
                 }
 
-                // --- READS FIRST ---
                 const newDocSnap = await transaction.get(newDocRef);
                 
-                // --- WRITES AFTER ---
                 if (oldDocRef) {
                     transaction.delete(oldDocRef);
                 }

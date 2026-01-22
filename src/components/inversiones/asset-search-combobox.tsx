@@ -1,18 +1,10 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
-import { Check, ChevronsUpDown } from 'lucide-react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '../ui/button';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '../ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Input } from '../ui/input';
+import { Card } from '../ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { searchStocks } from '@/ai/flows/stock-search';
 import { searchCryptos } from '@/ai/flows/crypto-search';
@@ -53,17 +45,16 @@ export function AssetSearchCombobox({
   disabled,
 }: AssetSearchComboboxProps) {
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
-  const [stockResults, setStockResults] = useState<StockSearchResult[]>([]);
-  const [cryptoResults, setCryptoResults] = useState<CryptoSearchResult[]>([]);
+  const [results, setResults] = useState<AssetSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isListVisible, setIsListVisible] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   const searchAssets = useCallback(
     async (query: string) => {
       if (query.length < 1) {
-        setStockResults([]);
-        setCryptoResults([]);
+        setResults([]);
         setIsSearching(false);
         return;
       }
@@ -71,21 +62,19 @@ export function AssetSearchCombobox({
       try {
         if (assetType === 'stock') {
           const response = await searchStocks({ query });
-          setStockResults(
+          setResults(
             response.results.filter((r) => !r.symbol.includes(':') && !r.symbol.includes('.')) || []
           );
-          setCryptoResults([]);
         } else {
           const response = await searchCryptos({ query });
-          setCryptoResults(response.results || []);
-          setStockResults([]);
+          setResults(response.results || []);
         }
       } catch (error) {
         console.error('Failed to search assets:', error);
         if ((error as Error).message?.includes('429')) {
              toast({
                 title: 'Límite de API alcanzado',
-                description: 'Demasiadas búsquedas rápidas. Por favor, espera un momento y vuelve a intentarlo.',
+                description: 'Demasiadas búsquedas rápidas. Espera un momento.',
                 variant: 'destructive',
             });
         } else {
@@ -95,8 +84,7 @@ export function AssetSearchCombobox({
                 variant: 'destructive',
             });
         }
-        setStockResults([]);
-        setCryptoResults([]);
+        setResults([]);
       } finally {
         setIsSearching(false);
       }
@@ -106,68 +94,80 @@ export function AssetSearchCombobox({
 
   const debouncedSearch = useCallback(debounce(searchAssets, 500), [searchAssets]);
 
-  const results = assetType === 'stock' ? stockResults : cryptoResults;
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setInputValue(query);
+    onSelectAsset(null); // Clear selection when user types
+    if (query) {
+      setIsListVisible(true);
+      debouncedSearch(query);
+    } else {
+      setIsListVisible(false);
+      setResults([]);
+    }
+  };
 
   const handleSelect = (asset: AssetSearchResult) => {
     onSelectAsset(asset);
-    setInputValue('');
-    setOpen(false);
+    setInputValue(`${asset.name} (${asset.symbol.toUpperCase()})`);
+    setIsListVisible(false);
   };
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setIsListVisible(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (selectedAsset) {
+        setInputValue(`${selectedAsset.name} (${selectedAsset.symbol.toUpperCase()})`);
+    } else {
+        setInputValue('');
+    }
+  }, [selectedAsset]);
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between"
-          disabled={disabled}
-        >
-          {selectedAsset
-            ? `${selectedAsset.name} (${selectedAsset.symbol.toUpperCase()})`
-            : 'Busca y selecciona un activo...'}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder="Busca un activo..."
-            value={inputValue}
-            onValueChange={(query) => {
-              setInputValue(query);
-              debouncedSearch(query);
-            }}
-          />
-          <CommandList>
-            {isSearching && <div className="p-4 text-sm text-center">Buscando...</div>}
+    <div className="relative" ref={searchContainerRef}>
+      <Input
+        placeholder="Busca un activo..."
+        value={inputValue}
+        onChange={handleInputChange}
+        onFocus={() => { if (inputValue && results.length > 0) setIsListVisible(true); }}
+        disabled={disabled}
+        autoComplete="off"
+      />
+      {isListVisible && (
+        <Card className="absolute top-full z-10 mt-1 w-full max-h-60 overflow-y-auto p-2">
+            {isSearching && <div className="p-2 text-sm text-center text-muted-foreground flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin"/> Buscando...</div>}
             {!isSearching && results.length === 0 && inputValue.length > 1 && (
-              <CommandEmpty>No se encontraron resultados.</CommandEmpty>
+              <div className="p-2 text-sm text-center text-muted-foreground">No se encontraron resultados.</div>
             )}
             {!isSearching && results.length > 0 && (
-              <CommandGroup>
-                {results.map((asset) => (
-                  <CommandItem
-                    key={(asset as any).id || (asset as any).symbol}
-                    value={`${asset.name} ${asset.symbol}`}
-                    onSelect={() => handleSelect(asset)}
-                  >
-                    <Check
-                      className={cn(
-                        'mr-2 h-4 w-4',
-                        selectedAsset?.name === asset.name ? 'opacity-100' : 'opacity-0'
-                      )}
-                    />
-                    {asset.name}
-                    <span className="ml-2 text-muted-foreground">{asset.symbol.toUpperCase()}</span>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
+                <ul className="space-y-1">
+                    {results.map((asset) => (
+                        <li
+                            key={(asset as any).id || (asset as any).symbol}
+                            className="flex cursor-pointer items-center justify-between rounded-md p-2 text-sm hover:bg-accent"
+                            onMouseDown={() => handleSelect(asset)} // Use onMouseDown to fire before input blur
+                        >
+                            <span>
+                                {asset.name}
+                                <span className="ml-2 text-muted-foreground">{asset.symbol.toUpperCase()}</span>
+                            </span>
+                            {selectedAsset?.name === asset.name && <Check className="h-4 w-4" />}
+                        </li>
+                    ))}
+                </ul>
             )}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+        </Card>
+      )}
+    </div>
   );
 }
