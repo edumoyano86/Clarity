@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Investment, PortfolioDataPoint, PriceHistory } from '@/lib/definitions';
-import { subDays, startOfDay, getUnixTime, isAfter, differenceInDays, addDays } from 'date-fns';
+import { subDays, startOfDay, getUnixTime, isAfter, differenceInDays, addDays, min } from 'date-fns';
 import { getCryptoPriceHistory } from '@/ai/flows/crypto-price-history';
 import { getStockPriceHistory } from '@/ai/flows/stock-price-history';
 import { getCryptoPrices } from '@/ai/flows/crypto-prices';
@@ -70,13 +70,11 @@ export function useDashboardPortfolio(
             // 3. Fetch history for the chart
             const chartPeriodStartDate = startOfDay(subDays(new Date(), period -1));
             const earliestPurchaseDate = investments.reduce((earliest, inv) => 
-                (inv.purchaseDate && inv.purchaseDate < earliest) ? inv.purchaseDate : earliest, 
-                Date.now()
+                min([earliest, new Date(inv.purchaseDate)]), 
+                new Date()
             );
 
-            const historyFetchStartDate = isAfter(new Date(earliestPurchaseDate), chartPeriodStartDate) 
-                ? chartPeriodStartDate
-                : startOfDay(new Date(earliestPurchaseDate));
+            const historyFetchStartDate = min([earliestPurchaseDate, chartPeriodStartDate]);
 
             const endDate = new Date();
             const startTimestamp = getUnixTime(historyFetchStartDate);
@@ -93,7 +91,7 @@ export function useDashboardPortfolio(
                     console.warn(`Dashboard: Could not fetch stock history for ${symbol}:`, e)
                     historyResults.push({ id: symbol, data: {} });
                 }
-                await delay(2100); // Avoid Finnhub rate limit
+                await delay(5100); // Avoid Finnhub rate limit
             }
 
             for (const id of cryptoIds) {
@@ -104,7 +102,7 @@ export function useDashboardPortfolio(
                     console.warn(`Dashboard: Could not fetch crypto history for ${id}:`, e)
                     historyResults.push({ id: id, data: {} });
                 }
-                await delay(2100); // Avoid CoinGecko rate limit
+                await delay(5100); // Avoid CoinGecko rate limit
             }
             
             const tempPriceHistory: PriceHistory = new Map();
@@ -112,8 +110,6 @@ export function useDashboardPortfolio(
                 const pricesMap = new Map<string, number>();
                 if (res.data) {
                     Object.entries(res.data).forEach(([dateStr, price]) => {
-                        // The dateStr from the flow is already the correct 'YYYY-MM-DD' UTC string.
-                        // Do not convert it again, as it can cause timezone-related-off-by-one errors.
                         pricesMap.set(dateStr, price);
                     });
                 }

@@ -57,7 +57,7 @@ const stockPricesFlow = ai.defineFlow(
             console.warn(`No current price data for symbol: ${symbol}`, data);
         }
          // To avoid rate limiting on free tier
-        await delay(2100);
+        await delay(5100);
       } catch (error) {
         console.error(`Error fetching price for ${symbol}:`, error);
         // Do not throw here, just log and continue

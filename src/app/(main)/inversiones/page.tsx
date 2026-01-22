@@ -10,7 +10,7 @@ import { getCryptoPriceHistory } from '@/ai/flows/crypto-price-history';
 import { getCryptoPrices } from '@/ai/flows/crypto-prices';
 import { getStockPrices } from '@/ai/flows/stock-prices';
 import { useToast } from '@/hooks/use-toast';
-import { subDays, startOfDay, getUnixTime, isAfter, differenceInDays, addDays, format as formatDate } from 'date-fns';
+import { subDays, startOfDay, getUnixTime, isAfter, differenceInDays, addDays, format as formatDate, min } from 'date-fns';
 
 export type PortfolioPeriod = 7 | 30 | 90;
 
@@ -119,13 +119,11 @@ export default function InversionesPage() {
                 // 3. Fetch Price History
                 const chartPeriodStartDate = startOfDay(subDays(new Date(), period -1));
                 const earliestPurchaseDate = investments.reduce((earliest, inv) => 
-                    (inv.purchaseDate && inv.purchaseDate < earliest) ? inv.purchaseDate : earliest, 
-                    Date.now()
+                    min([earliest, new Date(inv.purchaseDate)]), 
+                    new Date()
                 );
 
-                const historyFetchStartDate = isAfter(new Date(earliestPurchaseDate), chartPeriodStartDate) 
-                    ? chartPeriodStartDate
-                    : startOfDay(new Date(earliestPurchaseDate));
+                const historyFetchStartDate = min([earliestPurchaseDate, chartPeriodStartDate]);
                 
                 const endDate = new Date();
                 const startTimestamp = getUnixTime(historyFetchStartDate);
@@ -148,7 +146,7 @@ export default function InversionesPage() {
                             console.warn(`Could not fetch history for ${asset.id}:`, e)
                             historyResults.push({ id: asset.id, data: {} });
                         }
-                        await new Promise(resolve => setTimeout(resolve, 2100)); // Rate limit delay
+                        await new Promise(resolve => setTimeout(resolve, 5100)); // Rate limit delay
                     }
                 };
 
@@ -159,8 +157,6 @@ export default function InversionesPage() {
                     const pricesMap = new Map<string, number>();
                     if (res.data) {
                         Object.entries(res.data).forEach(([dateStr, price]) => {
-                            // The dateStr from the flow is already the correct 'YYYY-MM-DD' UTC string.
-                            // Do not convert it again, as it can cause timezone-related-off-by-one errors.
                             pricesMap.set(dateStr, price);
                         });
                     }
