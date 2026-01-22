@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm, SubmitHandler, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { CalendarIcon, Loader2, Check, ChevronsUpDown } from 'lucide-react';
+import { CalendarIcon, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Calendar } from '../ui/calendar';
 import { cn } from '@/lib/utils';
@@ -18,23 +18,11 @@ import { useFirestore } from '@/firebase';
 import { collection, doc, runTransaction, DocumentReference } from 'firebase/firestore';
 import { Investment } from '@/lib/definitions';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
-import { searchStocks } from '@/ai/flows/stock-search';
-import { searchCryptos } from '@/ai/flows/crypto-search';
+import { AssetSearchCombobox, type AssetSearchResult, type CryptoSearchResult, type StockSearchResult } from './asset-search-combobox';
 
-interface StockSearchResult {
-    symbol: string;
-    name: string;
-}
-
-interface CryptoSearchResult {
-    id: string; // coingecko id
-    symbol: string; // e.g. btc
-    name: string;
-}
 
 const InvestmentSchema = z.object({
-    id: z.string().min(1, 'Debes buscar y seleccionar un activo de la lista.'),
+    id: z.string().optional(),
     assetType: z.enum(['crypto', 'stock'], { required_error: 'Debes seleccionar un tipo de activo.' }),
     symbol: z.string().min(1, 'Símbolo del activo es requerido.'),
     name: z.string().min(1, 'El nombre del activo es requerido'),
@@ -42,6 +30,13 @@ const InvestmentSchema = z.object({
     purchaseDate: z.date({ required_error: 'La fecha de compra es requerida.' }),
     coinGeckoId: z.string().optional(),
 }).superRefine((data, ctx) => {
+    if (!data.id) {
+         ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['id'],
+            message: 'Debes buscar y seleccionar un activo de la lista.',
+        });
+    }
     if (data.assetType === 'crypto' && (!data.coinGeckoId || data.coinGeckoId.length === 0)) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -60,26 +55,11 @@ interface InvestmentFormProps {
     onFormSuccess: () => void;
 }
 
-function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
-  let timeout: ReturnType<typeof setTimeout> | null = null;
-  const debounced = (...args: Parameters<F>) => {
-    if (timeout) clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), waitFor);
-  };
-  return debounced as (...args: Parameters<F>) => void;
-}
-
 export function InvestmentForm({ userId, investment, onFormSuccess }: InvestmentFormProps) {
     const { toast } = useToast();
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = useState(false);
-    
-    const [searchQuery, setSearchQuery] = useState('');
-    const [stockResults, setStockResults] = useState<StockSearchResult[]>([]);
-    const [cryptoResults, setCryptoResults] = useState<CryptoSearchResult[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
-    const [selectedAsset, setSelectedAsset] = useState<StockSearchResult | CryptoSearchResult | null>(null);
-    const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+    const [selectedAsset, setSelectedAsset] = useState<AssetSearchResult | null>(null);
 
     const { register, handleSubmit, formState: { errors }, control, reset, watch, setValue } = useForm<FormValues>({
         resolver: zodResolver(InvestmentSchema),
@@ -90,38 +70,13 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
 
     const assetType = watch('assetType');
 
-    const searchAssets = useCallback(async (query: string) => {
-        if (query.length < 1) {
-            setStockResults([]);
-            setCryptoResults([]);
-            setIsSearching(false);
-            return;
-        }
-        setIsSearching(true);
-        try {
-            if (assetType === 'stock') {
-                const response = await searchStocks({ query });
-                setStockResults(response.results.filter(r => !r.symbol.includes(':') && !r.symbol.includes('.')) || []);
-                setCryptoResults([]);
-            } else {
-                const response = await searchCryptos({ query });
-                setCryptoResults(response.results || []);
-                setStockResults([]);
-            }
-        } catch (error) {
-            console.error("Failed to search assets:", error);
-            toast({ title: 'Error de Búsqueda', description: 'No se pudieron obtener resultados.', variant: 'destructive'});
-            setStockResults([]);
-            setCryptoResults([]);
-        } finally {
-            setIsSearching(false);
-        }
-    }, [assetType, toast]);
-
-    const debouncedSearch = useCallback(debounce(searchAssets, 300), [searchAssets]);
-
     useEffect(() => {
         if (investment) {
+            const initialAsset = { 
+                symbol: investment.symbol, 
+                name: investment.name, 
+                id: investment.coinGeckoId || investment.id 
+            };
             reset({
                 id: investment.id,
                 assetType: investment.assetType,
@@ -131,9 +86,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 purchaseDate: new Date(investment.purchaseDate),
                 coinGeckoId: investment.coinGeckoId,
             });
-            setSelectedAsset({ symbol: investment.symbol, name: investment.name, id: investment.coinGeckoId || investment.id });
-            setSearchQuery('');
-            setIsPopoverOpen(false);
+            setSelectedAsset(initialAsset as AssetSearchResult);
         } else {
              reset({
                 id: '',
@@ -145,7 +98,6 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 coinGeckoId: '',
             });
             setSelectedAsset(null);
-            setSearchQuery('');
         }
     }, [investment, reset]);
 
@@ -155,10 +107,27 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         setValue('name', '');
         setValue('coinGeckoId', '');
         setSelectedAsset(null);
-        setSearchQuery('');
-        setStockResults([]);
-        setCryptoResults([]);
     }, [assetType, setValue]);
+
+    const handleSelectAsset = (asset: AssetSearchResult) => {
+        if ('symbol' in asset && assetType === 'stock') {
+            const stockAsset = asset as StockSearchResult;
+            const upperCaseSymbol = stockAsset.symbol.toUpperCase();
+            setSelectedAsset({ ...stockAsset, symbol: upperCaseSymbol, id: upperCaseSymbol });
+            setValue('id', upperCaseSymbol, { shouldValidate: true });
+            setValue('symbol', upperCaseSymbol);
+            setValue('name', stockAsset.name);
+            setValue('coinGeckoId', '');
+        } else if ('id' in asset && assetType === 'crypto') {
+            const cryptoAsset = asset as CryptoSearchResult;
+            const upperCaseSymbol = cryptoAsset.symbol.toUpperCase();
+            setSelectedAsset({ ...cryptoAsset, symbol: upperCaseSymbol });
+            setValue('id', cryptoAsset.id, { shouldValidate: true });
+            setValue('symbol', upperCaseSymbol);
+            setValue('name', cryptoAsset.name);
+            setValue('coinGeckoId', cryptoAsset.id, { shouldValidate: true });
+        }
+    };
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         setIsLoading(true);
@@ -187,8 +156,10 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     oldDocRef = doc(collectionRef, investment.id);
                 }
 
+                // --- READS FIRST ---
                 const newDocSnap = await transaction.get(newDocRef);
-
+                
+                // --- WRITES AFTER ---
                 if (oldDocRef) {
                     transaction.delete(oldDocRef);
                 }
@@ -220,27 +191,6 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             setIsLoading(false);
         }
     };
-    
-    const handleSelectAsset = (asset: StockSearchResult | CryptoSearchResult) => {
-        if ('symbol' in asset && assetType === 'stock') {
-            const upperCaseSymbol = asset.symbol.toUpperCase();
-            setSelectedAsset({ ...asset, id: upperCaseSymbol });
-            setValue('id', upperCaseSymbol);
-            setValue('symbol', upperCaseSymbol);
-            setValue('name', asset.name);
-            setValue('coinGeckoId', '');
-        } else if ('id' in asset && assetType === 'crypto') {
-            const cryptoAsset = asset as CryptoSearchResult;
-            const upperCaseSymbol = cryptoAsset.symbol.toUpperCase();
-            setSelectedAsset(cryptoAsset);
-            setValue('id', cryptoAsset.id);
-            setValue('symbol', upperCaseSymbol);
-            setValue('name', cryptoAsset.name);
-            setValue('coinGeckoId', cryptoAsset.id);
-        }
-        setIsPopoverOpen(false);
-        setSearchQuery('');
-    };
 
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -251,9 +201,8 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 render={({ field }) => (
                     <RadioGroup 
                         onValueChange={field.onChange} 
-                        defaultValue={field.value} 
+                        value={field.value} 
                         className="grid grid-cols-2 gap-4"
-                        disabled={!!investment}
                     >
                         <div>
                             <RadioGroupItem value="crypto" id="crypto" className="peer sr-only" />
@@ -269,60 +218,13 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
 
             <div>
                 <Label htmlFor="asset-search">Activo</Label>
-                <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-                    <PopoverTrigger asChild>
-                        <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={isPopoverOpen}
-                        className="w-full justify-between"
-                        disabled={!!investment}
-                        >
-                        {selectedAsset
-                            ? `${selectedAsset.name} (${selectedAsset.symbol.toUpperCase()})`
-                            : "Busca y selecciona un activo..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                        <Command shouldFilter={false}>
-                            <CommandInput
-                                placeholder={assetType === 'crypto' ? "Busca cripto (ej: bitcoin)..." : "Busca acción (ej: AAPL)..."}
-                                value={searchQuery}
-                                onValueChange={(query) => {
-                                    setSearchQuery(query);
-                                    debouncedSearch(query);
-                                }}
-                            />
-                            <CommandList>
-                                {isSearching ? (
-                                    <CommandEmpty>Buscando...</CommandEmpty>
-                                ) : (stockResults.length > 0 || cryptoResults.length > 0) ? (
-                                    <CommandGroup>
-                                        {(assetType === 'stock' ? stockResults : cryptoResults).map((asset) => (
-                                            <CommandItem
-                                                key={(asset as any).id || (asset as any).symbol}
-                                                value={asset.name}
-                                                onSelect={() => handleSelectAsset(asset)}
-                                            >
-                                                <Check
-                                                className={cn(
-                                                    "mr-2 h-4 w-4",
-                                                    selectedAsset?.name === asset.name ? "opacity-100" : "opacity-0"
-                                                )}
-                                                />
-                                                {asset.name} ({(asset.symbol || '').toUpperCase()})
-                                            </CommandItem>
-                                        ))}
-                                    </CommandGroup>
-                                ) : (
-                                    searchQuery.length > 1 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>
-                                )}
-                            </CommandList>
-                        </Command>
-                    </PopoverContent>
-                </Popover>
+                <AssetSearchCombobox
+                    assetType={assetType}
+                    selectedAsset={selectedAsset}
+                    onSelectAsset={handleSelectAsset}
+                />
                 {errors.id && <p className="text-sm text-destructive">{errors.id.message}</p>}
+                {errors.coinGeckoId && <p className="text-sm text-destructive">{errors.coinGeckoId.message}</p>}
                 {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
                 {errors.symbol && <p className="text-sm text-destructive">{errors.symbol.message}</p>}
             </div>
