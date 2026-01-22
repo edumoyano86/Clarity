@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
@@ -43,7 +44,7 @@ export interface FirebaseServicesAndUser {
 }
 
 // Return type for useUser() - specific to user auth state
-export interface UserHookResult { // Renamed from UserAuthHookResult for consistency if desired, or keep as UserAuthHookResult
+export interface UserHookResult {
   user: User | null;
   isUserLoading: boolean;
   userError: Error | null;
@@ -152,6 +153,22 @@ export const useFirestore = (): Firestore => {
 export const useFirebaseApp = (): FirebaseApp => {
   const { firebaseApp } = useFirebase();
   return firebaseApp;
+};
+
+/**
+ * Hook to access user authentication state.
+ * This is the canonical way to get user info.
+ */
+export const useUser = (): UserHookResult => {
+  const context = useContext(FirebaseContext);
+  if (context === undefined) {
+    throw new Error("useUser must be used within a FirebaseProvider.");
+  }
+  return {
+    user: context.user,
+    isUserLoading: context.isUserLoading,
+    userError: context.userError,
+  };
 };
 
 type MemoFirebase <T> = T & {__memo?: boolean};

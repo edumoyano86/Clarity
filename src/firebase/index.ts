@@ -1,3 +1,4 @@
+
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
@@ -31,15 +32,13 @@ export {
   useAuth,
   useFirestore,
   useFirebaseApp,
+  useUser,
   useMemoFirebase,
-  type FirebaseContextState,
-  type FirebaseServicesAndUser,
-  type UserHookResult,
 } from './provider';
+export type { FirebaseContextState, FirebaseServicesAndUser, UserHookResult } from './provider';
 export { FirebaseClientProvider } from './client-provider';
 export { useCollection, type UseCollectionResult, type WithId } from './firestore/use-collection';
 export { useDoc, type UseDocResult } from './firestore/use-doc';
-export { useUser } from './auth/use-user';
 export {
   setDocumentNonBlocking,
   addDocumentNonBlocking,
