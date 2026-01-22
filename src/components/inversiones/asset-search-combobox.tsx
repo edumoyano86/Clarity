@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Button } from '../ui/button';
 import { Check, ChevronsUpDown } from 'lucide-react';
@@ -46,6 +46,7 @@ export function AssetSearchCombobox({ assetType, selectedAsset, onSelectAsset, d
     const [stockResults, setStockResults] = useState<StockSearchResult[]>([]);
     const [cryptoResults, setCryptoResults] = useState<CryptoSearchResult[]>([]);
     const [isSearching, setIsSearching] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     const searchAssets = useCallback(async (query: string) => {
         if (query.length < 1) {
@@ -96,7 +97,7 @@ export function AssetSearchCombobox({ assetType, selectedAsset, onSelectAsset, d
     const results = assetType === 'stock' ? stockResults : cryptoResults;
 
     return (
-        <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+        <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen} modal={true}>
             <PopoverTrigger asChild>
                 <Button
                     variant="outline"
@@ -113,10 +114,14 @@ export function AssetSearchCombobox({ assetType, selectedAsset, onSelectAsset, d
             </PopoverTrigger>
             <PopoverContent
                 className="w-[--radix-popover-trigger-width] p-0"
-                onOpenAutoFocus={(e) => e.preventDefault()}
+                onOpenAutoFocus={(e) => {
+                    e.preventDefault();
+                    inputRef.current?.focus();
+                }}
             >
                 <Command shouldFilter={false}>
                     <CommandInput
+                        ref={inputRef}
                         placeholder={assetType === 'crypto' ? "Busca cripto (ej: bitcoin)..." : "Busca acción (ej: AAPL)..."}
                         value={searchQuery}
                         onValueChange={(query) => {
