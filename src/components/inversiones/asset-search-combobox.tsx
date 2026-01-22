@@ -96,7 +96,7 @@ export function AssetSearchCombobox({ assetType, selectedAsset, onSelectAsset, d
     const results = assetType === 'stock' ? stockResults : cryptoResults;
 
     return (
-        <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+        <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen} modal={true}>
             <PopoverTrigger asChild>
                 <Button
                     variant="outline"
@@ -113,9 +113,6 @@ export function AssetSearchCombobox({ assetType, selectedAsset, onSelectAsset, d
             </PopoverTrigger>
             <PopoverContent 
                 className="w-[--radix-popover-trigger-width] p-0"
-                onOpenAutoFocus={(e) => {
-                    e.preventDefault();
-                }}
             >
                 <Command shouldFilter={false}>
                     <CommandInput
