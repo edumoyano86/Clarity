@@ -111,7 +111,12 @@ export function AssetSearchCombobox({ assetType, selectedAsset, onSelectAsset, d
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+            <PopoverContent 
+                className="w-[--radix-popover-trigger-width] p-0"
+                onOpenAutoFocus={(e) => {
+                    e.preventDefault();
+                }}
+            >
                 <Command shouldFilter={false}>
                     <CommandInput
                         placeholder={assetType === 'crypto' ? "Busca cripto (ej: bitcoin)..." : "Busca acción (ej: AAPL)..."}
