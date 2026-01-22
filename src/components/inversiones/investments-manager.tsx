@@ -8,7 +8,7 @@ import { ManagerPage } from '../shared/manager-page';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { InvestmentForm } from './investment-form';
 import { Button } from '../ui/button';
-import { Edit, Trash2, TrendingUp, TrendingDown, Loader2, DollarSign, AlertCircle } from 'lucide-react';
+import { Edit, Trash2, TrendingUp, TrendingDown, Loader2, DollarSign, AlertCircle, Info } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useFirestore } from '@/firebase';
 import { deleteDoc, doc } from 'firebase/firestore';
@@ -249,7 +249,21 @@ export function InvestmentsManager({
                                         <TableHead>Precio de Compra</TableHead>
                                         <TableHead>Valor de Compra</TableHead>
                                         <TableHead>Valor Actual</TableHead>
-                                        <TableHead>G/P</TableHead>
+                                        <TableHead>
+                                            <div className="flex items-center gap-1">
+                                                G/P
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Info className="h-3 w-3 cursor-help text-muted-foreground" />
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>Ganancia / Pérdida total desde la fecha de compra.</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            </div>
+                                        </TableHead>
                                         <TableHead className='text-right'>Acciones</TableHead>
                                     </TableRow>
                                 </TableHeader>

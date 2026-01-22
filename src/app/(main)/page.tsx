@@ -172,7 +172,7 @@ export default function DashboardPage() {
     { key: 'ano_actual', label: 'Este Año' },
   ];
 
-  const isLoading = isUserLoading || loadingTransactions || loadingCategorias || loadingInvestments || loadingAccounts || isLoadingHistory;
+  const isLoading = isUserLoading || loadingTransactions || loadingCategorias || loadingInvestments || loadingAccounts;
 
   if (isLoading) {
     return <div className="flex h-full items-center justify-center"><p>Cargando...</p></div>

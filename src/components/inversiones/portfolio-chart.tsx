@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -6,10 +5,11 @@ import { Area, AreaChart, CartesianGrid, Tooltip, XAxis, YAxis } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { type ChartConfig, ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { PortfolioDataPoint } from '@/lib/definitions';
-import { Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '../ui/button';
 import { PortfolioPeriod } from '@/app/(main)/inversiones/page';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 
 interface PortfolioChartProps {
@@ -68,8 +68,17 @@ export function PortfolioChart({ chartData, totalValue, isLoading, period, setPe
             <CardContent>
                 <ChartContainer config={chartConfig} className="h-[350px] w-full">
                     {isLoading && (
-                        <div className="flex h-full items-center justify-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                        <div className="flex h-full w-full items-center justify-center">
+                            <div className="flex flex-col items-center justify-center gap-4 rounded-lg bg-background p-6 text-center shadow-sm">
+                                <Alert className="max-w-sm">
+                                    <AlertCircle className="h-4 w-4" />
+                                    <AlertTitle>Cargando Datos del Mercado</AlertTitle>
+                                    <AlertDescription>
+                                        Para darte datos precisos, consultamos APIs externas con límites de uso. La carga inicial puede demorar unos segundos. <br/> Agradecemos tu paciencia.
+                                    </AlertDescription>
+                                </Alert>
+                                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mt-4" />
+                            </div>
                         </div>
                     )}
                     {!isLoading && hasData ? (
