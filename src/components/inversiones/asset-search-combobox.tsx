@@ -1,9 +1,7 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Button } from '../ui/button';
-import { Check, ChevronsUpDown } from 'lucide-react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { Check } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { useToast } from '@/hooks/use-toast';
 import { searchStocks } from '@/ai/flows/stock-search';
@@ -26,7 +24,7 @@ export type AssetSearchResult = StockSearchResult | CryptoSearchResult;
 interface AssetSearchComboboxProps {
     assetType: 'crypto' | 'stock';
     selectedAsset: AssetSearchResult | null;
-    onSelectAsset: (asset: AssetSearchResult) => void;
+    onSelectAsset: (asset: AssetSearchResult | null) => void;
     disabled?: boolean;
 }
 
@@ -41,12 +39,37 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
 
 export function AssetSearchCombobox({ assetType, selectedAsset, onSelectAsset, disabled }: AssetSearchComboboxProps) {
     const { toast } = useToast();
-    const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [isListOpen, setIsListOpen] = useState(false);
+    const [inputValue, setInputValue] = useState('');
     const [stockResults, setStockResults] = useState<StockSearchResult[]>([]);
     const [cryptoResults, setCryptoResults] = useState<CryptoSearchResult[]>([]);
     const [isSearching, setIsSearching] = useState(false);
-    const inputRef = useRef<HTMLInputElement>(null);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    // Sync input value with parent's selected asset
+    useEffect(() => {
+        if (selectedAsset && !isListOpen) {
+            setInputValue(`${selectedAsset.name} (${selectedAsset.symbol.toUpperCase()})`);
+        }
+    }, [selectedAsset, isListOpen]);
+    
+    // Close list on click outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+                setIsListOpen(false);
+                // If there's no selected asset, clear the input on blur
+                if (!selectedAsset) {
+                    setInputValue('');
+                }
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [wrapperRef, selectedAsset]);
+
 
     const searchAssets = useCallback(async (query: string) => {
         if (query.length < 1) {
@@ -80,58 +103,37 @@ export function AssetSearchCombobox({ assetType, selectedAsset, onSelectAsset, d
 
     const handleSelect = (asset: AssetSearchResult) => {
         onSelectAsset(asset);
-        setIsPopoverOpen(false);
-        setSearchQuery('');
+        setIsListOpen(false);
     };
-
-    // Reset search when popover closes
-    React.useEffect(() => {
-        if (!isPopoverOpen) {
-            setSearchQuery('');
-            setStockResults([]);
-            setCryptoResults([]);
-            setIsSearching(false);
-        }
-    }, [isPopoverOpen]);
 
     const results = assetType === 'stock' ? stockResults : cryptoResults;
 
     return (
-        <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-            <PopoverTrigger asChild>
-                <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={isPopoverOpen}
-                    className="w-full justify-between"
-                    disabled={disabled}
-                >
-                    {selectedAsset
-                        ? `${selectedAsset.name} (${selectedAsset.symbol.toUpperCase()})`
-                        : "Busca y selecciona un activo..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent
-                className="w-[--radix-popover-trigger-width] p-0"
-                onOpenAutoFocus={(e) => {
-                    e.preventDefault();
-                    inputRef.current?.focus();
+        <Command ref={wrapperRef} shouldFilter={false} className="relative overflow-visible">
+            <CommandInput
+                placeholder="Busca y selecciona un activo..."
+                disabled={disabled}
+                value={inputValue}
+                onValueChange={(query) => {
+                    setInputValue(query);
+                    debouncedSearch(query);
+                     if (query === '') {
+                        onSelectAsset(null);
+                    }
                 }}
-            >
-                <Command shouldFilter={false}>
-                    <CommandInput
-                        ref={inputRef}
-                        placeholder={assetType === 'crypto' ? "Busca cripto (ej: bitcoin)..." : "Busca acción (ej: AAPL)..."}
-                        value={searchQuery}
-                        onValueChange={(query) => {
-                            setSearchQuery(query);
-                            debouncedSearch(query);
-                        }}
-                    />
-                    <CommandList>
+                onFocus={() => {
+                    setIsListOpen(true)
+                    // Clear input for searching if an asset is already selected
+                    if (selectedAsset) {
+                        setInputValue('');
+                    }
+                }}
+            />
+            {isListOpen && (
+                <div className="absolute top-full z-10 mt-1 w-full">
+                    <CommandList className="rounded-md border bg-popover text-popover-foreground shadow-md">
                         {isSearching && <CommandEmpty>Buscando...</CommandEmpty>}
-                        {!isSearching && results.length === 0 && searchQuery.length > 1 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}
+                        {!isSearching && results.length === 0 && inputValue.length > 1 && <CommandEmpty>No se encontraron resultados.</CommandEmpty>}
                         {!isSearching && results.length > 0 && (
                             <CommandGroup>
                                 {results.map((asset) => (
@@ -152,8 +154,8 @@ export function AssetSearchCombobox({ assetType, selectedAsset, onSelectAsset, d
                             </CommandGroup>
                         )}
                     </CommandList>
-                </Command>
-            </PopoverContent>
-        </Popover>
+                </div>
+            )}
+        </Command>
     );
 }

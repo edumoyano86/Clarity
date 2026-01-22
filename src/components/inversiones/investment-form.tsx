@@ -101,31 +101,41 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         }
     }, [investment, reset]);
 
+    // Reset form fields when asset type changes
     useEffect(() => {
-        setValue('id', '');
-        setValue('symbol', '');
-        setValue('name', '');
-        setValue('coinGeckoId', '');
-        setSelectedAsset(null);
-    }, [assetType, setValue]);
+        // Don't reset if editing an existing investment
+        if (investment) return;
 
-    const handleSelectAsset = useCallback((asset: AssetSearchResult) => {
-        if ('symbol' in asset && assetType === 'stock') {
-            const stockAsset = asset as StockSearchResult;
-            const upperCaseSymbol = stockAsset.symbol.toUpperCase();
-            setSelectedAsset({ ...stockAsset, symbol: upperCaseSymbol, id: upperCaseSymbol });
-            setValue('id', upperCaseSymbol, { shouldValidate: true });
-            setValue('symbol', upperCaseSymbol);
-            setValue('name', stockAsset.name);
+        handleSelectAsset(null);
+    }, [assetType, investment, setValue]);
+
+
+    const handleSelectAsset = useCallback((asset: AssetSearchResult | null) => {
+        if (asset) {
+            if ('symbol' in asset && assetType === 'stock') {
+                const stockAsset = asset as StockSearchResult;
+                const upperCaseSymbol = stockAsset.symbol.toUpperCase();
+                setSelectedAsset({ ...stockAsset, symbol: upperCaseSymbol, id: upperCaseSymbol });
+                setValue('id', upperCaseSymbol, { shouldValidate: true });
+                setValue('symbol', upperCaseSymbol);
+                setValue('name', stockAsset.name);
+                setValue('coinGeckoId', '');
+            } else if ('id' in asset && assetType === 'crypto') {
+                const cryptoAsset = asset as CryptoSearchResult;
+                const upperCaseSymbol = cryptoAsset.symbol.toUpperCase();
+                setSelectedAsset({ ...cryptoAsset, symbol: upperCaseSymbol });
+                setValue('id', cryptoAsset.id, { shouldValidate: true });
+                setValue('symbol', upperCaseSymbol);
+                setValue('name', cryptoAsset.name);
+                setValue('coinGeckoId', cryptoAsset.id, { shouldValidate: true });
+            }
+        } else {
+            // Clear fields if asset is null
+            setSelectedAsset(null);
+            setValue('id', '', { shouldValidate: true });
+            setValue('symbol', '');
+            setValue('name', '');
             setValue('coinGeckoId', '');
-        } else if ('id' in asset && assetType === 'crypto') {
-            const cryptoAsset = asset as CryptoSearchResult;
-            const upperCaseSymbol = cryptoAsset.symbol.toUpperCase();
-            setSelectedAsset({ ...cryptoAsset, symbol: upperCaseSymbol });
-            setValue('id', cryptoAsset.id, { shouldValidate: true });
-            setValue('symbol', upperCaseSymbol);
-            setValue('name', cryptoAsset.name);
-            setValue('coinGeckoId', cryptoAsset.id, { shouldValidate: true });
         }
     }, [assetType, setValue]);
 
