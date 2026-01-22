@@ -145,7 +145,7 @@ export function InvestmentsManager({
                                     </div>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    <p>Activo antiguo o con datos inválidos. Edítalo y vuelve a guardarlo para ver su valor.</p>
+                                    <p>Activo con datos inválidos. Por favor, elimínalo y vuelve a crearlo para ver su valor.</p>
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
