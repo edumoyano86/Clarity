@@ -101,38 +101,40 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
         }
     }, [investment, reset]);
 
-    useEffect(() => {
-        if (!investment) {
-            handleSelectAsset(null);
-        }
-    }, [assetType, investment]);
-
-
     const handleSelectAsset = useCallback((asset: AssetSearchResult | null) => {
-        setSelectedAsset(asset); 
+        setSelectedAsset(asset);
         if (asset) {
-            if ('symbol' in asset && assetType === 'stock') {
-                const stockAsset = asset as StockSearchResult;
-                const upperCaseSymbol = stockAsset.symbol.toUpperCase();
-                setValue('id', upperCaseSymbol, { shouldValidate: true });
-                setValue('symbol', upperCaseSymbol);
-                setValue('name', stockAsset.name);
-                setValue('coinGeckoId', '');
-            } else if ('id' in asset && assetType === 'crypto') {
+            // Common properties
+            setValue('name', asset.name);
+            setValue('symbol', asset.symbol.toUpperCase());
+            
+            // Type-specific properties
+            if (assetType === 'crypto') {
+                // We can be sure it's a CryptoSearchResult because the search function depends on assetType
                 const cryptoAsset = asset as CryptoSearchResult;
-                const upperCaseSymbol = cryptoAsset.symbol.toUpperCase();
                 setValue('id', cryptoAsset.id, { shouldValidate: true });
-                setValue('symbol', upperCaseSymbol);
-                setValue('name', cryptoAsset.name);
                 setValue('coinGeckoId', cryptoAsset.id, { shouldValidate: true });
+            } else { // assetType === 'stock'
+                // We can be sure it's a StockSearchResult
+                const stockAsset = asset as StockSearchResult;
+                setValue('id', stockAsset.symbol.toUpperCase(), { shouldValidate: true });
+                setValue('coinGeckoId', ''); // Ensure this is cleared for stocks
             }
         } else {
+            // Clear all fields if asset is null
             setValue('id', '', { shouldValidate: true });
             setValue('symbol', '');
             setValue('name', '');
             setValue('coinGeckoId', '');
         }
     }, [assetType, setValue]);
+
+    useEffect(() => {
+        if (!investment) {
+            handleSelectAsset(null);
+        }
+    }, [assetType, investment, handleSelectAsset]);
+
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         setIsLoading(true);
@@ -224,14 +226,12 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 <Label htmlFor="asset-search">Activo</Label>
                 <AssetSearchCombobox
                     assetType={assetType}
-                    selectedAsset={selectedAsset}
                     onSelectAsset={handleSelectAsset}
                     disabled={!!investment}
+                    key={assetType}
                 />
                 {errors.id && <p className="text-sm text-destructive">{errors.id.message}</p>}
                 {errors.coinGeckoId && <p className="text-sm text-destructive">{errors.coinGeckoId.message}</p>}
-                {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
-                {errors.symbol && <p className="text-sm text-destructive">{errors.symbol.message}</p>}
             </div>
             
             <div>

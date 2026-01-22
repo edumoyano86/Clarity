@@ -2,7 +2,6 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Check, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { Input } from '../ui/input';
 import { Card } from '../ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -24,7 +23,6 @@ export type AssetSearchResult = StockSearchResult | CryptoSearchResult;
 
 interface AssetSearchComboboxProps {
   assetType: 'crypto' | 'stock';
-  selectedAsset: AssetSearchResult | null;
   onSelectAsset: (asset: AssetSearchResult | null) => void;
   disabled?: boolean;
 }
@@ -40,7 +38,6 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
 
 export function AssetSearchCombobox({
   assetType,
-  selectedAsset,
   onSelectAsset,
   disabled,
 }: AssetSearchComboboxProps) {
@@ -125,14 +122,6 @@ export function AssetSearchCombobox({
     };
   }, []);
 
-  useEffect(() => {
-    if (selectedAsset) {
-        setInputValue(`${selectedAsset.name} (${selectedAsset.symbol.toUpperCase()})`);
-    } else {
-        setInputValue('');
-    }
-  }, [selectedAsset]);
-
   return (
     <div className="relative" ref={searchContainerRef}>
       <Input
@@ -144,7 +133,7 @@ export function AssetSearchCombobox({
         autoComplete="off"
       />
       {isListVisible && (
-        <Card className="absolute top-full z-10 mt-1 w-full max-h-60 overflow-y-auto p-2">
+        <Card className="absolute top-full z-50 mt-1 w-full max-h-60 overflow-y-auto p-2">
             {isSearching && <div className="p-2 text-sm text-center text-muted-foreground flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin"/> Buscando...</div>}
             {!isSearching && results.length === 0 && inputValue.length > 1 && (
               <div className="p-2 text-sm text-center text-muted-foreground">No se encontraron resultados.</div>
@@ -155,13 +144,13 @@ export function AssetSearchCombobox({
                         <li
                             key={(asset as any).id || (asset as any).symbol}
                             className="flex cursor-pointer items-center justify-between rounded-md p-2 text-sm hover:bg-accent"
-                            onMouseDown={() => handleSelect(asset)} // Use onMouseDown to fire before input blur
+                            onClick={() => handleSelect(asset)}
+                            onTouchEnd={(e) => { e.preventDefault(); handleSelect(asset); }} // preventDefault to avoid double event
                         >
                             <span>
                                 {asset.name}
                                 <span className="ml-2 text-muted-foreground">{asset.symbol.toUpperCase()}</span>
                             </span>
-                            {selectedAsset?.name === asset.name && <Check className="h-4 w-4" />}
                         </li>
                     ))}
                 </ul>
