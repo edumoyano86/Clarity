@@ -44,16 +44,21 @@ export function useDashboardPortfolio(
             // 2. Fetch current prices for total value
             let fetchedPrices: { [key: string]: { price: number } } = {};
             try {
-                const pricePromises = [];
-                if (cryptoIds.length > 0) pricePromises.push(getCryptoPrices({ ids: cryptoIds }));
-                if (stockSymbols.length > 0) pricePromises.push(getStockPrices({ symbols: stockSymbols }));
+                 if (cryptoIds.length > 0) {
+                    const cryptoPrices = await getCryptoPrices({ ids: cryptoIds });
+                    fetchedPrices = { ...fetchedPrices, ...cryptoPrices };
+                }
 
-                const results = await Promise.allSettled(pricePromises);
-                results.forEach(res => {
-                    if (res.status === 'fulfilled' && res.value) {
-                        fetchedPrices = { ...fetchedPrices, ...res.value };
+                for (const symbol of stockSymbols) {
+                    try {
+                        const stockPrice = await getStockPrices({ symbol });
+                        fetchedPrices = { ...fetchedPrices, ...stockPrice };
+                    } catch (e) {
+                         console.warn(`Dashboard: Could not fetch stock price for ${symbol}`, e);
                     }
-                });
+                    await new Promise(resolve => setTimeout(resolve, 2100));
+                }
+
             } catch (e) {
                 console.error("Dashboard: Failed to fetch prices", e);
             }
@@ -91,7 +96,7 @@ export function useDashboardPortfolio(
                     console.warn(`Dashboard: Could not fetch stock history for ${symbol}:`, e)
                     historyResults.push({ id: symbol, data: {} });
                 }
-                await delay(5100); // Avoid Finnhub rate limit
+                await delay(2100); // Avoid Finnhub rate limit
             }
 
             for (const id of cryptoIds) {
@@ -102,7 +107,7 @@ export function useDashboardPortfolio(
                     console.warn(`Dashboard: Could not fetch crypto history for ${id}:`, e)
                     historyResults.push({ id: id, data: {} });
                 }
-                await delay(5100); // Avoid CoinGecko rate limit
+                await delay(2100); // Avoid CoinGecko rate limit
             }
             
             const tempPriceHistory: PriceHistory = new Map();

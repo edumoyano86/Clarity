@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useFirestore, useUser, useMemoFirebase } from "@/firebase";
 import { Investment, PriceData, PortfolioDataPoint, PriceHistory } from "@/lib/definitions";
 import { InvestmentsManager } from "@/components/inversiones/investments-manager";
@@ -10,7 +10,7 @@ import { getCryptoPriceHistory } from '@/ai/flows/crypto-price-history';
 import { getCryptoPrices } from '@/ai/flows/crypto-prices';
 import { getStockPrices } from '@/ai/flows/stock-prices';
 import { useToast } from '@/hooks/use-toast';
-import { subDays, startOfDay, getUnixTime, isAfter, differenceInDays, addDays, format as formatDate, min } from 'date-fns';
+import { subDays, startOfDay, getUnixTime, isAfter, differenceInDays, addDays, min } from 'date-fns';
 
 export type PortfolioPeriod = 7 | 30 | 90;
 
@@ -91,19 +91,28 @@ export default function InversionesPage() {
                 const stockSymbols = [...new Set(stockAssets.map(i => i.symbol!))];
                 
                 let fetchedPrices: PriceData = {};
-                const pricePromises = [];
-                if (cryptoIds.length > 0) pricePromises.push(getCryptoPrices({ ids: cryptoIds }));
-                if (stockSymbols.length > 0) pricePromises.push(getStockPrices({ symbols: stockSymbols }));
                 
-                const results = await Promise.allSettled(pricePromises);
-
-                results.forEach(res => {
-                    if (res.status === 'fulfilled' && res.value) {
-                        fetchedPrices = { ...fetchedPrices, ...res.value };
-                    } else if (res.status === 'rejected') {
-                        console.warn('Partial failure fetching prices:', res.reason);
+                // Fetch crypto prices in a batch
+                if (cryptoIds.length > 0) {
+                    try {
+                        const cryptoPrices = await getCryptoPrices({ ids: cryptoIds });
+                        fetchedPrices = { ...fetchedPrices, ...cryptoPrices };
+                    } catch (e) {
+                         console.warn('Could not fetch crypto prices:', e);
                     }
-                });
+                }
+
+                // Fetch stock prices serially to avoid rate-limiting
+                for (const symbol of stockSymbols) {
+                    try {
+                        const stockPrice = await getStockPrices({ symbol });
+                        fetchedPrices = { ...fetchedPrices, ...stockPrice };
+                    } catch (e) {
+                        console.warn(`Could not fetch current price for ${symbol}:`, e);
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 2100));
+                }
+                
                 setCurrentPrices(fetchedPrices);
 
                 // 2. Calculate Total Value
@@ -146,7 +155,7 @@ export default function InversionesPage() {
                             console.warn(`Could not fetch history for ${asset.id}:`, e)
                             historyResults.push({ id: asset.id, data: {} });
                         }
-                        await new Promise(resolve => setTimeout(resolve, 5100)); // Rate limit delay
+                        await new Promise(resolve => setTimeout(resolve, 2100)); // Rate limit delay
                     }
                 };
 

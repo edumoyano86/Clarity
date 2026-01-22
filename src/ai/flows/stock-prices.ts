@@ -1,27 +1,25 @@
 'use server';
 
 /**
- * @fileOverview A Genkit flow for fetching stock prices from the Finnhub API.
+ * @fileOverview A Genkit flow for fetching a stock price from the Finnhub API.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
 const StockPricesInputSchema = z.object({
-  symbols: z.array(z.string()).describe('An array of stock ticker symbols (e.g., ["AAPL", "MSFT"]).'),
+  symbol: z.string().describe('A stock ticker symbol (e.g., "AAPL").'),
 });
 export type StockPricesInput = z.infer<typeof StockPricesInputSchema>;
 
 const PricesOutputSchema = z.record(z.object({
     price: z.number(),
-})).describe('An object where keys are symbols and values are their current prices.');
+})).describe('An object where the key is the symbol and value is its current price.');
 export type PricesOutput = z.infer<typeof PricesOutputSchema>;
 
 export async function getStockPrices(input: StockPricesInput): Promise<PricesOutput> {
   return stockPricesFlow(input);
 }
-
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const stockPricesFlow = ai.defineFlow(
   {
@@ -36,34 +34,31 @@ const stockPricesFlow = ai.defineFlow(
       throw new Error('Finnhub API key is not configured.');
     }
 
-    const results: PricesOutput = {};
-    const baseUrl = 'https://finnhub.io/api/v1/quote';
-
-    // Finnhub API requires one call per symbol for quotes
-    for (const symbol of input.symbols) {
-      if (!symbol) continue;
-      const url = `${baseUrl}?symbol=${symbol}&token=${apiKey}`;
-      try {
-        const response = await fetch(url);
-        if (!response.ok) {
-          console.warn(`Finnhub quote API request for ${symbol} failed with status ${response.status}`);
-          continue; // Continue to the next symbol
-        }
-        const data = await response.json();
-        // 'c' is the current price in the Finnhub response
-        if (typeof data.c === 'number') {
-            results[symbol] = { price: data.c };
-        } else {
-            console.warn(`No current price data for symbol: ${symbol}`, data);
-        }
-         // To avoid rate limiting on free tier
-        await delay(5100);
-      } catch (error) {
-        console.error(`Error fetching price for ${symbol}:`, error);
-        // Do not throw here, just log and continue
-      }
+    const { symbol } = input;
+    if (!symbol) {
+        return {};
     }
 
-    return results;
+    const url = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${apiKey}`;
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        // Throw an error to be handled by the client
+        throw new Error(`Finnhub API request for ${symbol} failed with status ${response.status}`);
+      }
+      const data = await response.json();
+      
+      if (typeof data.c === 'number') {
+        return { [symbol]: { price: data.c } };
+      } else {
+        console.warn(`No current price data for symbol: ${symbol}`, data);
+        return {};
+      }
+    } catch (error) {
+      console.error(`Error fetching price for ${symbol}:`, error);
+      // Re-throw to let client-side handle it.
+      throw error;
+    }
   }
 );
