@@ -15,7 +15,7 @@ import { Calendar } from '../ui/calendar';
 import { cn } from '@/lib/utils';
 import { es } from 'date-fns/locale';
 import { useFirestore } from '@/firebase';
-import { collection, doc, runTransaction } from 'firebase/firestore';
+import { collection, doc, runTransaction, DocumentReference } from 'firebase/firestore';
 import { Investment } from '@/lib/definitions';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
@@ -190,20 +190,25 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             };
 
             await runTransaction(firestore, async (transaction) => {
-                // If we are editing, AND the ID has changed, it means the user picked a different asset.
-                // In this case, we must delete the old document to prevent orphans.
+                const newDocRef = doc(collectionRef, newDocId);
+                let oldDocRef: DocumentReference | undefined;
+                
                 if (investment && investment.id !== newDocId) {
-                    const oldDocRef = doc(collectionRef, investment.id);
+                    oldDocRef = doc(collectionRef, investment.id);
+                }
+
+                // --- 1. ALL READS FIRST ---
+                const newDocSnap = await transaction.get(newDocRef);
+
+                // --- 2. ALL WRITES AFTER ---
+                
+                // First, handle deletion if necessary
+                if (oldDocRef) {
                     transaction.delete(oldDocRef);
                 }
 
-                const newDocRef = doc(collectionRef, newDocId);
-                const newDocSnap = await transaction.get(newDocRef);
-
+                // Now, handle creation/update
                 if (newDocSnap.exists() && (!investment || investment.id !== newDocId)) { 
-                    // This condition handles:
-                    // 1. Adding to an existing position when CREATING a new investment.
-                    // 2. Editing an investment and changing it to ANOTHER existing asset.
                     const existingData = newDocSnap.data() as Investment;
                     const newAmount = existingData.amount + data.amount;
                     
@@ -217,9 +222,6 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     });
 
                 } else { 
-                    // This handles:
-                    // 1. Creating a brand new investment.
-                    // 2. Editing an existing investment (and not changing the asset).
                     transaction.set(newDocRef, dataToSave, { merge: true });
                 }
             });
