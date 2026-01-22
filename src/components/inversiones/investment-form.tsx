@@ -173,14 +173,21 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             
             const collectionRef = collection(firestore, 'users', userId, 'investments');
             
-            let docId: string;
+            let newDocId: string;
             if (data.assetType === 'crypto') {
                 if (!data.coinGeckoId) throw new Error("El ID de CoinGecko es requerido para criptomonedas.");
-                docId = data.coinGeckoId;
+                newDocId = data.coinGeckoId;
             } else {
-                docId = data.symbol.toUpperCase();
+                newDocId = (data.symbol || '').toUpperCase();
             }
-            data.id = docId;
+
+            if (!newDocId) {
+                toast({ title: 'Error', description: 'El ID del activo es inválido.', variant: 'destructive' });
+                setIsLoading(false);
+                return;
+            }
+            
+            data.id = newDocId;
 
             const dataToSave = {
                 ...data,
@@ -188,26 +195,37 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             };
 
             await runTransaction(firestore, async (transaction) => {
-                const docRef = doc(collectionRef, docId);
-                const docSnap = await transaction.get(docRef);
+                // If we are editing, AND the ID has changed, it means the user picked a different asset.
+                // In this case, we must delete the old document to prevent orphans.
+                if (investment && investment.id !== newDocId) {
+                    const oldDocRef = doc(collectionRef, investment.id);
+                    transaction.delete(oldDocRef);
+                }
 
-                if (docSnap.exists() && !investment) { // Handle adding to an existing asset
-                    const existingData = docSnap.data() as Investment;
+                const newDocRef = doc(collectionRef, newDocId);
+                const newDocSnap = await transaction.get(newDocRef);
+
+                // This condition handles adding to an existing position when CREATING a new investment.
+                // It should not run when editing an existing item (that logic is in the else block)
+                if (newDocSnap.exists() && !investment) { 
+                    const existingData = newDocSnap.data() as Investment;
                     const newAmount = existingData.amount + data.amount;
                     
-                    // Weighted average of purchase date by amount.
-                    // This is a simple way to represent an averaged cost basis date.
                     const weightedPurchaseDate = Math.round(
                         (existingData.purchaseDate * existingData.amount + data.purchaseDate.getTime() * data.amount) / newAmount
                     );
 
-                    transaction.update(docRef, { 
+                    transaction.update(newDocRef, { 
                         amount: newAmount, 
                         purchaseDate: weightedPurchaseDate 
                     });
 
-                } else { // Handle new investment or editing an existing one
-                    transaction.set(docRef, dataToSave, { merge: true });
+                } else { 
+                    // This handles:
+                    // 1. Creating a brand new investment.
+                    // 2. Editing an existing investment (overwriting its data).
+                    // 3. Creating a new investment record after an edit changed the asset.
+                    transaction.set(newDocRef, dataToSave, { merge: true });
                 }
             });
 
@@ -266,7 +284,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 name="assetType"
                 control={control}
                 render={({ field }) => (
-                    <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-2 gap-4" disabled={!!investment}>
+                    <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-2 gap-4">
                         <div>
                             <RadioGroupItem value="crypto" id="crypto" className="peer sr-only" />
                             <Label htmlFor="crypto" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">Criptomoneda</Label>
@@ -291,7 +309,6 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                             if (!isListVisible) setIsListVisible(true);
                         }}
                         onFocus={() => setIsListVisible(true)}
-                        disabled={!!investment}
                     />
                     {isListVisible && (
                         <CommandList className="absolute top-10 z-10 w-full rounded-md border bg-popover text-popover-foreground shadow-md">
