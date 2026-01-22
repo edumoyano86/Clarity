@@ -75,8 +75,8 @@ export function useDashboardPortfolio(
             );
 
             const historyFetchStartDate = isAfter(new Date(earliestPurchaseDate), chartPeriodStartDate) 
-                ? chartPeriodStartDate 
-                : startOfDay(new Date(earliestPurchaseDate));
+                ? startOfDay(new Date(earliestPurchaseDate))
+                : chartPeriodStartDate;
 
             const endDate = new Date();
             const startTimestamp = getUnixTime(historyFetchStartDate);
