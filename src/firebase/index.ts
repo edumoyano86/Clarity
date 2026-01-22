@@ -24,12 +24,32 @@ firestore = initializeFirestore(firebaseApp, {
 
 export { firebaseApp, auth, firestore };
 
-export * from './provider';
-export * from './client-provider';
-export * from './firestore/use-collection';
-export * from './firestore/use-doc';
-export * from './auth/use-user';
-export * from './non-blocking-updates';
-export * from './non-blocking-login';
-export * from './errors';
-export * from './error-emitter';
+// Explicit exports to avoid conflicts
+export {
+  FirebaseProvider,
+  useFirebase,
+  useAuth,
+  useFirestore,
+  useFirebaseApp,
+  useMemoFirebase,
+  type FirebaseContextState,
+  type FirebaseServicesAndUser,
+  type UserHookResult,
+} from './provider';
+export { FirebaseClientProvider } from './client-provider';
+export { useCollection, type UseCollectionResult, type WithId } from './firestore/use-collection';
+export { useDoc, type UseDocResult } from './firestore/use-doc';
+export { useUser } from './auth/use-user';
+export {
+  setDocumentNonBlocking,
+  addDocumentNonBlocking,
+  updateDocumentNonBlocking,
+  deleteDocumentNonBlocking,
+} from './non-blocking-updates';
+export {
+  initiateAnonymousSignIn,
+  initiateEmailSignUp,
+  initiateEmailSignIn,
+} from './non-blocking-login';
+export { FirestorePermissionError } from './errors';
+export { errorEmitter } from './error-emitter';

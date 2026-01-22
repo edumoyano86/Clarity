@@ -39,7 +39,7 @@ export function BalanceChart({ ingresos, gastos }: BalanceChartProps) {
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 20 }} width={399} height={300}>
+              <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 20 }}>
                   <YAxis 
                       dataKey="name" 
                       type="category" 

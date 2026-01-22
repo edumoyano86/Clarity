@@ -40,7 +40,7 @@ export function ExpensesChart({ data }: ExpensesChartProps) {
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
           {data.length > 0 ? (
-            <PieChart width={400} height={300}>
+            <PieChart>
               <Tooltip
                 cursor={{ fill: 'hsl(var(--muted))' }}
                 content={<ChartTooltipContent nameKey="name" hideLabel />}
