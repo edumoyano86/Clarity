@@ -61,7 +61,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     const [isLoading, setIsLoading] = useState(false);
     const [selectedAsset, setSelectedAsset] = useState<AssetSearchResult | null>(null);
 
-    const { register, handleSubmit, formState: { errors }, control, reset, watch, setValue } = useForm<FormValues>({
+    const { register, handleSubmit, formState: { errors }, control, reset, watch, setValue, trigger } = useForm<FormValues>({
         resolver: zodResolver(InvestmentSchema),
         defaultValues: {
             assetType: investment?.assetType || 'crypto',
@@ -104,30 +104,26 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     const handleSelectAsset = useCallback((asset: AssetSearchResult | null) => {
         setSelectedAsset(asset);
         if (asset) {
-            // Common properties
             setValue('name', asset.name);
             setValue('symbol', asset.symbol.toUpperCase());
             
-            // Type-specific properties
             if (assetType === 'crypto') {
-                // We can be sure it's a CryptoSearchResult because the search function depends on assetType
                 const cryptoAsset = asset as CryptoSearchResult;
-                setValue('id', cryptoAsset.id, { shouldValidate: true });
-                setValue('coinGeckoId', cryptoAsset.id, { shouldValidate: true });
-            } else { // assetType === 'stock'
-                // We can be sure it's a StockSearchResult
+                setValue('id', cryptoAsset.id);
+                setValue('coinGeckoId', cryptoAsset.id);
+            } else { 
                 const stockAsset = asset as StockSearchResult;
-                setValue('id', stockAsset.symbol.toUpperCase(), { shouldValidate: true });
-                setValue('coinGeckoId', ''); // Ensure this is cleared for stocks
+                setValue('id', stockAsset.symbol.toUpperCase());
+                setValue('coinGeckoId', '');
             }
         } else {
-            // Clear all fields if asset is null
-            setValue('id', '', { shouldValidate: true });
+            setValue('id', '');
             setValue('symbol', '');
             setValue('name', '');
             setValue('coinGeckoId', '');
         }
-    }, [assetType, setValue]);
+        trigger(['id', 'coinGeckoId']);
+    }, [assetType, setValue, trigger]);
 
     useEffect(() => {
         if (!investment) {
