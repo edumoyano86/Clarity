@@ -38,8 +38,8 @@ const stockSearchFlow = ai.defineFlow(
   async (input) => {
     const apiKey = process.env.FINNHUB_API_KEY;
     if (!apiKey) {
-      console.error('Finnhub API key is not set in .env.local (FINNHUB_API_KEY)');
-      throw new Error('Finnhub API key is not configured.');
+      console.warn('La clave de API de Finnhub no está configurada. La búsqueda de acciones estará deshabilitada. Por favor, añade FINNHUB_API_KEY a tu archivo .env para habilitarla.');
+      return { results: [] };
     }
 
     if (!input.query) {

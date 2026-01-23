@@ -35,9 +35,8 @@ const stockPriceHistoryFlow = ai.defineFlow(
   async (input) => {
     const apiKey = process.env.FINNHUB_API_KEY;
     if (!apiKey) {
-      console.error('Finnhub API key is not set in .env.local (FINNHUB_API_KEY)');
-      // Throw an error if the API key is missing.
-      throw new Error('Finnhub API key is not configured.');
+      console.warn('La clave de API de Finnhub no está configurada. El historial de precios de acciones estará deshabilitado. Por favor, añade FINNHUB_API_KEY a tu archivo .env para habilitarla.');
+      return { history: {} };
     }
 
     const url = `https://finnhub.io/api/v1/stock/candle?symbol=${input.symbol}&resolution=D&from=${input.from}&to=${input.to}&token=${apiKey}`;
