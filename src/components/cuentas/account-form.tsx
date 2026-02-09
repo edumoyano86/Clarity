@@ -153,21 +153,21 @@ export function AccountForm({ userId, accounts, onFormSuccess }: AccountFormProp
                 <div>
                     <RadioGroupItem value="new" id="new" className="peer sr-only" />
                     <Label htmlFor="new" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
-                        Nueva Cuenta
+                        Nueva Deuda
                     </Label>
                 </div>
                 <div>
                     <RadioGroupItem value="add" id="add" className="peer sr-only" />
                      <Label htmlFor="add" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
-                        Añadir a Existente
+                        Aumentar Deuda Existente
                     </Label>
                 </div>
             </RadioGroup>
 
             {formType === 'new' ? (
                  <div>
-                    <Label htmlFor="name">Nombre de la nueva cuenta</Label>
-                    <Input id="name" placeholder="Ej: Tarjeta de Crédito, Alquiler" {...register('name')} />
+                    <Label htmlFor="name">Nombre de la cuenta</Label>
+                    <Input id="name" placeholder="Ej: Tarjeta de Crédito Visa, Préstamo Personal" {...register('name')} />
                     {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
                 </div>
             ) : (
@@ -196,7 +196,7 @@ export function AccountForm({ userId, accounts, onFormSuccess }: AccountFormProp
             )}
 
             <div>
-                <Label htmlFor="amount">Monto a {formType === 'new' ? 'Total' : 'Añadir'}</Label>
+                <Label htmlFor="amount">{formType === 'new' ? 'Monto Total de la Deuda' : 'Monto a Añadir al Total'}</Label>
                 <Input id="amount" type="number" step="0.01" placeholder={formType === 'new' ? 'Ej: 50000' : 'Ej: 10000'} {...register('amount')} />
                  {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
             </div>

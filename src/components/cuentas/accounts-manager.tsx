@@ -85,8 +85,9 @@ export function AccountsManager({ accounts, userId }: AccountsManagerProps) {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Nombre</TableHead>
-                                    <TableHead>Total</TableHead>
+                                    <TableHead>Monto Total</TableHead>
                                     <TableHead>Pagado</TableHead>
+                                    <TableHead>Saldo Pendiente</TableHead>
                                     <TableHead>Vencimiento</TableHead>
                                     <TableHead>Estado</TableHead>
                                     <TableHead className='text-right'>Acciones</TableHead>
@@ -95,15 +96,19 @@ export function AccountsManager({ accounts, userId }: AccountsManagerProps) {
                             <TableBody>
                                 {accounts.map((account) => {
                                     const progress = (account.paidAmount / account.amount) * 100;
+                                    const remainingBalance = account.amount - account.paidAmount;
                                     return (
-                                        <TableRow key={account.id} className={account.status === 'pagada' ? 'text-muted-foreground' : ''}>
+                                        <TableRow key={account.id} className={account.status === 'pagada' ? 'text-muted-foreground bg-muted/30' : ''}>
                                             <TableCell className="font-medium">{account.name}</TableCell>
                                             <TableCell>{formatCurrency(account.amount)}</TableCell>
                                             <TableCell>
-                                                <div className='flex flex-col gap-1'>
+                                                <div className='flex flex-col gap-1 min-w-[120px]'>
                                                     <span>{formatCurrency(account.paidAmount)}</span>
                                                     <Progress value={progress} className='h-2'/>
                                                 </div>
+                                            </TableCell>
+                                            <TableCell className="font-bold">
+                                                {formatCurrency(remainingBalance)}
                                             </TableCell>
                                             <TableCell>{new Date(account.dueDate).toLocaleDateString('es-ES')}</TableCell>
                                             <TableCell>
@@ -122,6 +127,13 @@ export function AccountsManager({ accounts, userId }: AccountsManagerProps) {
                                         </TableRow>
                                     )
                                 })}
+                                {accounts.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                                            No tienes cuentas por pagar registradas.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
                             </TableBody>
                         </Table>
                     </CardContent>
@@ -133,7 +145,7 @@ export function AccountsManager({ accounts, userId }: AccountsManagerProps) {
                     <DialogHeader>
                         <DialogTitle>Nueva Cuenta / Añadir Saldo</DialogTitle>
                          <DialogDescription>
-                            Crea una nueva cuenta por pagar o añade saldo a una existente.
+                            Crea una nueva cuenta por pagar o añade saldo a una deuda existente.
                         </DialogDescription>
                     </DialogHeader>
                     <AccountForm userId={userId} accounts={accounts} onFormSuccess={handleCloseForm} />
