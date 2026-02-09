@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
@@ -54,7 +53,7 @@ export interface UserHookResult {
 export const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
 
 /**
- * FirebaseProvider manages and provides Firebase services and user authentication state.
+ * FirebaseProvider devuelve y provee los servicios de Firebase y el estado de autenticación del usuario.
  */
 export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   children,
@@ -113,8 +112,8 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 };
 
 /**
- * Hook to access core Firebase services and user authentication state.
- * Throws error if core services are not available or used outside provider.
+ * Hook para acceder a los servicios centrales de Firebase y al estado de autenticación.
+ * Devuelve los servicios o null si no están disponibles (por ejemplo, durante la compilación).
  */
 export const useFirebase = (): FirebaseServicesAndUser => {
   const context = useContext(FirebaseContext);
@@ -123,14 +122,12 @@ export const useFirebase = (): FirebaseServicesAndUser => {
     throw new Error('useFirebase must be used within a FirebaseProvider.');
   }
 
-  if (!context.areServicesAvailable || !context.firebaseApp || !context.firestore || !context.auth) {
-    throw new Error('Firebase core services not available. Check FirebaseProvider props.');
-  }
-
+  // No lanzamos un error si faltan los servicios para permitir que el proceso de build se complete.
+  // Los componentes deben manejar los casos en los que firestore o auth sean null.
   return {
-    firebaseApp: context.firebaseApp,
-    firestore: context.firestore,
-    auth: context.auth,
+    firebaseApp: context.firebaseApp as FirebaseApp,
+    firestore: context.firestore as Firestore,
+    auth: context.auth as Auth,
     user: context.user,
     isUserLoading: context.isUserLoading,
     userError: context.userError,

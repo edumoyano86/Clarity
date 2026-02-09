@@ -1,4 +1,3 @@
-
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
@@ -6,22 +5,27 @@ import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { initializeFirestore, type Firestore } from 'firebase/firestore';
 
-let firebaseApp: FirebaseApp;
-let auth: Auth;
-let firestore: Firestore;
+let firebaseApp: FirebaseApp = null as any;
+let auth: Auth = null as any;
+let firestore: Firestore = null as any;
 
-// This check prevents re-initializing the app on every hot-reload
-if (!getApps().length) {
-  firebaseApp = initializeApp(firebaseConfig);
-} else {
-  firebaseApp = getApp();
+// Solo inicializa Firebase si la configuración está presente y es válida.
+// Esto evita errores durante el proceso de construcción de Next.js (pre-rendering)
+// cuando las variables de entorno pueden no estar disponibles en el entorno de build.
+const isConfigValid = !!firebaseConfig.apiKey && firebaseConfig.apiKey !== 'undefined';
+
+if (isConfigValid) {
+  if (!getApps().length) {
+    firebaseApp = initializeApp(firebaseConfig);
+  } else {
+    firebaseApp = getApp();
+  }
+
+  auth = getAuth(firebaseApp);
+  firestore = initializeFirestore(firebaseApp, {
+    experimentalForceLongPolling: true,
+  });
 }
-
-auth = getAuth(firebaseApp);
-// Use initializeFirestore to apply settings
-firestore = initializeFirestore(firebaseApp, {
-  experimentalForceLongPolling: true,
-});
 
 export { firebaseApp, auth, firestore };
 
