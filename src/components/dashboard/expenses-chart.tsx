@@ -13,9 +13,15 @@ type ExpensesChartProps = {
     icono: string;
     fill: string; // The color now comes from the page
   }[];
+  title?: string;
+  description?: string;
 };
 
-export function ExpensesChart({ data }: ExpensesChartProps) {
+export function ExpensesChart({ 
+  data,
+  title = "Gastos por Categoría",
+  description = "Distribución de tus gastos por categoría para el período seleccionado."
+}: ExpensesChartProps) {
   const chartConfig = useMemo(() => {
     const config: ChartConfig = {
       total: { label: "Total" },
@@ -34,8 +40,8 @@ export function ExpensesChart({ data }: ExpensesChartProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Gastos por Categoría</CardTitle>
-        <CardDescription>Distribución de tus gastos por categoría para el período seleccionado.</CardDescription>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">

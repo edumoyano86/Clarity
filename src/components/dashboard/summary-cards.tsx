@@ -57,7 +57,7 @@ export function SummaryCards({ totalIngresos, totalGastos, balance, cuentasPorPa
           <div className={`text-2xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-destructive'}`}>
             {formatCurrency(balance)}
           </div>
-          <p className="text-xs text-muted-foreground">Balance del período</p>
+          <p className="text-xs text-muted-foreground">Liquidez total (histórica)</p>
         </CardContent>
       </Card>
     </div>

@@ -23,26 +23,28 @@ import { AssetSearchCombobox, type AssetSearchResult, type CryptoSearchResult, t
 
 const InvestmentSchema = z.object({
     id: z.string().optional(),
-    assetType: z.enum(['crypto', 'stock'], { required_error: 'Debes seleccionar un tipo de activo.' }),
-    symbol: z.string().min(1, 'Símbolo del activo es requerido.'),
+    assetType: z.enum(['crypto', 'stock', 'fund'], { required_error: 'Debes seleccionar un tipo de activo.' }),
+    symbol: z.string().optional(),
     name: z.string().min(1, 'El nombre del activo es requerido'),
-    amount: z.coerce.number().positive('La cantidad debe ser un número positivo.'),
+    amount: z.coerce.number().positive('La cantidad o valor debe ser un número positivo.'),
     purchaseDate: z.date({ required_error: 'La fecha de compra es requerida.' }),
     coinGeckoId: z.string().optional(),
 }).superRefine((data, ctx) => {
-    if (!data.id) {
-         ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ['id'],
-            message: 'Debes buscar y seleccionar un activo de la lista.',
-        });
-    }
-    if (data.assetType === 'crypto' && (!data.coinGeckoId || data.coinGeckoId.length === 0)) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ['id'],
-            message: 'Para criptomonedas, el ID de CoinGecko es requerido. Por favor, vuelve a seleccionar el activo de la lista.',
-        });
+    if (data.assetType !== 'fund') {
+        if (!data.id) {
+             ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['id'],
+                message: 'Debes buscar y seleccionar un activo de la lista.',
+            });
+        }
+        if (data.assetType === 'crypto' && (!data.coinGeckoId || data.coinGeckoId.length === 0)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['id'],
+                message: 'Para criptomonedas, el ID de CoinGecko es requerido.',
+            });
+        }
     }
 });
 
@@ -138,7 +140,9 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             const collectionRef = collection(firestore, 'users', userId, 'investments');
             
             let newDocId: string;
-            if (data.assetType === 'crypto') {
+            if (data.assetType === 'fund') {
+                newDocId = investment?.id || `fund_${data.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+            } else if (data.assetType === 'crypto') {
                 if (!data.coinGeckoId) throw new Error("El ID de CoinGecko es requerido para criptomonedas.");
                 newDocId = data.coinGeckoId;
             } else {
@@ -149,6 +153,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 ...data,
                 id: newDocId,
                 purchaseDate: data.purchaseDate.getTime(),
+                symbol: data.assetType === 'fund' ? '' : data.symbol,
             };
 
             await runTransaction(firestore, async (transaction) => {
@@ -203,7 +208,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     <RadioGroup 
                         onValueChange={field.onChange} 
                         value={field.value} 
-                        className="grid grid-cols-2 gap-4"
+                        className="grid grid-cols-3 gap-4"
                         disabled={!!investment}
                     >
                         <div>
@@ -214,25 +219,37 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                             <RadioGroupItem value="stock" id="stock" className="peer sr-only" />
                              <Label htmlFor="stock" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Acción</Label>
                         </div>
+                        <div>
+                            <RadioGroupItem value="fund" id="fund" className="peer sr-only" />
+                             <Label htmlFor="fund" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Fondo/Manual</Label>
+                        </div>
                     </RadioGroup>
                 )}
             />
 
-            <div>
-                <Label htmlFor="asset-search">Activo</Label>
-                <AssetSearchCombobox
-                    assetType={assetType}
-                    onSelectAsset={handleSelectAsset}
-                    disabled={!!investment}
-                    key={assetType}
-                />
-                {errors.id && <p className="text-sm text-destructive">{errors.id.message}</p>}
-                {errors.coinGeckoId && <p className="text-sm text-destructive">{errors.coinGeckoId.message}</p>}
-            </div>
+            {assetType !== 'fund' ? (
+                <div>
+                    <Label htmlFor="asset-search">Activo</Label>
+                    <AssetSearchCombobox
+                        assetType={assetType}
+                        onSelectAsset={handleSelectAsset}
+                        disabled={!!investment}
+                        key={assetType}
+                    />
+                    {errors.id && <p className="text-sm text-destructive">{errors.id.message}</p>}
+                    {errors.coinGeckoId && <p className="text-sm text-destructive">{errors.coinGeckoId.message}</p>}
+                </div>
+            ) : (
+                <div>
+                    <Label htmlFor="name">Nombre de la Inversión / Fondo</Label>
+                    <Input id="name" placeholder="Ej: Plazo Fijo Banco, FCI Balanz..." {...register('name')} disabled={!!investment} />
+                    {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+                </div>
+            )}
             
             <div>
-                <Label htmlFor="amount">Cantidad</Label>
-                <Input id="amount" type="number" step="any" placeholder="Ej: 0.5" {...register('amount')} />
+                <Label htmlFor="amount">{assetType === 'fund' ? 'Valor Total ($)' : 'Cantidad'}</Label>
+                <Input id="amount" type="number" step="any" placeholder={assetType === 'fund' ? 'Ej: 500000' : 'Ej: 0.5'} {...register('amount')} />
                  {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
             </div>
 

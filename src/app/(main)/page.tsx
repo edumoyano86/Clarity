@@ -105,6 +105,11 @@ export default function DashboardPage() {
 
     const transactionsFiltradas = transactions.filter(filterByDate);
 
+    // Balance Total Histórico (sin filtrar por fecha)
+    const allTimeIngresos = transactions.filter(t => t.type === 'ingreso').reduce((sum, i) => sum + i.amount, 0);
+    const allTimeGastosYPagos = transactions.filter(t => t.type === 'gasto' || t.type === 'pago').reduce((sum, g) => sum + g.amount, 0);
+    const balanceTotalLiquido = allTimeIngresos - allTimeGastosYPagos;
+
     const ingresos = transactionsFiltradas.filter(t => t.type === 'ingreso');
     const gastosYPagos = transactionsFiltradas.filter(t => t.type === 'gasto' || t.type === 'pago');
 
@@ -148,6 +153,31 @@ export default function DashboardPage() {
           return result;
         });
 
+    // Gastos por Concepto (Top 10)
+    let colorIndexConcepto = 0;
+    const gastosAgrupadosPorConcepto: Record<string, number> = {};
+    
+    gastosYPagos.forEach(g => {
+        // Agrupamos usando la descripción o un valor por defecto para pagos sin descripción
+        const desc = g.description || (g.type === 'pago' ? 'Pago de Cuenta' : 'Sin descripción');
+        gastosAgrupadosPorConcepto[desc] = (gastosAgrupadosPorConcepto[desc] || 0) + g.amount;
+    });
+
+    const gastosPorConcepto = Object.entries(gastosAgrupadosPorConcepto)
+        .filter(([_, total]) => total > 0)
+        .sort((a, b) => b[1] - a[1]) // Mayor a menor
+        .slice(0, 10) // Top 10
+        .map(([name, total]) => {
+             const result = {
+                name,
+                total,
+                icono: 'Receipt',
+                fill: CHART_COLORS[colorIndexConcepto % CHART_COLORS.length]
+             };
+             colorIndexConcepto++;
+             return result;
+        });
+
     const transaccionesRecientes = [...transactions]
       .sort((a, b) => b.date - a.date)
       .slice(0, 5);
@@ -157,8 +187,9 @@ export default function DashboardPage() {
     return {
       totalIngresos,
       totalGastos,
-      balance: totalIngresos - totalGastos,
+      balance: balanceTotalLiquido,
       gastosPorCategoria,
+      gastosPorConcepto,
       transaccionesRecientes,
       categorias,
       totalCuentasPorPagar,
@@ -227,8 +258,19 @@ export default function DashboardPage() {
             <BalanceChart ingresos={dashboardData.totalIngresos} gastos={dashboardData.totalGastos} />
           </div>
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            <div className="lg:col-span-2">
-              <ExpensesChart data={dashboardData.gastosPorCategoria} />
+            <div className="lg:col-span-1">
+              <ExpensesChart 
+                data={dashboardData.gastosPorCategoria} 
+                title="Por Categoría" 
+                description="Agrupado por etiquetas."
+              />
+            </div>
+            <div className="lg:col-span-1">
+              <ExpensesChart 
+                data={dashboardData.gastosPorConcepto} 
+                title="Top 10 Gastos" 
+                description="Tus mayores gastos individuales."
+              />
             </div>
             <div className="lg:col-span-1 space-y-8">
               <RecentTransactions transactions={dashboardData.transaccionesRecientes} categorias={dashboardData.categorias || []} />

@@ -47,15 +47,26 @@ export function useDashboardPortfolio(
 
             // 2. Fetch current prices
             let fetchedPrices: PriceData = {};
+            let usdtToArsRate = 1300;
+            const idsToFetch = [...cryptoIds];
+            if (stockSymbols.length > 0 && !idsToFetch.includes('tether')) {
+                idsToFetch.push('tether');
+            }
+
             try {
-                 if (cryptoIds.length > 0) {
-                    const cryptoPrices = await getCryptoPrices({ ids: cryptoIds });
+                 if (idsToFetch.length > 0) {
+                    const cryptoPrices = await getCryptoPrices({ ids: idsToFetch });
                     fetchedPrices = { ...fetchedPrices, ...cryptoPrices };
+                    if (cryptoPrices['tether']) {
+                        usdtToArsRate = cryptoPrices['tether'].price;
+                    }
                 }
                 for (const symbol of stockSymbols) {
                     try {
                         const stockPrice = await getStockPrices({ symbol });
-                        fetchedPrices = { ...fetchedPrices, ...stockPrice };
+                        if (stockPrice[symbol]) {
+                            fetchedPrices[symbol] = { price: stockPrice[symbol].price * usdtToArsRate };
+                        }
                     } catch (e) {
                          console.warn(`Dashboard: Could not fetch stock price for ${symbol}`, e);
                     }
@@ -79,6 +90,9 @@ export function useDashboardPortfolio(
 
             const historyResults: { id: string; data: Record<string, number> }[] = [];
             const allAssets = [...stockSymbols.map(s => ({type: 'stock', id: s})), ...cryptoIds.map(c => ({type: 'crypto', id: c}))];
+            if (stockSymbols.length > 0 && !allAssets.some(a => a.id === 'tether')) {
+                allAssets.push({ type: 'crypto', id: 'tether' });
+            }
             
             for (const asset of allAssets) {
                 try {
@@ -106,6 +120,17 @@ export function useDashboardPortfolio(
                 }
                 tempPriceHistory.set(res.id, pricesMap);
             });
+
+            const tetherHistory = tempPriceHistory.get('tether');
+            for (const symbol of stockSymbols) {
+                const stockHistory = tempPriceHistory.get(symbol);
+                if (stockHistory) {
+                    for (const [dateStr, usdPrice] of stockHistory.entries()) {
+                        const dailyRate = tetherHistory?.get(dateStr) || usdtToArsRate;
+                        stockHistory.set(dateStr, usdPrice * dailyRate);
+                    }
+                }
+            }
             
             const totalDaysInHistory = differenceInDays(endDate, historyFetchStartDate);
             if (totalDaysInHistory >= 0) {
@@ -162,9 +187,13 @@ export function useDashboardPortfolio(
         // 1. Calculate Total Value
         let newTotalValue = 0;
         investments.forEach(inv => {
-            const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
-            if (priceKey && currentPrices[priceKey]) {
-                newTotalValue += inv.amount * currentPrices[priceKey].price;
+            if (inv.assetType === 'fund') {
+                newTotalValue += inv.amount;
+            } else {
+                const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
+                if (priceKey && currentPrices[priceKey]) {
+                    newTotalValue += inv.amount * currentPrices[priceKey].price;
+                }
             }
         });
         setTotalValue(newTotalValue);
@@ -183,6 +212,12 @@ export function useDashboardPortfolio(
 
             investments.forEach(inv => {
                 if (isAfter(new Date(inv.purchaseDate), currentDate)) {
+                    return;
+                }
+
+                if (inv.assetType === 'fund') {
+                    dailyTotal += inv.amount;
+                    assetsWithValue++;
                     return;
                 }
 

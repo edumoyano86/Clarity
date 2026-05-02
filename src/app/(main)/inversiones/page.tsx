@@ -88,12 +88,22 @@ export default function InversionesPage() {
                 const cryptoIds = [...new Set(cryptoAssets.map(i => i.coinGeckoId!))];
                 const stockSymbols = [...new Set(stockAssets.map(i => i.symbol!))];
                 
+                // Agregamos tether (USDT) si hay acciones, para convertir USD a ARS
+                const idsToFetch = [...cryptoIds];
+                if (stockSymbols.length > 0 && !idsToFetch.includes('tether')) {
+                    idsToFetch.push('tether');
+                }
+
                 let fetchedPrices: PriceData = {};
+                let usdtToArsRate = 1300; // Tasa de respaldo aproximada
                 
-                if (cryptoIds.length > 0) {
+                if (idsToFetch.length > 0) {
                     try {
-                        const cryptoPrices = await getCryptoPrices({ ids: cryptoIds });
+                        const cryptoPrices = await getCryptoPrices({ ids: idsToFetch });
                         fetchedPrices = { ...fetchedPrices, ...cryptoPrices };
+                        if (cryptoPrices['tether']) {
+                            usdtToArsRate = cryptoPrices['tether'].price;
+                        }
                     } catch (e) {
                          console.warn('Partial failure fetching crypto prices:', e);
                     }
@@ -102,7 +112,10 @@ export default function InversionesPage() {
                 for (const symbol of stockSymbols) {
                     try {
                         const stockPrice = await getStockPrices({ symbol });
-                        fetchedPrices = { ...fetchedPrices, ...stockPrice };
+                        if (stockPrice[symbol]) {
+                            // Convertir precio de USD (Finnhub) a ARS usando la tasa de USDT
+                            fetchedPrices[symbol] = { price: stockPrice[symbol].price * usdtToArsRate };
+                        }
                     } catch (e) {
                         console.warn(`Could not fetch current price for ${symbol}:`, e);
                     }
@@ -124,6 +137,9 @@ export default function InversionesPage() {
 
                 const historyResults: { id: string; data: Record<string, number> }[] = [];
                 const allAssets = [...stockSymbols.map(s => ({type: 'stock', id: s})), ...cryptoIds.map(c => ({type: 'crypto', id: c}))];
+                if (stockSymbols.length > 0 && !allAssets.some(a => a.id === 'tether')) {
+                    allAssets.push({ type: 'crypto', id: 'tether' });
+                }
 
                 for (const asset of allAssets) {
                      try {
@@ -151,6 +167,18 @@ export default function InversionesPage() {
                     }
                     tempPriceHistory.set(res.id, pricesMap);
                 });
+                
+                // Convertir el historial de acciones (USD) a ARS usando el historial de tether
+                const tetherHistory = tempPriceHistory.get('tether');
+                for (const symbol of stockSymbols) {
+                    const stockHistory = tempPriceHistory.get(symbol);
+                    if (stockHistory) {
+                        for (const [dateStr, usdPrice] of stockHistory.entries()) {
+                            const dailyRate = tetherHistory?.get(dateStr) || usdtToArsRate;
+                            stockHistory.set(dateStr, usdPrice * dailyRate);
+                        }
+                    }
+                }
                 
                 const todayStr = new Date().toISOString().split('T')[0];
                 for (const [assetId, priceInfo] of Object.entries(fetchedPrices)) {
@@ -229,9 +257,13 @@ export default function InversionesPage() {
         // 1. Calculate Total Value
         let newTotalValue = 0;
         investments.forEach(inv => {
-            const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
-            if (priceKey && currentPrices[priceKey]) {
-                newTotalValue += inv.amount * currentPrices[priceKey].price;
+            if (inv.assetType === 'fund') {
+                newTotalValue += inv.amount;
+            } else {
+                const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
+                if (priceKey && currentPrices[priceKey]) {
+                    newTotalValue += inv.amount * currentPrices[priceKey].price;
+                }
             }
         });
         setTotalValue(newTotalValue);
@@ -253,6 +285,12 @@ export default function InversionesPage() {
                     return;
                 }
                 
+                if (inv.assetType === 'fund') {
+                    dailyTotal += inv.amount;
+                    assetsWithValue++;
+                    return;
+                }
+
                 const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
                 if (!priceKey) return;
 

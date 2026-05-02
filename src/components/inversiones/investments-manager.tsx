@@ -8,7 +8,7 @@ import { ManagerPage } from '../shared/manager-page';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { InvestmentForm } from './investment-form';
 import { Button } from '../ui/button';
-import { Edit, Trash2, TrendingUp, TrendingDown, Loader2, DollarSign, AlertCircle, Info } from 'lucide-react';
+import { Edit, Trash2, TrendingUp, TrendingDown, Loader2, DollarSign, AlertCircle, Info, Plus, Minus } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useFirestore } from '@/firebase';
 import { deleteDoc, doc } from 'firebase/firestore';
@@ -19,6 +19,8 @@ import { Switch } from '../ui/switch';
 import { SellInvestmentDialog } from './sell-investment-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { PortfolioPeriod } from '@/app/(main)/inversiones/page';
+import { Input } from '../ui/input';
+import { updateDoc } from 'firebase/firestore';
 
 
 interface InvestmentsManagerProps {
@@ -52,6 +54,10 @@ export function InvestmentsManager({
     const [selectedInvestment, setSelectedInvestment] = useState<Investment | undefined>(undefined);
     const [investmentToSell, setInvestmentToSell] = useState<Investment | undefined>(undefined);
     const [investmentToDelete, setInvestmentToDelete] = useState<Investment | null>(null);
+    const [isAdjustOpen, setIsAdjustOpen] = useState(false);
+    const [investmentToAdjust, setInvestmentToAdjust] = useState<Investment | null>(null);
+    const [adjustAmount, setAdjustAmount] = useState('');
+    const [isAdjusting, setIsAdjusting] = useState(false);
     const [showInArs, setShowInArs] = useState(false);
 
     const firestore = useFirestore();
@@ -107,23 +113,96 @@ export function InvestmentsManager({
         }
     };
 
+    const handleOpenAdjust = (investment: Investment) => {
+        setInvestmentToAdjust(investment);
+        setAdjustAmount('');
+        setIsAdjustOpen(true);
+    };
+
+    const handleAdjust = async (type: 'add' | 'subtract') => {
+        if (!investmentToAdjust || !adjustAmount || isNaN(parseFloat(adjustAmount))) return;
+        
+        setIsAdjusting(true);
+        try {
+            const amountChange = parseFloat(adjustAmount);
+            const newAmount = type === 'add' 
+                ? investmentToAdjust.amount + amountChange 
+                : investmentToAdjust.amount - amountChange;
+
+            if (newAmount < 0) {
+                throw new Error("El monto resultante no puede ser negativo.");
+            }
+
+            await updateDoc(doc(firestore, 'users', userId, 'investments', investmentToAdjust.id!), {
+                amount: newAmount
+            });
+
+            toast({ title: 'Éxito', description: `Balance de ${investmentToAdjust.name} actualizado correctamente.` });
+            setIsAdjustOpen(false);
+        } catch (error) {
+            console.error("Error adjusting balance:", error);
+            toast({ title: 'Error', description: (error as Error).message || 'No se pudo ajustar el balance.', variant: 'destructive' });
+        } finally {
+            setIsAdjusting(false);
+        }
+    };
+
     const sortedInvestments = useMemo(() => {
         if (!investments) return [];
         return [...investments].sort((a, b) => {
-            const priceKeyA = a.assetType === 'crypto' ? a.coinGeckoId : a.symbol;
-            const priceKeyB = b.assetType === 'crypto' ? b.coinGeckoId : b.symbol;
-            
-            const aPrice = (priceKeyA && currentPrices[priceKeyA]?.price) || 0;
-            const bPrice = (priceKeyB && currentPrices[priceKeyB]?.price) || 0;
+            let aValue = 0;
+            let bValue = 0;
 
-            const aValue = a.amount * aPrice;
-            const bValue = b.amount * bPrice;
+            if (a.assetType === 'fund') {
+                aValue = a.amount;
+            } else {
+                const priceKeyA = a.assetType === 'crypto' ? a.coinGeckoId : a.symbol;
+                aValue = a.amount * ((priceKeyA && currentPrices[priceKeyA]?.price) || 0);
+            }
+
+            if (b.assetType === 'fund') {
+                bValue = b.amount;
+            } else {
+                const priceKeyB = b.assetType === 'crypto' ? b.coinGeckoId : b.symbol;
+                bValue = b.amount * ((priceKeyB && currentPrices[priceKeyB]?.price) || 0);
+            }
             
             return bValue - aValue;
         });
     }, [investments, currentPrices]);
 
     const renderPortfolioRow = (investment: Investment) => {
+        if (investment.assetType === 'fund') {
+            return (
+                <TableRow key={investment.id}>
+                    <TableCell>
+                        <div className='font-medium'>{investment.name}</div>
+                        <div className='text-sm text-muted-foreground'>Fondo / Manual</div>
+                    </TableCell>
+                    <TableCell>-</TableCell>
+                    <TableCell>-</TableCell>
+                    <TableCell>-</TableCell>
+                    <TableCell>
+                        {formatCurrency(investment.amount)}
+                    </TableCell>
+                    <TableCell>
+                        <span className="text-muted-foreground">N/A</span>
+                    </TableCell>
+                    <TableCell className='text-right space-x-0'>
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenAdjust(investment)} title="Ajustar Balance">
+                            <Plus className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenForm(investment)} title="Editar">
+                            <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenAlert(investment)} title="Eliminar">
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </TableCell>
+                </TableRow>
+            );
+        }
+
         const isCrypto = investment.assetType === 'crypto';
         const priceKey = isCrypto ? investment.coinGeckoId : investment.symbol;
         const isDataIncomplete = !priceKey;
@@ -196,6 +275,9 @@ export function InvestmentsManager({
                     )}
                 </TableCell>
                 <TableCell className='text-right space-x-0'>
+                     <Button variant="ghost" size="icon" onClick={() => handleOpenAdjust(investment)} title="Ajustar Balance">
+                        <Plus className="h-4 w-4" />
+                    </Button>
                      <Button variant="ghost" size="icon" onClick={() => handleOpenSellDialog(investment)} title="Vender">
                         <DollarSign className="h-4 w-4" />
                     </Button>
@@ -293,6 +375,49 @@ export function InvestmentsManager({
                         </DialogDescription>
                     </DialogHeader>
                     <InvestmentForm userId={userId} investment={selectedInvestment} onFormSuccess={handleCloseForm} />
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isAdjustOpen} onOpenChange={setIsAdjustOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Ajustar Balance</DialogTitle>
+                        <DialogDescription>
+                            Suma o resta una cantidad a tu tenencia de {investmentToAdjust?.name}.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="adjust-amount">Monto a ajustar ({investmentToAdjust?.symbol || 'ARS'})</Label>
+                            <Input
+                                id="adjust-amount"
+                                type="number"
+                                step="any"
+                                placeholder="0.00"
+                                value={adjustAmount}
+                                onChange={(e) => setAdjustAmount(e.target.value)}
+                            />
+                        </div>
+                        <div className="flex gap-4 pt-2">
+                            <Button 
+                                className="flex-1 bg-green-600 hover:bg-green-700" 
+                                onClick={() => handleAdjust('add')}
+                                disabled={isAdjusting || !adjustAmount}
+                            >
+                                {isAdjusting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                                Sumar
+                            </Button>
+                            <Button 
+                                variant="destructive" 
+                                className="flex-1" 
+                                onClick={() => handleAdjust('subtract')}
+                                disabled={isAdjusting || !adjustAmount}
+                            >
+                                {isAdjusting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Minus className="mr-2 h-4 w-4" />}
+                                Restar
+                            </Button>
+                        </div>
+                    </div>
                 </DialogContent>
             </Dialog>
 

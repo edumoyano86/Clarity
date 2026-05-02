@@ -16,7 +16,7 @@ export type CryptoPricesInput = z.infer<typeof CryptoPricesInputSchema>;
 
 const PricesOutputSchema = z.record(z.object({
     price: z.number(),
-})).describe('An object where keys are coin IDs and values contain their current price in USD.');
+})).describe('An object where keys are coin IDs and values contain their current price in ARS.');
 export type PricesOutput = z.infer<typeof PricesOutputSchema>;
 
 export async function getCryptoPrices(input: CryptoPricesInput): Promise<PricesOutput> {
@@ -35,7 +35,7 @@ const cryptoPricesFlow = ai.defineFlow(
     }
 
     const idsString = input.ids.join(',');
-    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${idsString}&vs_currencies=usd`;
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${idsString}&vs_currencies=ars`;
 
     try {
       const response = await fetch(url);
@@ -48,8 +48,8 @@ const cryptoPricesFlow = ai.defineFlow(
 
       const results: PricesOutput = {};
       for (const id in data) {
-        if (data[id] && typeof data[id].usd === 'number') {
-          results[id] = { price: data[id].usd };
+        if (data[id] && typeof data[id].ars === 'number') {
+          results[id] = { price: data[id].ars };
         }
       }
       return results;

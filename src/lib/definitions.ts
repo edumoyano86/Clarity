@@ -44,9 +44,9 @@ export type Note = {
 
 export type Investment = {
     id: string; // The unique ID for the investment document in Firestore.
-    assetType: 'crypto' | 'stock';
+    assetType: 'crypto' | 'stock' | 'fund';
     name: string;
-    symbol: string; // e.g., 'BTC', 'AAPL'
+    symbol?: string; // e.g., 'BTC', 'AAPL'. Optional for funds.
     amount: number;
     purchaseDate: number; // timestamp
     coinGeckoId?: string; // The unique ID from CoinGecko, e.g., 'bitcoin'. Required for cryptos.
