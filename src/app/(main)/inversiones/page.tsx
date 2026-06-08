@@ -262,7 +262,8 @@ export default function InversionesPage() {
             } else {
                 const priceKey = inv.assetType === 'crypto' ? inv.coinGeckoId : inv.symbol;
                 if (priceKey && currentPrices[priceKey]) {
-                    newTotalValue += inv.amount * currentPrices[priceKey].price;
+                    const ratio = inv.ratio || 1;
+                    newTotalValue += (inv.amount * currentPrices[priceKey].price) / ratio;
                 }
             }
         });
@@ -298,7 +299,8 @@ export default function InversionesPage() {
                 const priceForDay = historyForAsset?.get(dateStr);
                 
                 if (priceForDay !== undefined) {
-                    dailyTotal += inv.amount * priceForDay;
+                    const ratio = inv.ratio || 1;
+                    dailyTotal += (inv.amount * priceForDay) / ratio;
                     assetsWithValue++;
                 }
             });

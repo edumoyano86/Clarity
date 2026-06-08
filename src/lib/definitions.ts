@@ -50,6 +50,7 @@ export type Investment = {
     amount: number;
     purchaseDate: number; // timestamp
     coinGeckoId?: string; // The unique ID from CoinGecko, e.g., 'bitcoin'. Required for cryptos.
+    ratio?: number; // Optional conversion ratio for CEDEARs (default to 1)
 };
 
 // For Price APIs

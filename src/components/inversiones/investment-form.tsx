@@ -29,6 +29,7 @@ const InvestmentSchema = z.object({
     amount: z.coerce.number().positive('La cantidad o valor debe ser un número positivo.'),
     purchaseDate: z.date({ required_error: 'La fecha de compra es requerida.' }),
     coinGeckoId: z.string().optional(),
+    ratio: z.coerce.number().positive('El ratio debe ser un número positivo.').optional(),
 }).superRefine((data, ctx) => {
     if (data.assetType !== 'fund') {
         if (!data.id) {
@@ -87,6 +88,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 amount: investment.amount,
                 purchaseDate: new Date(investment.purchaseDate),
                 coinGeckoId: investment.coinGeckoId,
+                ratio: investment.ratio || 1,
             });
             setSelectedAsset(initialAsset);
         } else {
@@ -98,6 +100,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 amount: undefined,
                 purchaseDate: new Date(),
                 coinGeckoId: '',
+                ratio: 1,
             });
             setSelectedAsset(null);
         }
@@ -154,6 +157,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 id: newDocId,
                 purchaseDate: data.purchaseDate.getTime(),
                 symbol: data.assetType === 'fund' ? '' : data.symbol,
+                ratio: data.ratio ? Number(data.ratio) : 1,
             };
 
             await runTransaction(firestore, async (transaction) => {
@@ -180,7 +184,8 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
 
                     transaction.update(newDocRef, { 
                         amount: newAmount, 
-                        purchaseDate: weightedPurchaseDate 
+                        purchaseDate: weightedPurchaseDate,
+                        ratio: data.ratio ? Number(data.ratio) : (existingData.ratio || 1)
                     });
 
                 } else { 
@@ -228,16 +233,28 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
             />
 
             {assetType !== 'fund' ? (
-                <div>
-                    <Label htmlFor="asset-search">Activo</Label>
-                    <AssetSearchCombobox
-                        assetType={assetType}
-                        onSelectAsset={handleSelectAsset}
-                        disabled={!!investment}
-                        key={assetType}
-                    />
-                    {errors.id && <p className="text-sm text-destructive">{errors.id.message}</p>}
-                    {errors.coinGeckoId && <p className="text-sm text-destructive">{errors.coinGeckoId.message}</p>}
+                <div className="space-y-4">
+                    <div>
+                        <Label htmlFor="asset-search">Activo</Label>
+                        <AssetSearchCombobox
+                            assetType={assetType}
+                            onSelectAsset={handleSelectAsset}
+                            disabled={!!investment}
+                            key={assetType}
+                        />
+                        {errors.id && <p className="text-sm text-destructive">{errors.id.message}</p>}
+                        {errors.coinGeckoId && <p className="text-sm text-destructive">{errors.coinGeckoId.message}</p>}
+                    </div>
+                    {assetType === 'stock' && (
+                        <div>
+                            <Label htmlFor="ratio">Ratio CEDEAR (Opcional)</Label>
+                            <Input id="ratio" type="number" placeholder="Ej: 39 para VIG, 10 para AAPL" {...register('ratio')} />
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Si es un CEDEAR, ingresa el ratio de conversión (ej: 39 para VIG). Deja en blanco si es la acción directa de EE.UU.
+                            </p>
+                            {errors.ratio && <p className="text-sm text-destructive">{errors.ratio.message}</p>}
+                        </div>
+                    )}
                 </div>
             ) : (
                 <div>

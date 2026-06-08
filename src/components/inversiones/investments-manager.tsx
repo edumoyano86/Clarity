@@ -66,9 +66,9 @@ export function InvestmentsManager({
     const formatCurrency = (amount: number) => {
         if (isNaN(amount)) amount = 0;
         if (showInArs) {
-            return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount * USD_TO_ARS_RATE);
+            return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
         }
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount / USD_TO_ARS_RATE);
     };
 
     const handleOpenForm = (investment?: Investment) => {
@@ -157,14 +157,16 @@ export function InvestmentsManager({
                 aValue = a.amount;
             } else {
                 const priceKeyA = a.assetType === 'crypto' ? a.coinGeckoId : a.symbol;
-                aValue = a.amount * ((priceKeyA && currentPrices[priceKeyA]?.price) || 0);
+                const ratioA = a.ratio || 1;
+                aValue = (a.amount * ((priceKeyA && currentPrices[priceKeyA]?.price) || 0)) / ratioA;
             }
 
             if (b.assetType === 'fund') {
                 bValue = b.amount;
             } else {
                 const priceKeyB = b.assetType === 'crypto' ? b.coinGeckoId : b.symbol;
-                bValue = b.amount * ((priceKeyB && currentPrices[priceKeyB]?.price) || 0);
+                const ratioB = b.ratio || 1;
+                bValue = (b.amount * ((priceKeyB && currentPrices[priceKeyB]?.price) || 0)) / ratioB;
             }
             
             return bValue - aValue;
@@ -241,12 +243,15 @@ export function InvestmentsManager({
             );
         }
         
+        const ratio = investment.ratio || 1;
         const purchaseDateStr = new Date(investment.purchaseDate).toISOString().split('T')[0];
         const historyForAsset = priceHistory.get(priceKey);
-        const purchasePrice = historyForAsset?.get(purchaseDateStr);
+        const rawPurchasePrice = historyForAsset?.get(purchaseDateStr);
+        const purchasePrice = rawPurchasePrice !== undefined ? rawPurchasePrice / ratio : undefined;
 
         const purchaseValue = purchasePrice !== undefined ? investment.amount * purchasePrice : null;
-        const currentPrice = currentPrices[priceKey]?.price;
+        const rawCurrentPrice = currentPrices[priceKey]?.price;
+        const currentPrice = rawCurrentPrice !== undefined ? rawCurrentPrice / ratio : undefined;
         const currentValue = currentPrice !== undefined ? investment.amount * currentPrice : null;
         
         const pnl = (currentValue !== null && purchaseValue !== null) ? currentValue - purchaseValue : null;
@@ -256,7 +261,10 @@ export function InvestmentsManager({
             <TableRow key={investment.id}>
                 <TableCell>
                     <div className='font-medium'>{investment.name}</div>
-                    <div className='text-sm text-muted-foreground'>{investment.symbol}</div>
+                    <div className='text-sm text-muted-foreground'>
+                        {investment.symbol}
+                        {investment.ratio && investment.ratio > 1 ? ` (Ratio ${investment.ratio}:1)` : ''}
+                    </div>
                 </TableCell>
                 <TableCell>{investment.amount.toFixed(4)}</TableCell>
                 <TableCell>{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (purchasePrice !== undefined ? formatCurrency(purchasePrice) : 'N/A')}</TableCell>
@@ -307,6 +315,7 @@ export function InvestmentsManager({
                         isLoading={isLoading}
                         period={period}
                         setPeriod={setPeriod}
+                        showInArs={showInArs}
                     />
                     <Card>
                         <CardHeader>
@@ -428,6 +437,7 @@ export function InvestmentsManager({
                     investment={investmentToSell}
                     userId={userId}
                     prices={currentPrices}
+                    showInArs={showInArs}
                     onSuccess={() => {
                         setIsSellDialogOpen(false);
                         setInvestmentToSell(undefined);

@@ -15,11 +15,16 @@ import { collection, addDoc, doc, runTransaction } from 'firebase/firestore';
 import { Investment, PriceData } from '@/lib/definitions';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 
+const USD_TO_ARS_RATE = 1050;
+
 const formatNumber = (amount: number) => {
     return new Intl.NumberFormat('en-US', { maximumFractionDigits: 8 }).format(amount);
 };
-const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+const formatCurrency = (amount: number, showInArs?: boolean) => {
+    if (showInArs) {
+        return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
+    }
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount / USD_TO_ARS_RATE);
 };
 
 const SellInvestmentSchema = (maxAmount: number) => z.object({
@@ -35,10 +40,11 @@ interface SellInvestmentDialogProps {
     investment: Investment;
     userId: string;
     prices: PriceData;
+    showInArs?: boolean;
     onSuccess: () => void;
 }
 
-export function SellInvestmentDialog({ isOpen, onOpenChange, investment, userId, prices, onSuccess }: SellInvestmentDialogProps) {
+export function SellInvestmentDialog({ isOpen, onOpenChange, investment, userId, prices, showInArs, onSuccess }: SellInvestmentDialogProps) {
     const { toast } = useToast();
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = useState(false);
@@ -47,24 +53,33 @@ export function SellInvestmentDialog({ isOpen, onOpenChange, investment, userId,
     type FormValues = z.infer<typeof schema>;
     
     const priceKey = investment.assetType === 'crypto' ? (investment.coinGeckoId || investment.id) : investment.symbol;
-    const currentPrice = prices[priceKey]?.price;
+    const ratio = investment.ratio || 1;
+    const rawCurrentPrice = prices[priceKey]?.price;
+    const currentPrice = rawCurrentPrice !== undefined ? rawCurrentPrice / ratio : undefined;
+    
+    // Convert current price to active currency (USD or ARS) for the input default value
+    const currentPriceInActiveCurrency = currentPrice !== undefined 
+        ? (showInArs ? currentPrice : currentPrice / USD_TO_ARS_RATE)
+        : undefined;
 
     const { register, handleSubmit, formState: { errors }, reset, watch } = useForm<FormValues>({
         resolver: zodResolver(schema),
         defaultValues: {
-            sellPrice: currentPrice || undefined,
+            sellPrice: currentPriceInActiveCurrency || undefined,
         }
     });
 
     // Update default price if it loads after the dialog is opened
     useEffect(() => {
-        if(isOpen && currentPrice) {
-            reset({sellPrice: currentPrice});
+        if(isOpen && currentPriceInActiveCurrency) {
+            reset({sellPrice: currentPriceInActiveCurrency});
         }
-    }, [isOpen, currentPrice, reset]);
+    }, [isOpen, currentPriceInActiveCurrency, reset]);
 
     const sellAmount = watch('amount');
     const sellPrice = watch('sellPrice');
+    
+    // totalSaleValue is calculated in active currency
     const totalSaleValue = (sellAmount && sellPrice) ? sellAmount * sellPrice : 0;
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
@@ -91,11 +106,14 @@ export function SellInvestmentDialog({ isOpen, onOpenChange, investment, userId,
                     transaction.delete(investmentRef);
                 }
 
-                // 2. Create a new income transaction for the sale
-                const totalValue = data.amount * data.sellPrice;
+                // 2. Create a new income transaction for the sale (stored in ARS)
+                const totalValueInArs = showInArs 
+                    ? (data.amount * data.sellPrice)
+                    : (data.amount * data.sellPrice * USD_TO_ARS_RATE);
+
                 const incomeTransaction = {
                     type: 'ingreso' as const,
-                    amount: totalValue,
+                    amount: totalValueInArs,
                     date: new Date().getTime(),
                     description: `Venta de ${formatNumber(data.amount)} ${currentInvestment.symbol.toUpperCase()}`,
                 };
@@ -126,7 +144,7 @@ export function SellInvestmentDialog({ isOpen, onOpenChange, investment, userId,
                 <DialogHeader>
                     <DialogTitle>Vender {investment.name} ({investment.symbol})</DialogTitle>
                     <DialogDescription>
-                        Cantidad disponible: {formatNumber(investment.amount)}. Precio actual: {currentPrice ? formatCurrency(currentPrice) : 'Cargando...'}
+                        Cantidad disponible: {formatNumber(investment.amount)}. Precio actual: {currentPrice !== undefined ? formatCurrency(currentPrice, showInArs) : 'Cargando...'}
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -136,13 +154,18 @@ export function SellInvestmentDialog({ isOpen, onOpenChange, investment, userId,
                         {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
                     </div>
                     <div>
-                        <Label htmlFor="sellPrice">Precio de Venta (por unidad, en USD)</Label>
+                        <Label htmlFor="sellPrice">Precio de Venta (por unidad, en {showInArs ? 'ARS' : 'USD'})</Label>
                         <Input id="sellPrice" type="number" step="any" {...register('sellPrice')} />
                         {errors.sellPrice && <p className="text-sm text-destructive">{errors.sellPrice.message}</p>}
                     </div>
                     <div className="rounded-md border bg-muted p-3">
                         <p className="text-sm font-medium text-muted-foreground">Valor total de la venta</p>
-                        <p className="text-2xl font-bold">{formatCurrency(totalSaleValue)}</p>
+                        <p className="text-2xl font-bold">
+                            {showInArs 
+                                ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(totalSaleValue)
+                                : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalSaleValue)
+                            }
+                        </p>
                     </div>
 
                     <Button type="submit" disabled={isLoading} className="w-full">

@@ -18,20 +18,23 @@ interface PortfolioChartProps {
     isLoading: boolean;
     period: PortfolioPeriod;
     setPeriod: (period: PortfolioPeriod) => void;
+    showInArs?: boolean;
 }
 
-const chartConfig = {
-    value: {
-        label: 'Valor (USD)',
-        color: 'hsl(var(--chart-1))',
-    },
-} satisfies ChartConfig;
-
-const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+const formatCurrency = (amount: number, showInArs?: boolean) => {
+    if (showInArs) {
+        return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
+    }
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount / 1050);
 };
 
-export function PortfolioChart({ chartData, totalValue, isLoading, period, setPeriod }: PortfolioChartProps) {
+export function PortfolioChart({ chartData, totalValue, isLoading, period, setPeriod, showInArs }: PortfolioChartProps) {
+    const chartConfig = {
+        value: {
+            label: `Valor (${showInArs ? 'ARS' : 'USD'})`,
+            color: 'hsl(var(--chart-1))',
+        },
+    } satisfies ChartConfig;
     
     const hasData = chartData.length > 0 && chartData.some(d => d.value !== null && d.value > 0);
     const periodOptions: { label: string; value: PortfolioPeriod }[] = [
@@ -47,7 +50,7 @@ export function PortfolioChart({ chartData, totalValue, isLoading, period, setPe
                     <div>
                         <CardTitle>Evolución del Portafolio</CardTitle>
                         <CardDescription>
-                            Valor total del portafolio. Valor actual: {formatCurrency(totalValue)}
+                            Valor total del portafolio. Valor actual: {formatCurrency(totalValue, showInArs)}
                         </CardDescription>
                     </div>
                     <div className="flex items-center gap-2">
@@ -102,12 +105,12 @@ export function PortfolioChart({ chartData, totalValue, isLoading, period, setPe
                                 tickLine={false}
                                 axisLine={false}
                                 tickMargin={8}
-                                tickFormatter={(value) => formatCurrency(value as number)}
+                                tickFormatter={(value) => formatCurrency(value as number, showInArs)}
                                 width={80}
                             />
                             <Tooltip
                                 content={<ChartTooltipContent
-                                    formatter={(value) => formatCurrency(value as number)}
+                                    formatter={(value) => formatCurrency(value as number, showInArs)}
                                     labelFormatter={(label) => {
                                         if (!label) return '';
                                         const date = new Date(Number(label));
