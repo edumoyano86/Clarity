@@ -30,6 +30,7 @@ const InvestmentSchema = z.object({
     purchaseDate: z.date({ required_error: 'La fecha de compra es requerida.' }),
     coinGeckoId: z.string().optional(),
     ratio: z.coerce.number().positive('El ratio debe ser un número positivo.').optional(),
+    purchasePrice: z.coerce.number().positive('El precio de compra debe ser un número positivo.').optional().nullable(),
 }).superRefine((data, ctx) => {
     if (data.assetType !== 'fund') {
         if (!data.id) {
@@ -89,6 +90,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 purchaseDate: new Date(investment.purchaseDate),
                 coinGeckoId: investment.coinGeckoId,
                 ratio: investment.ratio || 1,
+                purchasePrice: investment.purchasePrice || null,
             });
             setSelectedAsset(initialAsset);
         } else {
@@ -101,6 +103,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 purchaseDate: new Date(),
                 coinGeckoId: '',
                 ratio: 1,
+                purchasePrice: null,
             });
             setSelectedAsset(null);
         }
@@ -158,6 +161,7 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 purchaseDate: data.purchaseDate.getTime(),
                 symbol: data.assetType === 'fund' ? '' : data.symbol,
                 ratio: data.ratio ? Number(data.ratio) : 1,
+                purchasePrice: data.purchasePrice ? Number(data.purchasePrice) : null,
             };
 
             await runTransaction(firestore, async (transaction) => {
@@ -185,7 +189,8 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                     transaction.update(newDocRef, { 
                         amount: newAmount, 
                         purchaseDate: weightedPurchaseDate,
-                        ratio: data.ratio ? Number(data.ratio) : (existingData.ratio || 1)
+                        ratio: data.ratio ? Number(data.ratio) : (existingData.ratio || 1),
+                        purchasePrice: data.purchasePrice ? Number(data.purchasePrice) : (existingData.purchasePrice || null)
                     });
 
                 } else { 
@@ -269,6 +274,17 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
                 <Input id="amount" type="number" step="any" placeholder={assetType === 'fund' ? 'Ej: 500000' : 'Ej: 0.5'} {...register('amount')} />
                  {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
             </div>
+
+            {assetType !== 'fund' && (
+                <div>
+                    <Label htmlFor="purchasePrice">Precio de Compra Unitario (Opcional, en ARS)</Label>
+                    <Input id="purchasePrice" type="number" step="any" placeholder="Ej: 9297.75" {...register('purchasePrice')} />
+                    <p className="text-xs text-muted-foreground mt-1">
+                        Ingresa el precio por unidad pagado en pesos. Si lo dejas vacío, se usará el precio de mercado histórico.
+                    </p>
+                    {errors.purchasePrice && <p className="text-sm text-destructive">{errors.purchasePrice.message}</p>}
+                </div>
+            )}
 
              <div>
                 <Label htmlFor="purchaseDate">Fecha de Compra</Label>

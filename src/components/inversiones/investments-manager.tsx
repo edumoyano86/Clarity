@@ -247,7 +247,11 @@ export function InvestmentsManager({
         const purchaseDateStr = new Date(investment.purchaseDate).toISOString().split('T')[0];
         const historyForAsset = priceHistory.get(priceKey);
         const rawPurchasePrice = historyForAsset?.get(purchaseDateStr);
-        const purchasePrice = rawPurchasePrice !== undefined ? rawPurchasePrice / ratio : undefined;
+        
+        // Use custom purchasePrice if present (which is already per unit), otherwise use historical price divided by ratio
+        const purchasePrice = investment.purchasePrice !== undefined && investment.purchasePrice !== null
+            ? investment.purchasePrice
+            : (rawPurchasePrice !== undefined ? rawPurchasePrice / ratio : undefined);
 
         const purchaseValue = purchasePrice !== undefined ? investment.amount * purchasePrice : null;
         const rawCurrentPrice = currentPrices[priceKey]?.price;
