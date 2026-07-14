@@ -12,6 +12,9 @@ import { collection, query, where, orderBy, limit } from "firebase/firestore";
 import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear, startOfToday } from 'date-fns';
 import { PortfolioChart } from "@/components/inversiones/portfolio-chart";
 import { BalanceChart } from "@/components/dashboard/balance-chart";
+import { BudgetAlerts, type BudgetAlert } from "@/components/dashboard/budget-alerts";
+import { SavingsGoals } from "@/components/dashboard/savings-goals";
+import { QuickStart } from "@/components/onboarding/quick-start";
 import { useDashboardPortfolio, type PortfolioPeriod } from "@/hooks/use-dashboard-portfolio";
 
 type Periodo = 'mes_actual' | 'mes_pasado' | 'ultimos_3_meses' | 'ano_actual';
@@ -184,6 +187,29 @@ export default function DashboardPage() {
 
     const totalCuentasPorPagar = (accounts || []).reduce((sum, acc) => sum + (acc.amount - acc.paidAmount), 0);
 
+    const budgetAlerts = (categorias || [])
+      .map((categoria) => {
+        const budget = Number(categoria.budget || 0);
+        if (!budget) return null;
+        const spent = transactionsFiltradas
+          .filter((g) => g.type === 'gasto' && g.categoryId === categoria.id)
+          .reduce((sum, g) => sum + g.amount, 0);
+        const percentage = Math.min(100, (spent / budget) * 100);
+        const remaining = budget - spent;
+        if (spent <= 0) return null;
+        return {
+          categoryName: categoria.name,
+          spent,
+          budget,
+          percentage,
+          status: percentage >= 100 ? 'danger' : percentage >= 80 ? 'warning' : 'warning',
+          remaining,
+        } satisfies BudgetAlert;
+      })
+      .filter((item): item is BudgetAlert => Boolean(item))
+      .sort((a, b) => b.percentage - a.percentage)
+      .slice(0, 4);
+
     return {
       totalIngresos,
       totalGastos,
@@ -193,6 +219,7 @@ export default function DashboardPage() {
       transaccionesRecientes,
       categorias,
       totalCuentasPorPagar,
+      budgetAlerts,
     };
   }, [periodo, transactions, categorias, accounts]);
 
@@ -240,6 +267,7 @@ export default function DashboardPage() {
       
       {dashboardData ? (
         <>
+          <QuickStart />
           <SummaryCards
             totalIngresos={dashboardData.totalIngresos}
             totalGastos={dashboardData.totalGastos}
@@ -273,6 +301,8 @@ export default function DashboardPage() {
               />
             </div>
             <div className="lg:col-span-1 space-y-8">
+              <BudgetAlerts alerts={dashboardData.budgetAlerts || []} />
+              <SavingsGoals />
               <RecentTransactions transactions={dashboardData.transaccionesRecientes} categorias={dashboardData.categorias || []} />
               <UpcomingAppointments appointments={upcomingAppointments || []} isLoading={loadingAppointments}/>
             </div>

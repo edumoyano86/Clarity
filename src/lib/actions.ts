@@ -38,8 +38,16 @@ export async function getSavingsSuggestionsAction(userId: string) {
         .map(([category, amount]) => `${category}: $${amount.toFixed(2)}`)
         .join(', ');
 
+    const totalSpent = gastos.reduce((sum, gasto) => sum + gasto.amount, 0);
+    const topCategories = Object.entries(spendingData)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([category]) => category);
+
     const result = await generateSavingsSuggestions({
       spendingData: spendingDataString,
+      totalSpent,
+      topCategories,
     });
     
     return result;

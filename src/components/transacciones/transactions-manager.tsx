@@ -16,6 +16,8 @@ import { useFirestore } from '@/firebase';
 import { deleteDoc, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { RecurringTransactions } from './recurring-transactions';
+import { DataImportExport } from './data-import-export';
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
@@ -130,23 +132,29 @@ export function TransactionsManager({ transactions, categorias, accounts, userId
                 buttonLabel="Añadir Transacción"
                 onButtonClick={() => handleOpenDialog()}
             >
-                <Card>
-                    <CardContent className='pt-6'>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Descripción</TableHead>
-                                    <TableHead>Fecha</TableHead>
-                                    <TableHead>Cantidad</TableHead>
-                                    <TableHead className='text-right'>Acciones</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {transactions.map(renderRow)}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_360px] items-start">
+                    <Card>
+                        <CardContent className='pt-6'>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Descripción</TableHead>
+                                        <TableHead>Fecha</TableHead>
+                                        <TableHead>Cantidad</TableHead>
+                                        <TableHead className='text-right'>Acciones</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {transactions.map(renderRow)}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                    <div className="space-y-6 lg:sticky lg:top-6">
+                        <RecurringTransactions />
+                        <DataImportExport />
+                    </div>
+                </div>
             </ManagerPage>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent>

@@ -7,6 +7,15 @@ export type Categoria = {
   budget?: number;
 };
 
+export type BudgetAlertSummary = {
+  categoryName: string;
+  spent: number;
+  budget: number;
+  percentage: number;
+  status: 'warning' | 'danger';
+  remaining: number;
+};
+
 export type Transaction = {
   id: string;
   type: 'ingreso' | 'gasto' | 'pago';
