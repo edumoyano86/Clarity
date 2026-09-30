@@ -1,0 +1,226 @@
+================================================================================
+                         CLARITY - TUS FINANZAS CLARAS
+               MANUAL COMPLETO DE FUNCIONALIDADES Y ARQUITECTURA
+================================================================================
+Versión del Sistema: 2.0 (Next.js 15 + React 19 + Firebase + Genkit AI)
+Última Actualización: Septiembre 2026
+Propósito: Control integral, respaldo y optimización de finanzas personales.
+================================================================================
+
+--------------------------------------------------------------------------------
+1. RESUMEN EJECUTIVO Y FILOSOFÍA
+--------------------------------------------------------------------------------
+Clarity es una plataforma de gestión financiera personal diseñada para ofrecer
+claridad absoluta, control de deudas, seguimiento de inversiones y optimización
+del ahorro con inteligencia artificial y principios de finanzas conductuales.
+
+El sistema se enfoca en tres pilares:
+1. Visibilidad Total: Dashboard interactivo en tiempo real con alertas preventivas.
+2. Disciplina Financiera: Implementación de la regla 50/30/20 y lista de prioridades.
+3. Soberanía de Datos: Respaldo continuo en la nube (Firestore) y exportación
+   a archivos .CSV perfectamente adaptados para Microsoft Excel y Google Sheets.
+
+--------------------------------------------------------------------------------
+2. DASHBOARD INTELIGENTE (RESUMEN GENERAL - `/`)
+--------------------------------------------------------------------------------
+El panel principal consolida la salud financiera en una sola vista estructurada:
+
+• Indicadores Clave (KPIs Superiores):
+  - Balance Total Disponible: Diferencia neta entre ingresos y gastos totales.
+  - Ingresos del Mes: Sumatoria de entradas del mes en curso con comparativa.
+  - Gastos del Mes: Total desembolsado en el período activo.
+  - Ahorro Neto Mensual: Capacidad de ahorro efectiva y tasa de ahorro (%).
+
+• Gráficas Analíticas:
+  - Evolución de Flujo de Fondos: Gráfica de área que contrasta ingresos vs gastos.
+  - Distribución por Categorías: Desglose porcentual de gastos para detectar fugas.
+
+• Distribución de Widgets en Cuadrícula Equilibrada (Responsive Grid):
+  - Regla Financiera 50/30/20:
+    * Compara los ingresos del mes contra la regla dorada:
+      - 50% Necesidades Básicas y Deudas fijas.
+      - 30% Deseos y Consumo Personal (vinculado a la lista de deseos).
+      - 20% Ahorro e Inversión para el futuro.
+    * Barras de progreso tricolor con alertas automáticas si se supera el tope.
+  - Alertas Preventivas de Vencimiento de Deudas:
+    * Monitorea automáticamente todas tus cuentas por pagar.
+    * Muestra avisos urgentes con badges de color si una cuenta vence en los
+      próximos 3 a 5 días o si ya se encuentra vencida.
+    * Muestra de forma prioritaria las 4 deudas más antiguas/urgentes para evitar
+      saturación visual, con acceso directo a "Ver todas".
+  - Lista de Deseos y Prioridades de Consumo:
+    * Vista rápida de tus compras anheladas más prioritarias.
+    * Checkbox interactivo directo para tacharlas como cumplidas.
+    * Indicadores de costo estimado y enlace a la gestión completa.
+  - Alertas de Presupuesto con Inteligencia Artificial:
+    * Detección temprana de categorías con riesgo de sobregiro presupuestario.
+  - Agenda y Citas del Día:
+    * Recordatorios inmediatos de compromisos y vencimientos del día.
+  - Portafolio de Inversiones Acumulado:
+    * Valorización histórica de tus compras de activos financieros.
+
+--------------------------------------------------------------------------------
+3. MÓDULO DE TRANSACCIONES (`/transacciones`)
+--------------------------------------------------------------------------------
+Gestión exhaustiva del flujo de caja diario:
+
+• Tipos de Movimiento Soportados:
+  - Ingreso: Sueldos, honorarios, ventas de activos o rentas.
+  - Gasto: Egresos clasificados por categoría (supermercado, servicios, ocio, etc.).
+  - Pago de Cuenta (Abono): Movimientos especiales asociados a una deuda en particular.
+
+• Funciones Avanzadas:
+  - Filtro por fecha, categoría y búsqueda por texto descriptivo.
+  - Edición y eliminación instantánea con recálculo dinámico de balances.
+  - Transacciones Recurrentes: Soporte para pagos periódicos automáticos.
+  - Exportación de Reportes a CSV / Excel:
+    * Botón de descarga con 1 solo clic.
+    * Incorpora marca de orden de bytes BOM UTF-8 (\uFEFF) para que Excel reconozca
+      automáticamente acentos, eñes y caracteres especiales.
+    * Delimitador por punto y coma (;) para partición nativa en columnas en Excel.
+    * Exporta: Fecha, Hora, Tipo, Descripción, Monto, Categoría y Cuenta Asociada.
+
+--------------------------------------------------------------------------------
+4. MÓDULO DE CUENTAS POR PAGAR Y DEUDAS (`/cuentas`)
+--------------------------------------------------------------------------------
+Herramienta de desendeudamiento sistemático y control de pasivos:
+
+• Jerarquía y Ordenamiento Automático:
+  - Las deudas pendientes y activas aparecen siempre al principio de la lista.
+  - Las deudas totalmente saldadas se desplazan automáticamente al final, evitando
+    ruido visual y destacando únicamente lo que adeudas.
+
+• Tarjetas de Rendimiento Global (KPIs de Deuda):
+  - Total Deuda Comprometida: Monto global acumulado de pasivos.
+  - Total Pagado: Sumatoria de todos los abonos realizados.
+  - Saldo Pendiente Real: Capital exacto restante por pagar.
+  - Porcentaje de Desendeudamiento: Barra de progreso general de liquidación.
+
+• Historial de Abonos por Cuenta Específica (Dropdown / Desplegable):
+  - Cada fila cuenta con un desplegable que expande el historial de pagos parciales.
+  - Muestra: Fecha exacta, Hora, Monto abonado y % de la deuda que cubrió ese pago.
+  - Botón de Reversión Segura: Permite anular o eliminar un abono registrado por error,
+    devolviendo el monto al saldo pendiente de la cuenta de forma sincronizada.
+
+• Filtros Rápidos:
+  - "Todas", "Pendientes" y "Saldadas" con contador dinámico en cada botón.
+
+• Exportación a CSV / Excel:
+  - Genera reporte detallado de todas tus cuentas, progreso porcentual, fecha de
+    vencimiento, estado actual y cantidad de abonos registrados.
+
+--------------------------------------------------------------------------------
+5. MÓDULO DE DESEOS Y PRIORIDADES DE CONSUMO (`/deseos`)
+--------------------------------------------------------------------------------
+Sistema para evitar gastos impulsivos y planificar compras conscientes:
+
+• Organización por Niveles de Prioridad:
+  - Prioridad Alta (badge rojo): Metas esenciales o reemplazos inmediatos.
+  - Prioridad Media (badge ámbar): Gustos planificados o adquisiciones secundarias.
+  - Prioridad Baja (badge azul): Caprichos futuros o compras diferibles.
+
+• Dinámica Interactiva:
+  - Registro de nombre del deseo, costo estimado, notas explicativas y prioridad.
+  - Checkbox para tachar el ítem al ser cumplido (tachado visual y cambio de color).
+  - Cálculo de Ahorro Acumulado vs Costo Total de Deseos.
+  - Barra de Progreso del Sueño: Indicador porcentual de metas completadas.
+  - Integración nativa con el 30% ("Deseos / Consumo personal") de la regla 50/30/20.
+
+--------------------------------------------------------------------------------
+6. MÓDULO DE CATEGORÍAS Y PRESUPUESTOS (`/categorias`)
+--------------------------------------------------------------------------------
+Estructuración de presupuestos por centro de costo:
+
+• Categorización Personalizada:
+  - Asignación de nombres e iconos temáticos a cada rubro de gasto.
+• Presupuesto Máximo Mensual:
+  - Define topes de gasto por categoría (ej. $150.000 en Supermercado).
+  - Comparación en tiempo real de lo gastado vs lo presupuestado.
+  - Alerta temprana si el gasto alcanza el 80% o supera el 100% del límite fijado.
+
+--------------------------------------------------------------------------------
+7. MÓDULO DE INVERSIONES Y PORTAFOLIO (`/inversiones`)
+--------------------------------------------------------------------------------
+Monitoreo de activos y patrimonio financiero:
+
+• Tipos de Activos Disponibles:
+  - Criptomonedas: Bitcoin (BTC), Ethereum (ETH), Solana (SOL), USDT, etc.
+  - Acciones y CEDEARs: Apple (AAPL), Tesla (TSLA), Vista (VIST), MercadoLibre, etc.
+  - Fondos Comunes de Inversión y Bonos.
+
+• Cotizaciones y Fuentes de Datos (APIs):
+  - Criptomonedas: Consulta en tiempo real a CoinGecko API (conversión a ARS/USD).
+  - Acciones / CEDEARs: Integración con Finnhub API (cotizaciones de mercado global).
+  - Alternador de Divisas: Visualización instantánea del portafolio en Pesos (ARS) o Dólares (USD).
+
+• Registro de Operaciones:
+  - Compra de activos con fecha, cantidad y precio de entrada.
+  - Venta parcial o total: Diálogo interactivo que calcula el rendimiento, actualiza
+    la posición restante y genera automáticamente la transacción de ingreso por la venta.
+
+• Gráfica Histórica del Portafolio:
+  - Visualización del valor acumulado de compra y evolución a lo largo del tiempo.
+
+--------------------------------------------------------------------------------
+8. AGENDA Y CALENDARIO FINANCIERO (`/agenda`)
+--------------------------------------------------------------------------------
+Planificación temporal de vencimientos y trámites:
+
+• Calendario Adaptado de Alto Rendimiento:
+  - Motor react-day-picker v9 con celdas fijas y tipografía perfectamente alineada.
+  - Visualización de fechas límite de pago, cobros pactados y citas bancarias.
+• Notificador Automático (`AppointmentNotifier`):
+  - Revisa las citas registradas para el día de hoy y dispara un Toast persistente
+    con sonido/aviso al iniciar sesión.
+
+--------------------------------------------------------------------------------
+9. NOTAS Y APUNTES FINANCIEROS (`/notas`)
+--------------------------------------------------------------------------------
+Cuaderno de notas integrado en la nube:
+
+• Bloc de notas rápido para registrar estrategias, ideas de negocio, números de cuenta,
+  cálculos rápidos o metas semestrales.
+• Búsqueda por texto y ordenamiento por fecha de última actualización.
+
+--------------------------------------------------------------------------------
+10. ASISTENTE DE INTELIGENCIA ARTIFICIAL (GENKIT AI FLOWS)
+--------------------------------------------------------------------------------
+Algoritmos de análisis predictivo y sugerencias inteligentes:
+
+• `savings-suggestions`: Analiza el patrón de gastos del mes, identifica las tres
+  categorías con mayor consumo y formula recomendaciones prácticas de optimización.
+• `budget-alerts`: Genera avisos contextualizados cuando un presupuesto está en
+  riesgo de ser rebasado.
+
+--------------------------------------------------------------------------------
+11. CENTRO DE SOPORTE Y CONTACTO (`/soporte`)
+--------------------------------------------------------------------------------
+Canal oficial de atención, soporte y comunicación:
+
+• Canales Rápidos de Contacto:
+  - WhatsApp Directo: Apertura instantánea con mensaje precargado.
+  - Correo Electrónico: Enlace mailto directo a soporte@clarity.app.
+  - Formulario de Contacto Interactivo: Permite enviar dudas, sugerencias o reportes técnicos.
+• Base de Conocimiento y Preguntas Frecuentes (FAQ):
+  - Respuestas directas en acordeón sobre exportaciones, abonos de deudas, regla 50/30/20,
+    configuración de APIs de inversión y seguridad de la información.
+• Monitor de Estado de Servicio:
+  - Indicador en vivo de estado operativo de Firebase, Genkit AI y APIs externas.
+
+--------------------------------------------------------------------------------
+12. ARQUITECTURA TÉCNICA, SEGURIDAD Y PERFORMANCE
+--------------------------------------------------------------------------------
+• Frontend: Next.js 15.5 (App Router), React 19, TypeScript estricto (0 errores).
+• Estilos y UI: Tailwind CSS, Radix UI Primitives, Lucide Icons, Shadcn UI.
+• Backend y Base de Datos: Firebase Firestore en la nube con subcolecciones
+  aisladas por usuario (`users/{userId}/...`).
+• Autenticación: Firebase Authentication (Email/Password y sesiones persistentes).
+• SEO y Branding:
+  - Favicon multirresolución oficial (.ico, .png, apple-touch-icon).
+  - Compatible con Google Search Console y Google Analytics 4 (GA4).
+• Build de Producción:
+  - Validación de tipos en tiempo de compilación habilitada (`ignoreBuildErrors: false`).
+  - Generación estática optimizada de todas las rutas de la aplicación.
+================================================================================
+                              FIN DEL DOCUMENTO
+================================================================================

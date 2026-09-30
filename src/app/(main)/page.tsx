@@ -4,7 +4,7 @@ import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { ExpensesChart } from "@/components/dashboard/expenses-chart";
 import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 import { SavingsSuggestions } from "@/components/dashboard/savings-suggestions";
-import { Categoria, Appointment, Transaction, Investment, Account } from "@/lib/definitions";
+import { Categoria, Appointment, Transaction, Investment, Account, WishlistItem } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase";
 import { UpcomingAppointments } from "@/components/dashboard/upcoming-appointments";
@@ -14,6 +14,10 @@ import { PortfolioChart } from "@/components/inversiones/portfolio-chart";
 import { BalanceChart } from "@/components/dashboard/balance-chart";
 import { BudgetAlerts, type BudgetAlert } from "@/components/dashboard/budget-alerts";
 import { SavingsGoals } from "@/components/dashboard/savings-goals";
+import { WishlistWidget } from "@/components/dashboard/wishlist-widget";
+import { DebtAlertBanner } from "@/components/dashboard/debt-alert-banner";
+import { DebtDueAlerts } from "@/components/dashboard/debt-due-alerts";
+import { Rule503020 } from "@/components/dashboard/rule-50-30-20";
 import { QuickStart } from "@/components/onboarding/quick-start";
 import { useDashboardPortfolio, type PortfolioPeriod } from "@/hooks/use-dashboard-portfolio";
 
@@ -71,6 +75,12 @@ export default function DashboardPage() {
     );
   }, [firestore, user]);
   const { data: upcomingAppointments, isLoading: loadingAppointments } = useCollection<Appointment>(upcomingAppointmentsQuery);
+
+  const wishlistQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return collection(firestore, 'users', user.uid, 'wishlist');
+  }, [firestore, user]);
+  const { data: wishlistItems, isLoading: loadingWishlist } = useCollection<WishlistItem>(wishlistQuery);
 
   const dashboardData = useMemo(() => {
     if (!transactions || !categorias) return null;
@@ -220,6 +230,9 @@ export default function DashboardPage() {
       categorias,
       totalCuentasPorPagar,
       budgetAlerts,
+      transactionsFiltradas,
+      startDate,
+      endDate,
     };
   }, [periodo, transactions, categorias, accounts]);
 
@@ -264,6 +277,9 @@ export default function DashboardPage() {
             ))}
         </div>
       </div>
+
+      {/* Alerta Preventiva de Vencimientos de Deudas */}
+      <DebtAlertBanner accounts={accounts || []} />
       
       {dashboardData ? (
         <>
@@ -275,6 +291,19 @@ export default function DashboardPage() {
             cuentasPorPagar={dashboardData.totalCuentasPorPagar}
             periodoLabel={getPeriodoLabel(periodo)}
           />
+
+          {/* Regla Financiera 50 / 30 / 20 */}
+          <Rule503020
+            totalIngresos={dashboardData.totalIngresos}
+            transactions={dashboardData.transactionsFiltradas}
+            categorias={categorias || []}
+            investments={investments || []}
+            wishlistItems={wishlistItems || []}
+            periodoLabel={getPeriodoLabel(periodo)}
+            startDate={dashboardData.startDate}
+            endDate={dashboardData.endDate}
+          />
+
           <div className="grid gap-8 md:grid-cols-2">
             <PortfolioChart 
               chartData={chartData} 
@@ -285,27 +314,27 @@ export default function DashboardPage() {
             />
             <BalanceChart ingresos={dashboardData.totalIngresos} gastos={dashboardData.totalGastos} />
           </div>
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            <div className="lg:col-span-1">
-              <ExpensesChart 
-                data={dashboardData.gastosPorCategoria} 
-                title="Por Categoría" 
-                description="Agrupado por etiquetas."
-              />
-            </div>
-            <div className="lg:col-span-1">
-              <ExpensesChart 
-                data={dashboardData.gastosPorConcepto} 
-                title="Top 10 Gastos" 
-                description="Tus mayores gastos individuales."
-              />
-            </div>
-            <div className="lg:col-span-1 space-y-8">
-              <BudgetAlerts alerts={dashboardData.budgetAlerts || []} />
-              <SavingsGoals />
-              <RecentTransactions transactions={dashboardData.transaccionesRecientes} categorias={dashboardData.categorias || []} />
-              <UpcomingAppointments appointments={upcomingAppointments || []} isLoading={loadingAppointments}/>
-            </div>
+          <div className="grid gap-8 md:grid-cols-2">
+            <ExpensesChart 
+              data={dashboardData.gastosPorCategoria} 
+              title="Gastos por Categoría" 
+              description="Agrupado por etiquetas."
+            />
+            <ExpensesChart 
+              data={dashboardData.gastosPorConcepto} 
+              title="Top 10 Gastos" 
+              description="Tus mayores gastos individuales."
+            />
+          </div>
+
+          {/* Grid de Paneles y Widgets informativos organizados en columnas */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <DebtDueAlerts accounts={accounts || []} isLoading={loadingAccounts} />
+            <WishlistWidget items={wishlistItems || []} userId={user.uid} isLoading={loadingWishlist} />
+            <RecentTransactions transactions={dashboardData.transaccionesRecientes} categorias={dashboardData.categorias || []} />
+            <BudgetAlerts alerts={dashboardData.budgetAlerts || []} />
+            <SavingsGoals />
+            <UpcomingAppointments appointments={upcomingAppointments || []} isLoading={loadingAppointments}/>
           </div>
           <SavingsSuggestions userId={user.uid} />
         </>

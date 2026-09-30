@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 
 const ClarityLogoIcon = () => (
-  <Image src="/logo.png" alt="Clarity Logo" width={40} height={40} />
+  <Image src="/logo-icon.png" alt="Clarity Logo" width={40} height={40} className="object-contain" priority />
 );
 
 export const Logo = ({ className }: { className?: string }) => {

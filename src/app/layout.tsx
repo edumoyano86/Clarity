@@ -6,6 +6,9 @@ import { FirebaseClientProvider } from '@/firebase';
 export const metadata: Metadata = {
   title: 'Clarity - Tus Finanzas Claras',
   description: 'Gestión de finanzas personales con claridad.',
+  verification: {
+    google: 'google7913ccccade90084',
+  },
 };
 
 export default function RootLayout({

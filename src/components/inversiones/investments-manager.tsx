@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from "@/components/ui/table";
 import { Investment, PriceData, PortfolioDataPoint, PriceHistory } from "@/lib/definitions";
@@ -35,7 +35,7 @@ interface InvestmentsManagerProps {
     setPeriod: (period: PortfolioPeriod) => void;
 }
 
-const USD_TO_ARS_RATE = 1050; 
+import { fetchDollarRate } from '@/lib/dollar-rate';
 
 export function InvestmentsManager({ 
     investments, 
@@ -59,16 +59,27 @@ export function InvestmentsManager({
     const [adjustAmount, setAdjustAmount] = useState('');
     const [isAdjusting, setIsAdjusting] = useState(false);
     const [showInArs, setShowInArs] = useState(false);
+    const [dollarRate, setDollarRate] = useState<number>(1450);
 
     const firestore = useFirestore();
     const { toast } = useToast();
+
+    useEffect(() => {
+        let isMounted = true;
+        fetchDollarRate().then((rate) => {
+            if (isMounted && rate > 0) {
+                setDollarRate(rate);
+            }
+        });
+        return () => { isMounted = false; };
+    }, []);
 
     const formatCurrency = (amount: number) => {
         if (isNaN(amount)) amount = 0;
         if (showInArs) {
             return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
         }
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount / USD_TO_ARS_RATE);
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount / dollarRate);
     };
 
     const handleOpenForm = (investment?: Investment) => {
@@ -325,13 +336,18 @@ export function InvestmentsManager({
                         <CardHeader>
                             <div className='flex justify-between items-center'>
                                 <CardTitle>Detalle de Activos</CardTitle>
-                                <div className="flex items-center space-x-2">
-                                    <Switch
-                                        id="currency-switch"
-                                        checked={showInArs}
-                                        onCheckedChange={setShowInArs}
-                                    />
-                                    <Label htmlFor="currency-switch">Mostrar en {showInArs ? "ARS" : "USD"}</Label>
+                                <div className="flex items-center space-x-3">
+                                    <span className="text-xs text-muted-foreground hidden sm:inline-block">
+                                        Dólar Blue: <strong className="text-foreground">${dollarRate.toLocaleString('es-AR')}</strong>
+                                    </span>
+                                    <div className="flex items-center space-x-2">
+                                        <Switch
+                                            id="currency-switch"
+                                            checked={showInArs}
+                                            onCheckedChange={setShowInArs}
+                                        />
+                                        <Label htmlFor="currency-switch">Mostrar en {showInArs ? "ARS" : "USD"}</Label>
+                                    </div>
                                 </div>
                             </div>
                         </CardHeader>
@@ -442,6 +458,7 @@ export function InvestmentsManager({
                     userId={userId}
                     prices={currentPrices}
                     showInArs={showInArs}
+                    dollarRate={dollarRate}
                     onSuccess={() => {
                         setIsSellDialogOpen(false);
                         setInvestmentToSell(undefined);

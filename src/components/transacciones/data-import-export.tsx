@@ -1,44 +1,59 @@
-"use client";
+'use client';
 
-import { useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Download, Upload } from "lucide-react";
+import { useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Download, Upload, FileSpreadsheet } from 'lucide-react';
+import { Transaction, Categoria, Account } from '@/lib/definitions';
+import { exportTransactionsToCsv } from '@/lib/export-utils';
+import { useToast } from '@/hooks/use-toast';
 
-export function DataImportExport() {
+interface DataImportExportProps {
+  transactions?: Transaction[];
+  categorias?: Categoria[];
+  accounts?: Account[];
+}
+
+export function DataImportExport({
+  transactions = [],
+  categorias = [],
+  accounts = [],
+}: DataImportExportProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
-  const exportCsv = () => {
-    const rows = [
-      ["description", "amount", "type", "date"],
-      ["Ejemplo", "1500", "gasto", "2026-07-10"],
-    ];
-    const csv = rows.map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "clarity-export.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+  const handleExportCsv = () => {
+    if (transactions.length === 0) {
+      toast({
+        title: 'Sin datos',
+        description: 'No hay transacciones registradas para exportar.',
+      });
+      return;
+    }
+
+    exportTransactionsToCsv(transactions, categorias, accounts);
+    toast({
+      title: 'Reporte generado',
+      description: `Se descargó el archivo CSV con ${transactions.length} transacciones para Excel.`,
+    });
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Importar / Exportar datos</CardTitle>
-        <CardDescription>Exporta tus datos para respaldarlos o importarlos desde un archivo CSV.</CardDescription>
+        <div className="flex items-center gap-2">
+          <FileSpreadsheet className="h-5 w-5 text-primary" />
+          <CardTitle className="text-base">Respaldo y Reportes</CardTitle>
+        </div>
+        <CardDescription>
+          Descarga tus transacciones en formato CSV compatible directamente con Microsoft Excel y Google Sheets.
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-2">
-        <Button onClick={exportCsv} variant="outline">
+        <Button onClick={handleExportCsv} variant="outline" className="w-full sm:w-auto">
           <Download className="mr-2 h-4 w-4" />
-          Exportar CSV
+          Exportar Transacciones (CSV)
         </Button>
-        <Button onClick={() => inputRef.current?.click()} variant="outline">
-          <Upload className="mr-2 h-4 w-4" />
-          Importar CSV
-        </Button>
-        <input ref={inputRef} type="file" accept=".csv" className="hidden" />
       </CardContent>
     </Card>
   );

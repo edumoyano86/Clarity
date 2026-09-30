@@ -1,18 +1,14 @@
 'use server';
 
-import { getDocs, collection } from 'firebase/firestore';
 import { generateSavingsSuggestions } from '@/ai/flows/savings-suggestions';
 import { db } from '@/firebase/server';
 import type { Categoria, Transaction } from './definitions';
 
 export async function getSavingsSuggestionsAction(userId: string) {
   try {
-    const transactionsRef = collection(db, `users/${userId}/transactions`);
-    const categoriesRef = collection(db, `users/${userId}/expenseCategories`);
-
     const [transactionsSnap, categoriesSnap] = await Promise.all([
-        getDocs(transactionsRef),
-        getDocs(categoriesRef),
+      db.collection(`users/${userId}/transactions`).get(),
+      db.collection(`users/${userId}/expenseCategories`).get(),
     ]);
 
     const gastos = transactionsSnap.docs.map(doc => doc.data() as Transaction).filter(t => t.type === 'gasto');

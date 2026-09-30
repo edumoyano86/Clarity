@@ -31,7 +31,7 @@ export function InvestmentsChart({ data }: InvestmentsChartProps) {
         return data
             .sort((a, b) => a.purchaseDate - b.purchaseDate)
             .map(investment => {
-                cumulativeValue += investment.purchasePrice * investment.amount;
+                cumulativeValue += (investment.purchasePrice ?? 0) * (investment.amount ?? 0);
                 return {
                     date: investment.purchaseDate,
                     value: cumulativeValue,

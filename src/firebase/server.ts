@@ -1,4 +1,4 @@
-import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase-admin/app';
+import { initializeApp, getApps, getApp, type App } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { credential } from 'firebase-admin';
 
@@ -10,7 +10,7 @@ const firebaseConfig = {
   projectId: 'clarity-d5e76',
 };
 
-let app: FirebaseApp;
+let app: App;
 if (!getApps().length) {
   app = initializeApp(firebaseConfig);
 } else {

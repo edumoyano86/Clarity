@@ -15,16 +15,15 @@ import { collection, addDoc, doc, runTransaction } from 'firebase/firestore';
 import { Investment, PriceData } from '@/lib/definitions';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 
-const USD_TO_ARS_RATE = 1050;
-
 const formatNumber = (amount: number) => {
     return new Intl.NumberFormat('en-US', { maximumFractionDigits: 8 }).format(amount);
 };
-const formatCurrency = (amount: number, showInArs?: boolean) => {
+
+const formatCurrency = (amount: number, showInArs?: boolean, rate = 1450) => {
     if (showInArs) {
         return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
     }
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount / USD_TO_ARS_RATE);
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount / rate);
 };
 
 const SellInvestmentSchema = (maxAmount: number) => z.object({
@@ -41,10 +40,20 @@ interface SellInvestmentDialogProps {
     userId: string;
     prices: PriceData;
     showInArs?: boolean;
+    dollarRate?: number;
     onSuccess: () => void;
 }
 
-export function SellInvestmentDialog({ isOpen, onOpenChange, investment, userId, prices, showInArs, onSuccess }: SellInvestmentDialogProps) {
+export function SellInvestmentDialog({ 
+    isOpen, 
+    onOpenChange, 
+    investment, 
+    userId, 
+    prices, 
+    showInArs, 
+    dollarRate = 1450,
+    onSuccess 
+}: SellInvestmentDialogProps) {
     const { toast } = useToast();
     const firestore = useFirestore();
     const [isLoading, setIsLoading] = useState(false);
@@ -52,14 +61,14 @@ export function SellInvestmentDialog({ isOpen, onOpenChange, investment, userId,
     const schema = SellInvestmentSchema(investment.amount);
     type FormValues = z.infer<typeof schema>;
     
-    const priceKey = investment.assetType === 'crypto' ? (investment.coinGeckoId || investment.id) : investment.symbol;
+    const priceKey = investment.assetType === 'crypto' ? (investment.coinGeckoId || investment.id) : (investment.symbol || '');
     const ratio = investment.ratio || 1;
-    const rawCurrentPrice = prices[priceKey]?.price;
+    const rawCurrentPrice = priceKey ? prices[priceKey]?.price : undefined;
     const currentPrice = rawCurrentPrice !== undefined ? rawCurrentPrice / ratio : undefined;
     
     // Convert current price to active currency (USD or ARS) for the input default value
     const currentPriceInActiveCurrency = currentPrice !== undefined 
-        ? (showInArs ? currentPrice : currentPrice / USD_TO_ARS_RATE)
+        ? (showInArs ? currentPrice : currentPrice / dollarRate)
         : undefined;
 
     const { register, handleSubmit, formState: { errors }, reset, watch } = useForm<FormValues>({
@@ -109,13 +118,13 @@ export function SellInvestmentDialog({ isOpen, onOpenChange, investment, userId,
                 // 2. Create a new income transaction for the sale (stored in ARS)
                 const totalValueInArs = showInArs 
                     ? (data.amount * data.sellPrice)
-                    : (data.amount * data.sellPrice * USD_TO_ARS_RATE);
+                    : (data.amount * data.sellPrice * dollarRate);
 
                 const incomeTransaction = {
                     type: 'ingreso' as const,
                     amount: totalValueInArs,
                     date: new Date().getTime(),
-                    description: `Venta de ${formatNumber(data.amount)} ${currentInvestment.symbol.toUpperCase()}`,
+                    description: `Venta de ${formatNumber(data.amount)} ${(currentInvestment.symbol || investment.symbol || '').toUpperCase()}`,
                 };
                 transaction.set(doc(transactionsRef), incomeTransaction);
             });

@@ -26,6 +26,9 @@ export type Transaction = {
   accountId?: string; // Para pagos, el ID de la cuenta que salda
 };
 
+export type Gasto = Transaction & { type: 'gasto' };
+export type Ingreso = Transaction & { type: 'ingreso' };
+
 export type Account = {
     id: string;
     name: string;
@@ -77,3 +80,18 @@ export type PortfolioDataPoint = {
 
 // Map<asset symbol or coinGeckoId, Map<date string 'yyyy-MM-dd', price>>
 export type PriceHistory = Map<string, Map<string, number>>;
+
+export type PriorityLevel = 'alta' | 'media' | 'baja';
+
+export type WishlistItem = {
+  id: string;
+  title: string;
+  estimatedPrice: number;
+  priority: PriorityLevel;
+  category?: string;
+  url?: string;
+  notes?: string;
+  completed: boolean;
+  completedAt?: number | null;
+  createdAt: number;
+};

@@ -69,22 +69,21 @@ export function PortfolioChart({ chartData, totalValue, isLoading, period, setPe
                 </div>
             </CardHeader>
             <CardContent>
-                <ChartContainer config={chartConfig} className="h-[350px] w-full">
-                    {isLoading && (
-                        <div className="flex h-full w-full items-center justify-center">
-                            <div className="flex flex-col items-center justify-center gap-4 rounded-lg bg-background p-6 text-center shadow-sm">
-                                <Alert className="max-w-sm">
-                                    <AlertCircle className="h-4 w-4" />
-                                    <AlertTitle>Cargando Datos del Mercado</AlertTitle>
-                                    <AlertDescription>
-                                        Para darte datos precisos, consultamos APIs externas con límites de uso. La carga inicial puede demorar unos segundos. <br/> Agradecemos tu paciencia.
-                                    </AlertDescription>
-                                </Alert>
-                                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mt-4" />
-                            </div>
+                {isLoading ? (
+                    <div className="flex h-[350px] w-full items-center justify-center">
+                        <div className="flex flex-col items-center justify-center gap-4 rounded-lg bg-background p-6 text-center shadow-sm">
+                            <Alert className="max-w-sm">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertTitle>Cargando Datos del Mercado</AlertTitle>
+                                <AlertDescription>
+                                    Para darte datos precisos, consultamos APIs externas con límites de uso. La carga inicial puede demorar unos segundos. <br/> Agradecemos tu paciencia.
+                                </AlertDescription>
+                            </Alert>
+                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mt-4" />
                         </div>
-                    )}
-                    {!isLoading && hasData ? (
+                    </div>
+                ) : hasData ? (
+                    <ChartContainer config={chartConfig} className="h-[350px] w-full">
                         <AreaChart data={chartData} margin={{ left: 12, right: 12, top: 10 }}>
                             <defs>
                                 <linearGradient id="fillValue" x1="0" y1="0" x2="0" y2="1">
@@ -130,15 +129,14 @@ export function PortfolioChart({ chartData, totalValue, isLoading, period, setPe
                                 strokeWidth={2}
                             />
                         </AreaChart>
-                    ) : null}
-                    {!isLoading && !hasData && (
-                        <div className="flex h-full items-center justify-center">
-                            <p className="text-muted-foreground text-center">
-                                No hay suficientes datos históricos para mostrar el gráfico.
-                            </p>
-                        </div>
-                    )}
-                </ChartContainer>
+                    </ChartContainer>
+                ) : (
+                    <div className="flex h-[350px] items-center justify-center">
+                        <p className="text-muted-foreground text-center">
+                            No hay suficientes datos históricos para mostrar el gráfico.
+                        </p>
+                    </div>
+                )}
             </CardContent>
         </Card>
     );

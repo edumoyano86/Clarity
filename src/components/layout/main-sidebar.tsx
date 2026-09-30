@@ -20,6 +20,7 @@ import {
   Wallet,
   Shapes,
   AreaChart,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
@@ -28,6 +29,7 @@ const menuItems = [
   { href: "/", label: "Resumen", icon: LayoutDashboard },
   { href: "/transacciones", label: "Transacciones", icon: ArrowRightLeft },
   { href: "/cuentas", label: "Cuentas", icon: Wallet },
+  { href: "/deseos", label: "Deseos y Prioridades", icon: Sparkles },
   { href: "/categorias", label: "Categorías", icon: Shapes },
   { href: "/inversiones", label: "Inversiones", icon: AreaChart },
   { href: "/agenda", label: "Agenda", icon: Calendar },
@@ -64,7 +66,14 @@ export function MainSidebar() {
             <SidebarMenuButton icon={<Settings />} tooltip="Configuración">Configuración</SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton icon={<CircleHelp />} tooltip="Ayuda">Ayuda</SidebarMenuButton>
+            <SidebarMenuButton
+              icon={<CircleHelp />}
+              tooltip="Contacto y Ayuda"
+              isActive={pathname === "/soporte"}
+              asChild
+            >
+              <Link href="/soporte">Contacto y Ayuda</Link>
+            </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

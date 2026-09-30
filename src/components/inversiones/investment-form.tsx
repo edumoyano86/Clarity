@@ -77,9 +77,9 @@ export function InvestmentForm({ userId, investment, onFormSuccess }: Investment
     useEffect(() => {
         if (investment) {
             const initialAsset: AssetSearchResult = { 
-                symbol: investment.symbol, 
+                symbol: investment.symbol || '', 
                 name: investment.name, 
-                id: investment.assetType === 'crypto' ? (investment.coinGeckoId || '') : investment.symbol
+                id: investment.assetType === 'crypto' ? (investment.coinGeckoId || '') : (investment.symbol || '')
             };
             reset({
                 id: investment.id,

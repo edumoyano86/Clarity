@@ -152,7 +152,7 @@ export function TransactionsManager({ transactions, categorias, accounts, userId
                     </Card>
                     <div className="space-y-6 lg:sticky lg:top-6">
                         <RecurringTransactions />
-                        <DataImportExport />
+                        <DataImportExport transactions={transactions} categorias={categorias} accounts={accounts} />
                     </div>
                 </div>
             </ManagerPage>

@@ -48,12 +48,7 @@ export function AppointmentNotifier() {
                 const appointment = doc.data() as Appointment;
                 
                 toast({
-                    title: (
-                        <div className="flex items-center gap-2">
-                            <CalendarCheck className="h-5 w-5" />
-                            <span>Recordatorio de Cita</span>
-                        </div>
-                    ),
+                    title: 'Recordatorio de Cita',
                     description: `Hoy a las ${format(new Date(appointment.date), 'p', { locale: es })}: ${appointment.title}`,
                     duration: 10000, // Show for 10 seconds
                 });

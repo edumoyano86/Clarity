@@ -79,34 +79,54 @@
   }
 }
 
-/* Custom styles for react-day-picker to override tailwind base */
+/* Styles for react-day-picker v9 to ensure perfect grid alignment */
 @layer components {
-    .rdp {
-        --rdp-cell-size: 40px;
-        margin: 1em 0;
-    }
-    .rdp-months {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 1em;
-    }
-    .rdp-month {
+    .rdp-root {
+        --rdp-accent-color: hsl(var(--primary));
+        --rdp-accent-background-color: hsl(var(--accent) / 0.15);
+        --rdp-day-height: 2.25rem;
+        --rdp-day-width: 2.25rem;
         margin: 0;
     }
-    .rdp-table {
+    .rdp-month_grid {
         width: 100%;
         border-collapse: collapse;
-        margin: 0;
+        margin: 0 auto;
     }
-    .rdp-head_row, .rdp-row {
+    .rdp-weekdays {
         display: flex;
         width: 100%;
+        justify-content: space-between;
     }
-    .rdp-head_cell, .rdp-cell {
-        width: 14.28%; /* 100 / 7 */
+    .rdp-weeks {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        gap: 0.25rem;
+    }
+    .rdp-week {
+        display: flex;
+        width: 100%;
+        justify-content: space-between;
+    }
+    .rdp-weekday, .rdp-day {
+        width: 2.25rem;
+        height: 2.25rem;
         display: flex;
         align-items: center;
         justify-content: center;
+        text-align: center;
+        padding: 0;
+        margin: 0;
         position: relative;
+    }
+    .rdp-day_button {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--radius);
+        font-size: 0.875rem;
     }
 }
